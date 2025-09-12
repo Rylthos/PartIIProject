@@ -1,1 +1,66 @@
-\section{Introduction}
+\section*{Introduction and structure}
+
+The aim of this project is to implement a range of acceleration
+structures targeted towards voxel ray marching, and to compare the
+effectiveness of these methods for a range of functions.
+These functions include, but are not limited to, rendering, updating,
+memory cost, and creation.
+The set of possible acceleration structures includes octrees,
+contrees, brick maps, flat grids and 3D textures.
+
+The project will be written in C++, with vulkan as the rendering API.
+Only a few libraries are known to be needed, including GLFW for windowing,
+ImGUI for UI, slang for shader compilation, and GLM for maths. The
+shader language of choice is slang, as this allows the shaders to be compiled
+during runtime, allowing for hot reloading.
+
+\subsection*{Core project}
+The core element of the project involves implementing the ray marcher
+for the main set of methods. The main 3 methods are the octree, bricks
+and flat grids. This puts the contrees and 3D textures as extensions
+as they are adaptations of
+the octree and flat grid respectively. With these methods the main
+aim is the compare the render time for various scenes, that range in
+size and complexity.
+
+An explanation of the main structures is below
+
+\begin{itemize}
+  \item Flat grids \\
+    Each voxel is individual stored in a single array. DDA can be used to
+    trace through the grid and check for collisions.
+  \item Octrees \\
+    A tree where each node has 8 children. In particular sparse octrees will be
+    used allowing the tree to have a varying depth. The voxels themselves are
+    represented by the leaf nodes
+  \item Bricks \\
+    A mix between octrees and flat arrays. Similar to the octree in
+    being a tree structure,
+    except each leaf node is composed of a `brick', an
+    $n*n*n$ collection of voxels.
+\end{itemize}
+
+\subsection*{Extensions}
+There are a few possible extensions for this project.
+One of the options involves implementing Contrees and 3D textures.
+
+\begin{itemize}
+  \item 3D textures \\
+    Similar to the flat grid except an image is now used to store the
+    voxel information, leveraging the GPU's acceleration for accessing texels.
+    Can also be expanded to be used as a brick.
+  \item Contrees \\
+    Similar to octrees except each node is composed of 64 children.
+\end{itemize}
+
+In addition, extensions to what is expected of each structure can be
+included. This includes comparison in creating the data structures,
+live modifying of the structures, and serialization for storage.
+
+A more advanced extension includes splitting the rendering of the scene between
+devices. A basic approach is rendering the scene on one device with
+another receiving it, though
+this can be further extended to partial rendering on each device.
+This is a method
+that can be utilized by cloud gaming to reduce the network overhead
+and to improve latency.
