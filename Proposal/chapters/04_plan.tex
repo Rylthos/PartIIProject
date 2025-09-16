@@ -8,6 +8,7 @@
 % Brick rendering
 % Contree
 % 3D texture
+% Events
 
 % Modification
 % Octree / Contree
@@ -35,32 +36,62 @@
   && Shader hot reloading \\
   && ImGui setup \\
   && Camera movement \\
+  && Event system \\
   \hline
   2 & Oct 27 -- Nov 10 & Start implementing ray marching structures \\
-  && Flat grid support \\
-  && Start octree support \\
+  && Flat grid structure \\
+  && Octree structure \\
   \hline
   3 & Nov 10 -- Nov 24 & Continue with implementing basic methods \\
-  && Continue octree support \\
   && Brickmap support \\
+  && Contree support \\
   \hline
-  4 & Nov 24 -- Dec 08 & \\
+  4 & Nov 24 -- Dec 08 & Additional structures \\
+  && 3D textures \\
+  && Modification for flat grid \\
   \hline
-  5 & Dec 08 -- Dec 22 & \\
+  5 & Dec 08 -- Dec 22 & Modification \\
+  && Modification for octree / contree \\
+  && Modification for brickmap \\
   \hline
-  6 & Dec 22 -- Jan 05 & \\
+  6 & Dec 22 -- Jan 05 & Break \\
   \hline
-  7 & Jan 05 -- Jan 19 & \\
+  7 & Jan 05 -- Jan 19 & Start split rendering\\
+  && Split software into client and server \\
+  && Establish connection between client and server \\
   \hline
-  8 & Jan 19 -- Feb 02 & \\
+  8 & Jan 19 -- Feb 02 & Data \\
+  && Implement 3D grid for split rendering \\
   \hline
-  9 & Feb 02 -- Feb 16 & \\
+  9 & Feb 02 -- Feb 16 & Implement structure across devices \\
+  && Implement Octree/Contree for split rendering \\
   \hline
-  10 & Feb 16 -- Mar 02 & \\
+  10 & Feb 16 -- Mar 02 & Octree addition \\
+  && Implement loading for tree nodes \\
   \hline
-  11 & Mar 02 -- Mar 16 & \\
+  11 & Mar 02 -- Mar 16 & Octree across devices \\
+  && Allow for nodes to be individually loaded between devices \\
   \hline
-  12 & Mar 16 -- Mar 30 & \\
+  12 & Mar 16 -- Mar 30 & Refactor / extra time \\
   \hline
-
 \end{tabular}
+
+By the end of Michaelmas the core project should be finished to a
+sufficient degree. This leaves Lent to work on the more complicated extensions.
+In particular lent will be focused on the split rendering, with an interest in
+implementing the octree/contree as this structure, along with
+selective inclusion
+of the tree nodes that are out of level of detail range, and those that are
+obscured would require more communication between the client and server, and so
+a more interesting challenge.
+
+There are also some additional tasks, that if time allows can be included.
+Notably this may include better lighting calculations, and serialization and
+loading of the voxel data. These are not planned for as the time requirement for
+split rendering is not easy to judge. This is why the last sprint is left open,
+either for additional tasks, or for continuing work on the previous tasks.
+
+Github projects will be used to split these tasks into further subcomponents and
+to organise those tasks within the sprints. This will also allow for
+bug tracking and any additional features that may be needed to be
+included and planned for.

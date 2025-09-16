@@ -20,10 +20,13 @@ can be expanded to compare the memory efficiency, ease of modification,
 and ease of generation.
 
 The goal is to hit performance suitable for real-time rendering, from each
-of the methods. This may not be suitable for some of the methods for all scenes,
-but the performance can be compared based on the theoretical average of
-intersection tests required and the actual observed average. This can be
-pushed further by looking at the register pressure the shaders place on the GPU.
+of the methods. This may not be suitable for some of the structures
+for all scenes.
+Performance can be additionally compared based on the theoretical
+intersection count and the actual observed count. This can be
+pushed further by looking at the register pressure on the GPU for
+the shaders that are used. This requires external tooling, either
+Nsight graphics for Nvidia cards or AMD's developer tool suite for AMD graphics.
 
 The project will be written in C++, with vulkan as the chosen rendering API,
 less for its performance and more for its flexibility.
