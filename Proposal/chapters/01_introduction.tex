@@ -6,7 +6,13 @@ These structures are designed to increase the efficiency at which a
 ray can be traversed through space in order to check for collisions with
 voxels.
 
-The simplest structure is a 3D grid, in which DDA can be used to
+We can use wavefront based ray-marching to move away from
+the `mega kernel' that is typical with compute shaders, which can possibly
+lead to performance improvements. This could lead to improved kernel times
+when lighting calculations are also performed.
+
+The simplest structure is a 3D grid, in which DDA (digital
+differential analyser) can be used to
 traverse the grid. DDA can be expanded to traverse non uniform space,
 which leads to octrees and contrees. These are tree structures where
 each node has either $8$ or $64$ children respectively, and the leaves
@@ -16,40 +22,48 @@ an $n*n*n$ collection. This combines some of the benefits of the two styles.
 
 This project aims to compare these methods to each other, comparing
 particularly for the rendering efficiency in the methods. This
-can be expanded to compare the memory efficiency, ease of modification,
-and ease of generation.
+can be expanded to compare the memory efficiency, ease of generation,
+and ease of modification. The modifications can be compared through
+animated scenes. With specific key-frames the entire scene can be changed every
+couple frames to stress test the modification of the scene.
 
 The goal is to hit performance suitable for real-time rendering, from each
-of the methods. This may not be suitable for some of the structures
+of the methods. However, this may not be suitable for some of the structures
 for all scenes.
 Performance can be additionally compared based on the theoretical
 intersection count and the actual observed count. This can be
 pushed further by looking at the register pressure on the GPU for
 the shaders that are used. This requires external tooling, either
-Nsight graphics for Nvidia cards or AMD's developer tool suite for AMD graphics.
+Nsight graphics for Nvidia cards or AMD's developer tool suite
+for AMD graphics.
 
-The project will be written in C++, with vulkan as the chosen rendering API,
+The project will be written in C++, with Vulkan as the chosen rendering API,
 less for its performance and more for its flexibility.
 Slang will be used as the shader language as this can allow for hot reloading
 of shaders as the compiler can be implemented with the rest of the project.
-Only a few external libraries will be required, these are used to reduce the
-boilerplate required and to help with the setup of vulkan. These libraries
-are
+A few external libraries will be required, these are used to reduce the
+boilerplate required and to help with the setup of Vulkan, along with
+some additional tooling. These libraries are:
 \begin{itemize}
   \item GLFW: A cross platform windowing library that can also handle inputs.
   \item GLM: A maths library targeted towards OpenGL but also
     functional with Vulkan.
-  \item ImGui: Immediate mode GUI, simple to use, and flexible UI library.
+  \item (Dear) ImGui: Immediate mode GUI, simple to use, and flexible
+    UI library.
   \item slang: Compiler for the slang shader language.
-  \item vk-bootstrap: Simplifies initialization of vulkan.
-  \item VulkanMemoryAllocator: Helps with memory allocation within vulkan.
+  \item vk-bootstrap: Simplifies initialization of Vulkan.
+  \item VulkanMemoryAllocator: Helps with memory allocation within Vulkan.
+  \item Tracy: A frame profiler
 \end{itemize}
 
 A summary of each structures is below
 \begin{itemize}
   \item 3D grids \\
     Each voxel is individual within a 3D grid. DDA can be used to
-    trace through the grid and check for collisions.
+    trace through the grid and check for collisions. This can be
+    represented directly through a buffer on the GPU. Indexing of the buffer
+    can be done by either flattening the grid index or using a Z-order curve
+    to improve spatial location of the indexing.
   \item 3D textures \\
     Uses the GPU architecture to help with memory lookups. Mipmaps
     can be used to implement level of detail and occupancy checks.
@@ -58,7 +72,8 @@ A summary of each structures is below
     used allowing the tree to have a varying depth. The voxels themselves are
     represented by the leaf nodes.
   \item Contrees \\
-    Each node of the tree has $64$ children instead of $8$.
+    Similar to octrees except each node of the tree has $64$ children
+    instead of $8$.
   \item Brick map \\
     A mix between octrees and 3D grids. Similar to the octree in
     being a tree structure, except each leaf node is composed of a `brick', an
@@ -67,9 +82,18 @@ A summary of each structures is below
 
 \subsection*{Core project}
 The core element of the project involves implementing the ray marcher
-for the structures, and implementing a system that should allow
+for each structure, and implementing a system that should allow
 for easy swapping between them. This system should also allow for different
 scenes to be loaded, so that each structure can be compared in various layouts.
+These scenes can either be generated programmatically, or
+alternatively by generating voxels based on a mesh. This skin of a mesh can
+be generated by checking if any triangle of a mesh intersects a grid of cubes.
+
+Along with the rendering of these structures another aim is to allow
+modification to them, while still hitting the real time rendering constraints.
+The modification of the structures should allow for addition, modification and
+removal of voxels, while also allowing for multiple voxels to be
+affected as apposed to a single voxel with each operation.
 
 The aim is the compare the structures for the efficiency in
 rendering, memory, and register pressure
@@ -78,18 +102,17 @@ through Vulkan, while external tools can measure the register
 pressure of a shader by inspecting the generated SPIR-V shader code.
 
 \subsection*{Extensions}
-The extensions add functionality to the core project. These functions include:
-modification of the structures, and generation of the structures.
-Generation will be required within the core project, however it will
-be once at the start of the program, the extension will aim to bring
-the generation to either real-time, or implement the generation as to
-not affect the main render thread.
+The extensions of this project aim to add additional functionality. One possible
+extension is larger then memory scenes. This would put focus on ensuring only
+visible voxels are possibly rendered, and those voxels that are not visible
+are left out of GPU memory. This should also lead to scenes that are
+near infinite in size to be used as those areas that are not visible can
+be offloaded, and those far from the view are put through a level of detail.
 
-Another larger extension involves split rendering. This is the
-process of rendering the scene across multiple platforms, in particular
-this may involve partial rendering or pre-processing of the scene on one
-platform, and then finishing the rendering and display of the scene on a
-separate platform. This can be particularly useful for cloud gaming,
-where latency is a concern. The splitting can reduce latency as the client
-can perform some of the calculation, while still reducing the resource
-requirements of the client system in order to render the scene.
+Another extension is split rendering is the process of rendering the
+scene across multiple compute nodes, in particular this may involve
+partial rendering or pre-processing of the scene on one node, and
+then finishing the rendering and display of the scene on a separate
+client-node. This reduces the computation power required on the
+client-node as some of the computationally intensive work can be
+moved to a node with more computation.
