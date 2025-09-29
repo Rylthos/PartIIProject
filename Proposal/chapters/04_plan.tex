@@ -28,52 +28,104 @@
 % Networking
 % Rendering between clients
 
-\begin{tabular}{lll}
-  Sprint & Dates & Plan \\
-  \hline
-  1 & Oct 13 -- Oct 27 & Project setup \\
-  && Basic Vulkan rendering to the screen via Compute shaders. \\
-  && Shader hot reloading \\
-  && ImGui setup \\
-  && Camera movement \\
-  && Event system \\
-  \hline
-  2 & Oct 27 -- Nov 10 & Start implementing ray marching structures \\
-  && Flat grid structure \\
-  && Octree structure \\
-  \hline
-  3 & Nov 10 -- Nov 24 & Continue with implementing basic methods \\
-  && Brickmap support \\
-  && Contree support \\
-  \hline
-  4 & Nov 24 -- Dec 08 & Additional structures \\
-  && 3D textures \\
-  && Modification for flat grid \\
-  \hline
-  5 & Dec 08 -- Dec 22 & Modification \\
-  && Modification for octree / contree \\
-  && Modification for brickmap \\
-  \hline
-  6 & Dec 22 -- Jan 05 & Break \\
-  \hline
-  7 & Jan 05 -- Jan 19 & Start split rendering\\
-  && Split software into client and server \\
-  && Establish connection between client and server \\
-  \hline
-  8 & Jan 19 -- Feb 02 & Data \\
-  && Implement 3D grid for split rendering \\
-  \hline
-  9 & Feb 02 -- Feb 16 & Implement structure across devices \\
-  && Implement Octree/Contree for split rendering \\
-  \hline
-  10 & Feb 16 -- Mar 02 & Octree addition \\
-  && Implement loading for tree nodes \\
-  \hline
-  11 & Mar 02 -- Mar 16 & Octree across devices \\
-  && Allow for nodes to be individually loaded between devices \\
-  \hline
-  12 & Mar 16 -- Mar 30 & Refactor / extra time \\
-  \hline
+\begin{longtblr}{colspec={clXX}, hlines, row{1}={}}
+  Sprint & Dates & Plan & Milestones \\
+  1 & Oct 13 -- Oct 27 &
+  - Project setup \newline
+  - Basic Vulkan rendering to the screen via Compute shaders \newline
+  - Shader hot reloading \newline
+  - ImGui setup \newline
+  - Camera movement \newline
+  - Event system
+  &
+  - Able to render a sphere through compute shaders \newline
+  - Reposition around the sphere via the camera \newline
+  - Modify properties of the sphere via ImGui \newline
+  - Modify the sphere from the shader without closing the window
+  \\
+  2 & Oct 27 -- Nov 10 &
+  - Start implementing ray marching structures \newline
+  - 3D grid structure \newline
+  - Octree structure
+  &
+  - Render a scene with the 3D grid and octree \newline
+  - Switch between structures within ImGui \newline
+  - Generation of structures
+  \\
+  3 & Nov 10 -- Nov 24 &
+  - Continue with implementing basic methods \newline
+  - Brickmap support \newline
+  - Contree support
+  &
+  - Render a scene with Brickmaps and contrees
+  \\
+  4 & Nov 24 -- Dec 08 &
+  - Additional structures \newline
+  - 3D textures \newline
+  - Modification for flat grid
+  &
+  - Render a scene with 3D textures
+  \\
+  5 & Dec 08 -- Dec 22 &
+  - Modification for octree / contree \newline
+  - Modification for brickmap
+  &
+  - Octree and brickmap can be modified \newline
+  - Cubes and spheres of voxels can be added and removed \newline
+  - Voxels in various colours can be added
+  \\
+  6 & Dec 22 -- Jan 05 &
+  - Mesh to Voxels \newline
+  - Slack time
+  &
+  - Be able to convert meshes to voxels \newline
+  - Load files for scenes \newline
+  - Change scene during runtime \newline
+  - All previous milestones met
+  \\
+  7 & Jan 05 -- Jan 19 &
+  - Start split rendering \newline
+  - Split software into client and server \newline
+  - Establish connection between client and server
+  &
+  - Be able to load the application as either a server or client \newline
+  - Connect the client to the server \newline
+  - Data can be shared between server and client
+  \\
+  8 & Jan 19 -- Feb 02 &
+  - Implement 3D grid for split rendering
+  &
+  - Data for 3D grid can be shared from server to client \newline
+  - Data can be requested from server
+  \\
+  9 & Feb 02 -- Feb 16 &
+  - Implement structures across devices \newline
+  - Implement Octree/Contree for split rendering
+  &
+  - Octree can be shared between server and client \newline
+  - Nodes of the octree can be loaded as needed from server
+  \\
+  10 & Feb 16 -- Mar 02 &
+  - Octree addition \newline
+  - Implement loading for tree nodes
+  &
+  - Octree can be modified on client and updated server side \newline
+  \\
+  11 & Mar 02 -- Mar 16 &
+  - Octree across devices \newline
+  - Allow for nodes to be individually loaded between devices
+  &
+  - Only visible children are loaded on the client \newline
+  - Newly visible children requested from server
+  \\
+  12 & Mar 16 -- Mar 30 &
+  - Refactor / extra time
+  &
+  - Project should be completed
+  \\
+  13 \rightarrow & Mar 30 -- May 15 &
+  - Dissertation
+  &
 \end{tabular}
 
 By the end of Michaelmas the core project should be finished to a
