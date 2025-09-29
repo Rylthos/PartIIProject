@@ -7,20 +7,20 @@ ray can be traversed through space in order to check for collisions with
 voxels.
 
 For the ray-marching one possible approach is to implement a
-wavefront\footcite{laine2013wavefront} based approach. This approach
+wavefront\cite{laine2013wavefront} based approach. This approach
 involves separating the individual stages of the ray-casting into individual
 shaders, instead of all stages occurring in the same `mega kernel'. This should
 result in performance improvements at the cost of some additional
 memory requirements for the additional buffers.
 
 The simplest structure is a 3D grid, in which DDA (digital
-differential analyser)\footcite{amanatides1987fast} can be used to
+differential analyser)\cite{amanatides1987fast} can be used to
 traverse the grid. DDA can be expanded to traverse non uniform space,
-which leads to octrees\footcite{laine2010svo} and contrees. These are
+which leads to octrees\cite{laine2010svo} and contrees. These are
 tree structures where each node has either $8$ or $64$ children
 respectively, and the leaves represent the individual voxels. These
 two methods can be combined to form brick
-maps\footcite{van2015brickmap}, where each node of the tree is actual
+maps\cite{van2015brickmap}, where each node of the tree is actual
 a `brick' of voxels, an $n*n*n$ collection. This combines some of the
 benefits of the two styles.
 
