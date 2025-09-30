@@ -1,13 +1,23 @@
 \section*{Success Criteria}
 
-The project will be deemed a success if:
-\begin{itemize}
-  \item It is possible to change the acceleration structure with minimal changes
-  \item The performance of an acceleration structure can be measured
-  \item The performance of the acceleration structures follow what is expected
-  \item The implementations are performant to enable real-time rendering, where
-    it applies
-  \item The scenes can be modified, either by a user or
-    programmatically (animations)
-  \item Scenes can be loaded to test the structures in various ways
+The core project will be deemed a success if:
+\begin{itemize}[noitemsep]
+  \item Shaders are reloaded during runtime after the source file is modified
+  \item The 5 acceleration structures, (3D grid, 3D texture, Octree,
+    Contrees, Brickmaps) are implemented
+    \begin{itemize}
+      \item Structures can be used for ray-marching
+      \item Structures can be modified
+      \item Structures can be created during runtime from files
+    \end{itemize}
+  \item The used acceleration structure can be changed during runtime
+  \item Metrics of the structures can be measured
+    \begin{itemize}
+      \item Memory consumption
+      \item Render time
+      \item GPU register pressure
+      \item Intersection count
+    \end{itemize}
+  \item Voxel scenes can be generated from meshes via a separate script
+  \item Scenes can be loaded and changed during runtime
 \end{itemize}
