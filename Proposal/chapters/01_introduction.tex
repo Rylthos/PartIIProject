@@ -23,7 +23,7 @@ which leads to octrees\cite{laine2010svo} and contrees. These are
 tree structures where each node has either $8$ or $64$ children
 respectively, and the leaves represent the individual voxels. These
 two methods can be combined to form brick
-maps\cite{van2015brickmap}, where each node of the tree is actual
+maps\cite{van2015brickmap}, where each leaf of the tree is actual
 a `brick' of voxels, an $n*n*n$ collection. This combines some of the
 benefits of the two styles.
 
@@ -36,7 +36,9 @@ Qualitatively the methods can be measured based on the how `easy' the
 structures are to modify, generate and serialize. `easy' being subjective
 for how much additional work is required.
 
-While comparison of these structures has been done previously, the comparison
+While comparison of these structures has been done previously, it is
+not typically between all the structures or with regards to the non
+quantitative measures. Additionally the comparison
 of these structures with regards to split rendering has not. Another aim is to
 compare these structures in areas that are not directly quantitative,
 in particular with what may be required to modify and regenerate the structures
@@ -62,9 +64,9 @@ A summary of each structures is below
     trace through the grid and check for collisions. This can be
     represented directly through a buffer on the GPU. Indexing of the buffer
     can be done by either flattening the grid index or using a Z-order curve
-    to improve spatial location of the indexing.
+    to improve spatial locality of the indexing.
   \item 3D textures \\
-    Uses the GPU architecture to help with memory lookups. Mipmaps
+    Uses the GPU firmware to help with memory lookups. Mipmaps
     can be used to implement level of detail and occupancy checks.
   \item Octrees \\
     A tree where each node has 8 children. In particular sparse octrees will be
