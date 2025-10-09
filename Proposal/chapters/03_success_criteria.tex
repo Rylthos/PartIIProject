@@ -2,13 +2,15 @@
 
 The core project will be deemed a success if:
 \begin{itemize}[noitemsep]
-  \item Shaders are reloaded during runtime after the source file is modified
-  \item The 5 acceleration structures, (3D grid, 3D texture, Octree,
+  \item Shaders are recompiled and reloaded during runtime after the
+    related source file is modified and saved
+  \item The 5 acceleration structures (3D grid, 3D texture, Octree,
     Contrees, Brickmaps) are implemented
     \begin{itemize}
       \item Structures can be used for ray-marching
-      \item Structures can be modified
-      \item Structures can be created during runtime from files
+      \item Structures can be modified, aiming for real-time modification
+      \item Structures can be created during runtime from scenes
+        defined within files
     \end{itemize}
   \item The used acceleration structure can be changed during runtime
   \item Metrics of the structures can be measured
