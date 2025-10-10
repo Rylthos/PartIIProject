@@ -3,10 +3,8 @@ cmake_minimum_required(VERSION 3.27...3.31)
 project(VoxelRaymarcher
   LANGUAGES CXX)
 
-find_package(PkgConfig REQUIRED)
-
-pkg_check_modules(Vulkan REQUIRED)
-pkg_check_modules(GLFW REQUIRED glfw3)
+find_package(Vulkan REQUIRED)
+find_package(glfw3 REQUIRED)
 
 add_subdirectory(vendor)
 

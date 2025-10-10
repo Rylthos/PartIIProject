@@ -18,13 +18,13 @@
           vulkan-tools-lunarg
 
           glfw-wayland
-
-          pkg-config
         ];
 
         LD_LIBRARY_PATH="${pkgs.vulkan-loader}/lib:${pkgs.vulkan-validation-layers}/lib";
         VULKAN_SDK = "${pkgs.vulkan-headers}";
         VK_LAYER_PATH = "${pkgs.vulkan-validation-layers}/share/vulkan/explicit_layer.d";
+        glfw3_DIR = "${pkgs.glfw-wayland}/lib/cmake/glfw3";
+        VulkanHeaders_DIR = "${pkgs.vulkan-headers}";
       };
     };
 }

@@ -12,6 +12,6 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
   GPUOpen::VulkanMemoryAllocator
   spdlog
   vk-bootstrap
-  ${GLFW_LIBRARIES}
-  ${VULKAN_LIBRARIES}
+  vulkan
+  glfw
 )
