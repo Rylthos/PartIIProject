@@ -1,8 +1,8 @@
 #include "window.hpp"
 
-#include "logger.hpp"
+#include "vulkan/vk_enum_string_helper.h"
 
-#include <iostream>
+#include "logger.hpp"
 
 void Window::init()
 {
@@ -11,9 +11,14 @@ void Window::init()
         exit(-1);
     }
 
+    m_WindowSize = glm::ivec2 { 500, 500 };
+
     LOG_INFO("Initialised GLFW");
 
-    m_Window = glfwCreateWindow(500, 500, "Voxel Raymarching", nullptr, nullptr);
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+
+    m_Window
+        = glfwCreateWindow(m_WindowSize.x, m_WindowSize.y, "Voxel Raymarching", nullptr, nullptr);
 
     if (!m_Window) {
         LOG_CRITICAL("Failed to create GLFW window");
@@ -21,4 +26,18 @@ void Window::init()
     }
 
     LOG_INFO("Created GLFW window");
+}
+
+void Window::cleanup()
+{
+    glfwDestroyWindow(m_Window);
+    glfwTerminate();
+}
+
+VkSurfaceKHR Window::createSurface(const VkInstance& instance)
+{
+    VkSurfaceKHR surface;
+    VK_CHECK(glfwCreateWindowSurface(instance, m_Window, nullptr, &surface),
+        "Failed to create window surface");
+    return surface;
 }
