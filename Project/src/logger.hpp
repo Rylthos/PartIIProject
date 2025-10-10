@@ -3,6 +3,8 @@
 #include "spdlog/sinks/stdout_color_sinks.h"
 #include "spdlog/spdlog.h"
 
+#include "vulkan/vk_enum_string_helper.h"
+
 #include <memory>
 
 class Logger {
@@ -21,3 +23,11 @@ class Logger {
 #define LOG_INFO(...) Logger::getLogger()->info(__VA_ARGS__)
 #define LOG_ERROR(...) Logger::getLogger()->error(__VA_ARGS__)
 #define LOG_CRITICAL(...) Logger::getLogger()->critical(__VA_ARGS__)
+
+#define VK_CHECK(result, msg)                                                                      \
+    do {                                                                                           \
+        VkResult temp = (result);                                                                  \
+        if (temp != VK_SUCCESS) {                                                                  \
+            LOG_ERROR("{}: {}", (msg), string_VkResult(temp));                                     \
+        }                                                                                          \
+    } while (0)
