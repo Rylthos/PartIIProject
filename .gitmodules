@@ -1,0 +1,12 @@
+[submodule "Project/vendor/glm"]
+	path = Project/vendor/glm
+	url = https://github.com/g-truc/glm.git
+[submodule "Project/vendor/vk-bootstrap"]
+	path = Project/vendor/vk-bootstrap
+	url = https://github.com/charles-lunarg/vk-bootstrap.git
+[submodule "Project/vendor/VMA"]
+	path = Project/vendor/VMA
+	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
+[submodule "Project/vendor/spdlog"]
+	path = Project/vendor/spdlog
+	url = https://github.com/gabime/spdlog.git

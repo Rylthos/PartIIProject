@@ -1,0 +1,23 @@
+#pragma once
+
+#include "spdlog/sinks/stdout_color_sinks.h"
+#include "spdlog/spdlog.h"
+
+#include <memory>
+
+class Logger {
+  public:
+    static void init();
+    static std::shared_ptr<spdlog::logger> getLogger() { return s_Logger; }
+
+  private:
+    inline static std::shared_ptr<spdlog::logger> s_Logger;
+
+  private:
+    Logger() = delete;
+};
+
+#define LOG_DEBUG(...) Logger::getLogger()->debug(__VA_ARGS__)
+#define LOG_INFO(...) Logger::getLogger()->info(__VA_ARGS__)
+#define LOG_ERROR(...) Logger::getLogger()->error(__VA_ARGS__)
+#define LOG_CRITICAL(...) Logger::getLogger()->critical(__VA_ARGS__)
