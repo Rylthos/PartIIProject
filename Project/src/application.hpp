@@ -6,6 +6,8 @@
 #include "logger.hpp"
 #include "window.hpp"
 
+#define FRAMES_IN_FLIGHT 2
+
 struct Queue {
     VkQueue queue;
     uint32_t queueFamily;
@@ -17,6 +19,11 @@ struct Image {
     VkFormat format;
     VkExtent3D extent;
     VmaAllocation allocation;
+};
+
+struct PerFrameData {
+    VkCommandPool commandPool;
+    VkCommandBuffer commandBuffer;
 };
 
 class Application {
@@ -47,6 +54,8 @@ class Application {
 
     Image m_DrawImage;
 
+    std::array<PerFrameData, FRAMES_IN_FLIGHT> m_PerFrameData;
+
   private:
     void initVulkan();
 
@@ -55,4 +64,7 @@ class Application {
 
     void createDrawImages();
     void destroyDrawImages();
+
+    void createCommandPools();
+    void destroyCommandPools();
 };

@@ -3,6 +3,7 @@
 #include "VkBootstrap.h"
 
 #include <iostream>
+#include <vulkan/vulkan_core.h>
 
 void Application::init()
 {
@@ -13,6 +14,9 @@ void Application::init()
 
     createSwapchain();
     createDrawImages();
+
+    createCommandPools();
+
     LOG_INFO("Initialised application");
 }
 
@@ -20,6 +24,8 @@ void Application::start() { std::cout << "Hello, World!\n"; }
 
 void Application::cleanup()
 {
+    destroyCommandPools();
+
     destroyDrawImages();
     destroySwapchain();
 
@@ -178,4 +184,41 @@ void Application::destroyDrawImages()
     vmaDestroyImage(m_VmaAllocator, m_DrawImage.image, nullptr);
 
     LOG_INFO("Destroyed draw images");
+}
+
+void Application::createCommandPools()
+{
+    VkCommandPoolCreateInfo commandPoolCI {};
+    commandPoolCI.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    commandPoolCI.pNext = nullptr;
+    commandPoolCI.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    commandPoolCI.queueFamilyIndex = m_GraphicsQueue.queueFamily;
+
+    VkCommandBufferAllocateInfo commandBufferAI {};
+    commandBufferAI.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    commandBufferAI.pNext = nullptr;
+    commandBufferAI.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    commandBufferAI.commandBufferCount = 1;
+
+    for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
+        VK_CHECK(vkCreateCommandPool(
+                     m_VkDevice, &commandPoolCI, nullptr, &m_PerFrameData[i].commandPool),
+            "Failed to create command pool");
+
+        commandBufferAI.commandPool = m_PerFrameData[i].commandPool;
+        VK_CHECK(vkAllocateCommandBuffers(
+                     m_VkDevice, &commandBufferAI, &m_PerFrameData[i].commandBuffer),
+            "Failed to allocate command buffer");
+    }
+
+    LOG_INFO("Created command pools");
+}
+
+void Application::destroyCommandPools()
+{
+    for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
+        vkDestroyCommandPool(m_VkDevice, m_PerFrameData[i].commandPool, nullptr);
+    }
+
+    LOG_INFO("Destroyed command pools");
 }
