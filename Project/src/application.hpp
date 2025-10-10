@@ -24,6 +24,10 @@ struct Image {
 struct PerFrameData {
     VkCommandPool commandPool;
     VkCommandBuffer commandBuffer;
+
+    VkFence fence;
+    VkSemaphore renderSemaphore;
+    VkSemaphore swapchainSemaphore;
 };
 
 class Application {
@@ -67,4 +71,7 @@ class Application {
 
     void createCommandPools();
     void destroyCommandPools();
+
+    void createSyncStructures();
+    void destroySyncStructures();
 };
