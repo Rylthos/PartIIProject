@@ -10,6 +10,15 @@ struct Queue {
     VkQueue queue;
     uint32_t queueFamily;
 };
+
+struct Image {
+    VkImage image;
+    VkImageView view;
+    VkFormat format;
+    VkExtent3D extent;
+    VmaAllocation allocation;
+};
+
 class Application {
   public:
     void init();
@@ -30,6 +39,20 @@ class Application {
 
     VmaAllocator m_VmaAllocator;
 
+    VkSwapchainKHR m_VkSwapchain;
+    VkFormat m_VkSwapchainImageFormat;
+    VkExtent2D m_VkSwapchainImageExtent;
+    std::vector<VkImage> m_VkSwapchainImages;
+    std::vector<VkImageView> m_VkSwapchainImageViews;
+
+    Image m_DrawImage;
+
   private:
     void initVulkan();
+
+    void createSwapchain();
+    void destroySwapchain();
+
+    void createDrawImages();
+    void destroyDrawImages();
 };
