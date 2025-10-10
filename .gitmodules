@@ -10,3 +10,6 @@
 [submodule "Project/vendor/spdlog"]
 	path = Project/vendor/spdlog
 	url = https://github.com/gabime/spdlog.git
+[submodule "Project/vendor/VulkanUtilityLibraries"]
+	path = Project/vendor/VulkanUtilityLibraries
+	url = https://github.com/KhronosGroup/Vulkan-Utility-Libraries.git

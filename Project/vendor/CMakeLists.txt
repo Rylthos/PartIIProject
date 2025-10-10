@@ -18,3 +18,6 @@ add_subdirectory(VMA)
 
 # spdlog
 add_subdirectory(spdlog)
+
+# Vulkan Utility Libraries
+add_subdirectory(VulkanUtilityLibraries)

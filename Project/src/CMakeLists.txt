@@ -10,6 +10,7 @@ add_executable(${PROJECT_NAME} ${SOURCE_LIST})
 target_link_libraries(${PROJECT_NAME} PRIVATE
   glm::glm
   GPUOpen::VulkanMemoryAllocator
+  Vulkan::UtilityHeaders
   spdlog
   vk-bootstrap
   vulkan
