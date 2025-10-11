@@ -3,8 +3,44 @@
 #include "VkBootstrap.h"
 
 #include <iostream>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 
+#include <fstream>
+
+VkShaderModule createShaderModule(VkDevice device, const std::string& filename)
+{
+    std::ifstream file(filename, std::ios::binary);
+
+    if (!file.is_open()) {
+        LOG_ERROR("Failed to open shader file: {}", filename);
+        return VK_NULL_HANDLE;
+    }
+
+    file.seekg(0, std::ios_base::end);
+    size_t size = file.tellg();
+
+    std::vector<uint32_t> data(size / sizeof(uint32_t));
+    file.seekg(0, std::ios_base::beg);
+
+    file.read((char*)data.data(), size);
+    file.close();
+
+    VkShaderModuleCreateInfo moduleCI {};
+    moduleCI.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    moduleCI.pNext = nullptr;
+    moduleCI.flags = 0;
+    moduleCI.codeSize = data.size() * sizeof(uint32_t);
+    moduleCI.pCode = data.data();
+
+    VkShaderModule module;
+    VK_CHECK(vkCreateShaderModule(device, &moduleCI, nullptr, &module),
+        "Failed to create shader module");
+
+    LOG_INFO("Compiled shader module: {}", filename);
+
+    return module;
+}
 void Application::init()
 {
     Logger::init();
@@ -22,6 +58,8 @@ void Application::init()
     createDescriptorPool();
     createDescriptors();
 
+    createPipelines();
+
     LOG_INFO("Initialised application");
 }
 
@@ -29,6 +67,10 @@ void Application::start() { std::cout << "Hello, World!\n"; }
 
 void Application::cleanup()
 {
+    vkDeviceWaitIdle(m_VkDevice);
+
+    destroyPipelines();
+
     destroyDescriptorPool();
 
     destroySyncStructures();
@@ -380,4 +422,55 @@ void Application::destroyDescriptorPool()
     vkDestroyDescriptorPool(m_VkDevice, m_VkDescriptorPool, nullptr);
 
     LOG_INFO("Destroyed descriptor pool");
+}
+
+void Application::createPipelines()
+{
+    VkPipelineLayoutCreateInfo pipelineLayoutCI {};
+    pipelineLayoutCI.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayoutCI.pNext = nullptr;
+    pipelineLayoutCI.flags = 0;
+    pipelineLayoutCI.setLayoutCount = 1;
+    pipelineLayoutCI.pSetLayouts = &m_ComputeDescriptorSetLayout;
+    pipelineLayoutCI.pushConstantRangeCount = 0;
+    pipelineLayoutCI.pPushConstantRanges = nullptr;
+
+    VK_CHECK(vkCreatePipelineLayout(m_VkDevice, &pipelineLayoutCI, nullptr, &m_VkPipelineLayout),
+        "Failed to create pipeline layout");
+
+    VkShaderModule shaderModule = createShaderModule(m_VkDevice, "res/shaders/basic_compute.spv");
+
+    VkPipelineShaderStageCreateInfo shaderStageCI {};
+    shaderStageCI.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    shaderStageCI.pNext = nullptr;
+    shaderStageCI.flags = 0;
+    shaderStageCI.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    shaderStageCI.module = shaderModule;
+    shaderStageCI.pName = "main";
+    shaderStageCI.pSpecializationInfo = nullptr;
+
+    VkComputePipelineCreateInfo pipelineCI {};
+    pipelineCI.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    pipelineCI.pNext = nullptr;
+    pipelineCI.flags = 0;
+    pipelineCI.stage = shaderStageCI;
+    pipelineCI.layout = m_VkPipelineLayout;
+    pipelineCI.basePipelineHandle = VK_NULL_HANDLE;
+    pipelineCI.basePipelineIndex = 0;
+
+    VK_CHECK(vkCreateComputePipelines(
+                 m_VkDevice, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &m_VkPipeline),
+        "Failed to create compute pipeline");
+
+    vkDestroyShaderModule(m_VkDevice, shaderModule, nullptr);
+
+    LOG_INFO("Created pipelines");
+}
+
+void Application::destroyPipelines()
+{
+    vkDestroyPipeline(m_VkDevice, m_VkPipeline, nullptr);
+    vkDestroyPipelineLayout(m_VkDevice, m_VkPipelineLayout, nullptr);
+
+    LOG_INFO("Destroyed pipelines");
 }

@@ -2,3 +2,5 @@
 build/*
 .cache/*
 .envrc
+res/shaders/*
+!res/shaders/*.slang

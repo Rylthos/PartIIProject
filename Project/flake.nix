@@ -1,7 +1,7 @@
 {
   description = "Flake for cpp vulkan development";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/fea37ae1cd8f9903a30d38966ed1ced07b141316";
 
   outputs = { self, nixpkgs, ... }:
     let
@@ -18,6 +18,10 @@
           vulkan-tools-lunarg
 
           glfw-wayland
+        ];
+
+        buildInputs = with pkgs; [
+          shader-slang
         ];
 
         LD_LIBRARY_PATH="${pkgs.vulkan-loader}/lib:${pkgs.vulkan-validation-layers}/lib";

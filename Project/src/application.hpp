@@ -64,6 +64,9 @@ class Application {
 
     VkDescriptorPool m_VkDescriptorPool;
     VkDescriptorSetLayout m_ComputeDescriptorSetLayout;
+
+    VkPipelineLayout m_VkPipelineLayout;
+    VkPipeline m_VkPipeline;
   private:
     void initVulkan();
 
@@ -82,4 +85,7 @@ class Application {
     void createDescriptorPool();
     void createDescriptors();
     void destroyDescriptorPool();
+
+    void createPipelines();
+    void destroyPipelines();
 };
