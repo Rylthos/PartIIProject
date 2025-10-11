@@ -19,6 +19,9 @@ void Application::init()
 
     createSyncStructures();
 
+    createDescriptorPool();
+    createDescriptors();
+
     LOG_INFO("Initialised application");
 }
 
@@ -26,6 +29,8 @@ void Application::start() { std::cout << "Hello, World!\n"; }
 
 void Application::cleanup()
 {
+    destroyDescriptorPool();
+
     destroySyncStructures();
     destroyCommandPools();
 
@@ -138,15 +143,15 @@ void Application::destroySwapchain()
 
 void Application::createDrawImages()
 {
-    m_DrawImage.extent = { m_Window.getWindowSize().x, m_Window.getWindowSize().y, 1 };
-    m_DrawImage.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+    VkExtent3D extent = { m_Window.getWindowSize().x, m_Window.getWindowSize().y, 1 };
+    VkFormat format = VK_FORMAT_R16G16B16A16_SFLOAT;
 
     VkImageCreateInfo imageCI {};
     imageCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     imageCI.flags = 0;
     imageCI.imageType = VK_IMAGE_TYPE_2D;
-    imageCI.format = m_DrawImage.format;
-    imageCI.extent = m_DrawImage.extent;
+    imageCI.format = format;
+    imageCI.extent = extent;
     imageCI.mipLevels = 1;
     imageCI.arrayLayers = 1;
     imageCI.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -158,33 +163,45 @@ void Application::createDrawImages()
     VmaAllocationCreateInfo allocationCI {};
     allocationCI.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
     allocationCI.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-    VK_CHECK(vmaCreateImage(m_VmaAllocator, &imageCI, &allocationCI, &m_DrawImage.image,
-                 &m_DrawImage.allocation, nullptr),
-        "Failed to allocate draw image");
 
     VkImageViewCreateInfo imageViewCI {};
     imageViewCI.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     imageViewCI.pNext = nullptr;
     imageViewCI.flags = 0;
-    imageViewCI.image = m_DrawImage.image;
+    imageViewCI.image = VK_NULL_HANDLE;
     imageViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    imageViewCI.format = m_DrawImage.format;
+    imageViewCI.format = format;
     imageViewCI.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     imageViewCI.subresourceRange.baseMipLevel = 0;
     imageViewCI.subresourceRange.levelCount = 1;
     imageViewCI.subresourceRange.baseArrayLayer = 0;
     imageViewCI.subresourceRange.layerCount = 1;
 
-    VK_CHECK(vkCreateImageView(m_VkDevice, &imageViewCI, nullptr, &m_DrawImage.view),
-        "Failed to create image view");
+    for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
+        m_PerFrameData[i].drawImage.format = format;
+        m_PerFrameData[i].drawImage.extent = extent;
+
+        VK_CHECK(vmaCreateImage(m_VmaAllocator, &imageCI, &allocationCI,
+                     &m_PerFrameData[i].drawImage.image, &m_PerFrameData[i].drawImage.allocation,
+                     nullptr),
+            "Failed to allocate draw image");
+
+        imageViewCI.image = m_PerFrameData[i].drawImage.image;
+        VK_CHECK(
+            vkCreateImageView(m_VkDevice, &imageViewCI, nullptr, &m_PerFrameData[i].drawImage.view),
+            "Failed to create image view");
+    }
 
     LOG_INFO("Created draw images");
 }
 
 void Application::destroyDrawImages()
 {
-    vkDestroyImageView(m_VkDevice, m_DrawImage.view, nullptr);
-    vmaDestroyImage(m_VmaAllocator, m_DrawImage.image, nullptr);
+    for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
+        vkDestroyImageView(m_VkDevice, m_PerFrameData[i].drawImage.view, nullptr);
+        vmaDestroyImage(m_VmaAllocator, m_PerFrameData[i].drawImage.image,
+            m_PerFrameData[i].drawImage.allocation);
+    }
 
     LOG_INFO("Destroyed draw images");
 }
@@ -262,4 +279,105 @@ void Application::destroySyncStructures()
     }
 
     LOG_INFO("Destroyed sync structures");
+}
+
+void Application::createDescriptorPool()
+{
+    std::vector<VkDescriptorPoolSize> poolSizes = {
+        {
+         .type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+         .descriptorCount = FRAMES_IN_FLIGHT,
+         },
+    };
+
+    VkDescriptorPoolCreateInfo descriptorPoolCI {};
+    descriptorPoolCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    descriptorPoolCI.pNext = nullptr;
+    descriptorPoolCI.flags = 0;
+    descriptorPoolCI.maxSets = FRAMES_IN_FLIGHT,
+    descriptorPoolCI.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+    descriptorPoolCI.pPoolSizes = poolSizes.data();
+
+    VK_CHECK(vkCreateDescriptorPool(m_VkDevice, &descriptorPoolCI, nullptr, &m_VkDescriptorPool),
+        "Failed to create descriptor pool");
+
+    LOG_INFO("Created descriptor pool");
+}
+
+void Application::createDescriptors()
+{
+    std::vector<VkDescriptorSetLayoutBinding> bindings = {
+        {
+         .binding = 0,
+         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+         .descriptorCount = 1,
+         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+         .pImmutableSamplers = VK_NULL_HANDLE,
+
+         }
+    };
+    VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCI {};
+    descriptorSetLayoutCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    descriptorSetLayoutCI.pNext = nullptr;
+    descriptorSetLayoutCI.flags = 0;
+    descriptorSetLayoutCI.bindingCount = static_cast<uint32_t>(bindings.size());
+    descriptorSetLayoutCI.pBindings = bindings.data();
+
+    VK_CHECK(vkCreateDescriptorSetLayout(
+                 m_VkDevice, &descriptorSetLayoutCI, nullptr, &m_ComputeDescriptorSetLayout),
+        "Failed to create compute descriptor set layout");
+
+    std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
+    for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++)
+        descriptorSetLayouts.push_back(m_ComputeDescriptorSetLayout);
+
+    VkDescriptorSetAllocateInfo descriptorSetAI {};
+    descriptorSetAI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    descriptorSetAI.pNext = nullptr;
+    descriptorSetAI.descriptorPool = m_VkDescriptorPool;
+    descriptorSetAI.descriptorSetCount = descriptorSetLayouts.size();
+    descriptorSetAI.pSetLayouts = descriptorSetLayouts.data();
+
+    std::vector<VkDescriptorSet> descriptorSets;
+    descriptorSets.resize(FRAMES_IN_FLIGHT);
+    VK_CHECK(vkAllocateDescriptorSets(m_VkDevice, &descriptorSetAI, descriptorSets.data()),
+        "Failed to allocate descriptor set");
+
+    for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
+        VkDescriptorImageInfo imageInfo {};
+        imageInfo.sampler = VK_NULL_HANDLE;
+        imageInfo.imageView = m_PerFrameData[i].drawImage.view;
+        imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+        std::vector<VkWriteDescriptorSet> writeSets = {
+            {
+             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+             .pNext = nullptr,
+             .dstSet = descriptorSets[i],
+             .dstBinding = 0,
+             .dstArrayElement = 0,
+             .descriptorCount = 1,
+             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+             .pImageInfo = &imageInfo,
+             .pBufferInfo = nullptr,
+             .pTexelBufferView = nullptr,
+             }
+        };
+
+        vkUpdateDescriptorSets(m_VkDevice, writeSets.size(), writeSets.data(), 0, nullptr);
+    }
+
+    for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
+        m_PerFrameData[i].drawImageDescriptorSet = descriptorSets[i];
+    }
+
+    LOG_INFO("Created descriptors");
+}
+
+void Application::destroyDescriptorPool()
+{
+    vkDestroyDescriptorSetLayout(m_VkDevice, m_ComputeDescriptorSetLayout, nullptr);
+    vkDestroyDescriptorPool(m_VkDevice, m_VkDescriptorPool, nullptr);
+
+    LOG_INFO("Destroyed descriptor pool");
 }

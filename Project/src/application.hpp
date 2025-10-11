@@ -28,6 +28,9 @@ struct PerFrameData {
     VkFence fence;
     VkSemaphore renderSemaphore;
     VkSemaphore swapchainSemaphore;
+
+    Image drawImage;
+    VkDescriptorSet drawImageDescriptorSet;
 };
 
 class Application {
@@ -56,10 +59,11 @@ class Application {
     std::vector<VkImage> m_VkSwapchainImages;
     std::vector<VkImageView> m_VkSwapchainImageViews;
 
-    Image m_DrawImage;
 
     std::array<PerFrameData, FRAMES_IN_FLIGHT> m_PerFrameData;
 
+    VkDescriptorPool m_VkDescriptorPool;
+    VkDescriptorSetLayout m_ComputeDescriptorSetLayout;
   private:
     void initVulkan();
 
@@ -74,4 +78,8 @@ class Application {
 
     void createSyncStructures();
     void destroySyncStructures();
+
+    void createDescriptorPool();
+    void createDescriptors();
+    void destroyDescriptorPool();
 };
