@@ -26,8 +26,6 @@ struct PerFrameData {
     VkCommandBuffer commandBuffer;
 
     VkFence fence;
-    VkSemaphore renderSemaphore;
-    VkSemaphore swapchainSemaphore;
 
     Image drawImage;
     VkDescriptorSet drawImageDescriptorSet;
@@ -59,6 +57,8 @@ class Application {
     std::vector<VkImage> m_VkSwapchainImages;
     std::vector<VkImageView> m_VkSwapchainImageViews;
 
+    std::vector<VkSemaphore> m_RenderSemaphores;
+    std::vector<VkSemaphore> m_SwapchainSemaphores;
 
     std::array<PerFrameData, FRAMES_IN_FLIGHT> m_PerFrameData;
 

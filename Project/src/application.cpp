@@ -107,8 +107,11 @@ void Application::initVulkan()
 
     VkPhysicalDeviceVulkan14Features features14 {};
     VkPhysicalDeviceVulkan13Features features13 {};
+    features13.synchronization2 = true;
+
     VkPhysicalDeviceVulkan12Features features12 {};
     features12.bufferDeviceAddress = true;
+
     VkPhysicalDeviceVulkan11Features features11 {};
     VkPhysicalDeviceFeatures features {};
 
@@ -292,20 +295,23 @@ void Application::createSyncStructures()
     fenceCI.pNext = nullptr;
     fenceCI.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
+    for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
+        VK_CHECK(vkCreateFence(m_VkDevice, &fenceCI, nullptr, &m_PerFrameData[i].fence),
+            "Failed to create fence");
+    }
+
     VkSemaphoreCreateInfo semaphoreCI {};
     semaphoreCI.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
     semaphoreCI.pNext = nullptr;
     semaphoreCI.flags = 0;
 
-    for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
-        VK_CHECK(vkCreateFence(m_VkDevice, &fenceCI, nullptr, &m_PerFrameData[i].fence),
-            "Failed to create fence");
+    m_RenderSemaphores.resize(m_VkSwapchainImages.size());
+    m_SwapchainSemaphores.resize(m_VkSwapchainImages.size());
 
-        VK_CHECK(vkCreateSemaphore(
-                     m_VkDevice, &semaphoreCI, nullptr, &m_PerFrameData[i].renderSemaphore),
+    for (size_t i = 0; i < m_VkSwapchainImages.size(); i++) {
+        VK_CHECK(vkCreateSemaphore(m_VkDevice, &semaphoreCI, nullptr, &m_RenderSemaphores[i]),
             "Failed to create render semaphore");
-        VK_CHECK(vkCreateSemaphore(
-                     m_VkDevice, &semaphoreCI, nullptr, &m_PerFrameData[i].swapchainSemaphore),
+        VK_CHECK(vkCreateSemaphore(m_VkDevice, &semaphoreCI, nullptr, &m_SwapchainSemaphores[i]),
             "Failed to create swapchain semaphore");
     }
 
@@ -316,8 +322,11 @@ void Application::destroySyncStructures()
 {
     for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
         vkDestroyFence(m_VkDevice, m_PerFrameData[i].fence, nullptr);
-        vkDestroySemaphore(m_VkDevice, m_PerFrameData[i].renderSemaphore, nullptr);
-        vkDestroySemaphore(m_VkDevice, m_PerFrameData[i].swapchainSemaphore, nullptr);
+    }
+
+    for (size_t i = 0; i < m_VkSwapchainImages.size(); i++) {
+        vkDestroySemaphore(m_VkDevice, m_RenderSemaphores[i], nullptr);
+        vkDestroySemaphore(m_VkDevice, m_SwapchainSemaphores[i], nullptr);
     }
 
     LOG_INFO("Destroyed sync structures");
