@@ -6,6 +6,11 @@ project(VoxelRaymarcher
 find_package(Vulkan REQUIRED)
 find_package(glfw3 REQUIRED)
 
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+  message("Enabled Debug features")
+  add_compile_definitions(DEBUG)
+endif()
+
 add_subdirectory(vendor)
 
 add_subdirectory(src)

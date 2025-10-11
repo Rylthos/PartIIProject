@@ -19,6 +19,7 @@ class Logger {
     Logger() = delete;
 };
 
+#ifdef DEBUG
 #define LOG_DEBUG(...) Logger::getLogger()->debug(__VA_ARGS__)
 #define LOG_INFO(...) Logger::getLogger()->info(__VA_ARGS__)
 #define LOG_ERROR(...) Logger::getLogger()->error(__VA_ARGS__)
@@ -31,3 +32,10 @@ class Logger {
             LOG_ERROR("{}: {}", (msg), string_VkResult(temp));                                     \
         }                                                                                          \
     } while (0)
+#else
+#define LOG_DEBUG(...)
+#define LOG_INFO(...)
+#define LOG_ERROR(...)
+#define LOG_CRITICAL(...)
+#define VK_CHECK(result, msg)
+#endif
