@@ -11,9 +11,11 @@ class Window {
     void cleanup();
 
     VkSurfaceKHR createSurface(const VkInstance& instance);
+    void pollEvents();
+    void swapBuffers();
+    bool shouldClose();
 
     GLFWwindow* getWindow() { return m_Window; }
-
     glm::uvec2 getWindowSize() { return m_WindowSize; }
 
   private:

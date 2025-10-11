@@ -3,6 +3,7 @@
 #include "vulkan/vk_enum_string_helper.h"
 
 #include "logger.hpp"
+#include <GLFW/glfw3.h>
 
 void Window::init()
 {
@@ -41,3 +42,7 @@ VkSurfaceKHR Window::createSurface(const VkInstance& instance)
         "Failed to create window surface");
     return surface;
 }
+
+void Window::pollEvents() { glfwPollEvents(); }
+void Window::swapBuffers() { glfwSwapBuffers(m_Window); }
+bool Window::shouldClose() { return glfwWindowShouldClose(m_Window); };

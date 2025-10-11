@@ -53,7 +53,7 @@ class Application {
 
     VkSwapchainKHR m_VkSwapchain;
     VkFormat m_VkSwapchainImageFormat;
-    VkExtent2D m_VkSwapchainImageExtent;
+    VkExtent3D m_VkSwapchainImageExtent;
     std::vector<VkImage> m_VkSwapchainImages;
     std::vector<VkImageView> m_VkSwapchainImageViews;
 
@@ -67,6 +67,10 @@ class Application {
 
     VkPipelineLayout m_VkPipelineLayout;
     VkPipeline m_VkPipeline;
+
+    uint32_t m_CurrentFrameIndex { 0 };
+    uint32_t m_CurrentSemaphore { 0 };
+
   private:
     void initVulkan();
 
@@ -88,4 +92,7 @@ class Application {
 
     void createPipelines();
     void destroyPipelines();
+
+    void render();
+    void update();
 };

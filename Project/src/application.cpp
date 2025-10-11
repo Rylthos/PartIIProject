@@ -41,6 +41,75 @@ VkShaderModule createShaderModule(VkDevice device, const std::string& filename)
 
     return module;
 }
+
+void transitionImage(VkCommandBuffer commandBuffer, VkImage target, VkImageLayout currentLayout,
+    VkImageLayout targetLayout)
+{
+    VkImageMemoryBarrier2 imageBarrier {};
+    imageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+    imageBarrier.pNext = nullptr;
+    imageBarrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    imageBarrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
+    imageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    imageBarrier.dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT;
+    imageBarrier.oldLayout = currentLayout;
+    imageBarrier.newLayout = targetLayout;
+    imageBarrier.image = target;
+    imageBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    imageBarrier.subresourceRange.baseMipLevel = 0;
+    imageBarrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
+    imageBarrier.subresourceRange.baseArrayLayer = 0;
+    imageBarrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
+
+    VkDependencyInfo dependencyInfo {};
+    dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+    dependencyInfo.pNext = nullptr;
+    dependencyInfo.dependencyFlags = 0;
+    dependencyInfo.memoryBarrierCount = 0;
+    dependencyInfo.pMemoryBarriers = nullptr;
+    dependencyInfo.bufferMemoryBarrierCount = 0;
+    dependencyInfo.pBufferMemoryBarriers = nullptr;
+    dependencyInfo.imageMemoryBarrierCount = 1;
+    dependencyInfo.pImageMemoryBarriers = &imageBarrier;
+
+    vkCmdPipelineBarrier2(commandBuffer, &dependencyInfo);
+}
+
+void copyImageToImage(
+    VkCommandBuffer command, VkImage src, VkImage dst, VkExtent3D srcSize, VkExtent3D dstSize)
+{
+    VkImageBlit2 blitRegion {};
+    blitRegion.sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2;
+    blitRegion.pNext = nullptr;
+    blitRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    blitRegion.srcSubresource.mipLevel = 0;
+    blitRegion.srcSubresource.baseArrayLayer = 0;
+    blitRegion.srcSubresource.layerCount = 1;
+    blitRegion.srcOffsets[1].x = srcSize.width;
+    blitRegion.srcOffsets[1].y = srcSize.height;
+    blitRegion.srcOffsets[1].z = srcSize.depth;
+    blitRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    blitRegion.dstSubresource.mipLevel = 0;
+    blitRegion.dstSubresource.baseArrayLayer = 0;
+    blitRegion.dstSubresource.layerCount = 1;
+    blitRegion.dstOffsets[1].x = dstSize.width;
+    blitRegion.dstOffsets[1].y = dstSize.height;
+    blitRegion.dstOffsets[1].z = dstSize.depth;
+
+    VkBlitImageInfo2 blitInfo {};
+    blitInfo.sType = VK_STRUCTURE_TYPE_BLIT_IMAGE_INFO_2;
+    blitInfo.pNext = nullptr;
+    blitInfo.srcImage = src;
+    blitInfo.srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    blitInfo.dstImage = dst;
+    blitInfo.dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    blitInfo.regionCount = 1;
+    blitInfo.pRegions = &blitRegion;
+    blitInfo.filter = VK_FILTER_LINEAR;
+
+    vkCmdBlitImage2(command, &blitInfo);
+}
+
 void Application::init()
 {
     Logger::init();
@@ -63,7 +132,15 @@ void Application::init()
     LOG_INFO("Initialised application");
 }
 
-void Application::start() { std::cout << "Hello, World!\n"; }
+void Application::start()
+{
+    while (!m_Window.shouldClose()) {
+        m_Window.pollEvents();
+
+        render();
+        update();
+    }
+}
 
 void Application::cleanup()
 {
@@ -163,12 +240,16 @@ void Application::createSwapchain()
               })
               .set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR)
               .set_desired_extent(m_Window.getWindowSize().x, m_Window.getWindowSize().y)
-              .add_image_usage_flags(VK_IMAGE_USAGE_TRANSFER_DST_BIT)
+              .add_image_usage_flags(VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT)
               .build()
               .value();
 
     m_VkSwapchain = vkbSwapchain.swapchain;
-    m_VkSwapchainImageExtent = vkbSwapchain.extent;
+    m_VkSwapchainImageExtent = {
+        .width = vkbSwapchain.extent.width,
+        .height = vkbSwapchain.extent.height,
+        .depth = 1,
+    };
     m_VkSwapchainImages = vkbSwapchain.get_images().value();
     m_VkSwapchainImageViews = vkbSwapchain.get_image_views().value();
 
@@ -482,4 +563,113 @@ void Application::destroyPipelines()
     vkDestroyPipelineLayout(m_VkDevice, m_VkPipelineLayout, nullptr);
 
     LOG_INFO("Destroyed pipelines");
+}
+
+void Application::render()
+{
+    PerFrameData& currentFrame = m_PerFrameData[m_CurrentFrameIndex];
+
+    uint64_t timeout = 1e9;
+
+    VK_CHECK(vkWaitForFences(m_VkDevice, 1, &currentFrame.fence, true, timeout), "Fence");
+
+    VK_CHECK(vkResetFences(m_VkDevice, 1, &currentFrame.fence), "Reset fence");
+
+    uint32_t swapchainImageIndex = 0;
+    vkAcquireNextImageKHR(m_VkDevice, m_VkSwapchain, timeout,
+        m_SwapchainSemaphores[m_CurrentSemaphore], nullptr, &swapchainImageIndex);
+
+    VkCommandBuffer commandBuffer = currentFrame.commandBuffer;
+    VK_CHECK(vkResetCommandBuffer(commandBuffer, 0), "Reset command Buffer");
+
+    VkCommandBufferBeginInfo commandBufferBI {};
+    commandBufferBI.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    commandBufferBI.pNext = nullptr;
+    commandBufferBI.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    commandBufferBI.pInheritanceInfo = nullptr;
+
+    {
+        VK_CHECK(vkBeginCommandBuffer(commandBuffer, &commandBufferBI), "Begin command buffer");
+
+        transitionImage(commandBuffer, m_VkSwapchainImages[swapchainImageIndex],
+            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        transitionImage(commandBuffer, currentFrame.drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_GENERAL);
+
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_VkPipeline);
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_VkPipelineLayout,
+            0, 1, &currentFrame.drawImageDescriptorSet, 0, nullptr);
+
+        vkCmdDispatch(commandBuffer, currentFrame.drawImage.extent.width / 8,
+            currentFrame.drawImage.extent.height / 8, 1);
+
+        transitionImage(commandBuffer, currentFrame.drawImage.image, VK_IMAGE_LAYOUT_GENERAL,
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+
+        copyImageToImage(commandBuffer, currentFrame.drawImage.image,
+            m_VkSwapchainImages[swapchainImageIndex], currentFrame.drawImage.extent,
+            m_VkSwapchainImageExtent);
+
+        transitionImage(commandBuffer, m_VkSwapchainImages[swapchainImageIndex],
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+
+        VK_CHECK(vkEndCommandBuffer(commandBuffer), "End command buffer");
+    }
+
+    {
+        VkCommandBufferSubmitInfo commandBufferSI {};
+        commandBufferSI.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+        commandBufferSI.pNext = nullptr;
+        commandBufferSI.commandBuffer = commandBuffer;
+        commandBufferSI.deviceMask = 0;
+
+        VkSemaphoreSubmitInfo waitSI {};
+        waitSI.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+        waitSI.pNext = nullptr;
+        waitSI.semaphore = m_SwapchainSemaphores[m_CurrentSemaphore];
+        waitSI.value = 1;
+        waitSI.stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR;
+        waitSI.deviceIndex = 0;
+
+        VkSemaphoreSubmitInfo signalSI {};
+        signalSI.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+        signalSI.pNext = nullptr;
+        signalSI.semaphore = m_RenderSemaphores[m_CurrentSemaphore];
+        signalSI.value = 1;
+        signalSI.stageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
+        signalSI.deviceIndex = 0;
+
+        VkSubmitInfo2 submit {};
+        submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+        submit.pNext = nullptr;
+        submit.flags = 0;
+        submit.waitSemaphoreInfoCount = 1;
+        submit.pWaitSemaphoreInfos = &waitSI;
+        submit.commandBufferInfoCount = 1;
+        submit.pCommandBufferInfos = &commandBufferSI;
+        submit.signalSemaphoreInfoCount = 1;
+        submit.pSignalSemaphoreInfos = &signalSI;
+
+        VK_CHECK(
+            vkQueueSubmit2(m_GraphicsQueue.queue, 1, &submit, currentFrame.fence), "Queue submit");
+
+        VkPresentInfoKHR presentInfo {};
+        presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+        presentInfo.pNext = nullptr;
+        presentInfo.waitSemaphoreCount = 1;
+        presentInfo.pWaitSemaphores = &m_RenderSemaphores[m_CurrentSemaphore];
+        presentInfo.swapchainCount = 1;
+        presentInfo.pSwapchains = &m_VkSwapchain;
+        presentInfo.pImageIndices = &swapchainImageIndex;
+        presentInfo.pResults = nullptr;
+        vkQueuePresentKHR(m_GraphicsQueue.queue, &presentInfo);
+    }
+
+    m_Window.swapBuffers();
+}
+
+void Application::update()
+{
+    m_CurrentFrameIndex = (m_CurrentFrameIndex + 1) % FRAMES_IN_FLIGHT;
+    m_CurrentSemaphore = (m_CurrentSemaphore + 1) % m_VkSwapchainImages.size();
 }
