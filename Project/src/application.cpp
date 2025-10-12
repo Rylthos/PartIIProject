@@ -171,6 +171,9 @@ void Application::init()
 
     createPipelines();
 
+    m_Window.subscribe(EventFamily::KEYBOARD,
+        std::bind(&Application::handleKeyInput, *this, std::placeholders::_1));
+
     LOG_INFO("Initialised application");
 }
 
@@ -743,4 +746,13 @@ void Application::update()
 {
     m_CurrentFrameIndex = (m_CurrentFrameIndex + 1) % FRAMES_IN_FLIGHT;
     m_CurrentSemaphore = (m_CurrentSemaphore + 1) % m_VkSwapchainImages.size();
+}
+
+void Application::handleKeyInput(const Event& event)
+{
+    const KeyboardEvent& kEvent = static_cast<const KeyboardEvent&>(event);
+
+    if (kEvent.type() == KeyboardEventType::PRESS) {
+        LOG_INFO("Press key");
+    }
 }

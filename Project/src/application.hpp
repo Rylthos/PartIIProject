@@ -104,4 +104,6 @@ class Application {
 
     void render();
     void update();
+
+    void handleKeyInput(const Event& event);
 };

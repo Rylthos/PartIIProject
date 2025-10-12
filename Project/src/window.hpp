@@ -5,7 +5,9 @@
 #include "GLFW/glfw3.h"
 #include "glm/glm.hpp"
 
-class Window {
+#include "events.hpp"
+
+class Window : public EventWatcher {
   public:
     void init();
     void cleanup();
@@ -22,4 +24,7 @@ class Window {
     GLFWwindow* m_Window;
 
     glm::uvec2 m_WindowSize;
+
+  private:
+    static void handleKeyInput(GLFWwindow* window, int key, int scancode, int action, int mods);
 };

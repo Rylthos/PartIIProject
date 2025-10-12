@@ -1,5 +1,6 @@
 #include "window.hpp"
 
+#include "events.hpp"
 #include "vulkan/vk_enum_string_helper.h"
 
 #include "logger.hpp"
@@ -26,6 +27,10 @@ void Window::init()
         exit(-1);
     }
 
+    glfwSetWindowUserPointer(m_Window, (void*)this);
+
+    glfwSetKeyCallback(m_Window, handleKeyInput);
+
     LOG_INFO("Created GLFW window");
 }
 
@@ -46,3 +51,19 @@ VkSurfaceKHR Window::createSurface(const VkInstance& instance)
 void Window::pollEvents() { glfwPollEvents(); }
 void Window::swapBuffers() { glfwSwapBuffers(m_Window); }
 bool Window::shouldClose() { return glfwWindowShouldClose(m_Window); };
+
+void Window::handleKeyInput(GLFWwindow* glfwWindow, int key, int scancode, int action, int mods)
+{
+    Window* window = (Window*)glfwGetWindowUserPointer(glfwWindow);
+
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+        glfwSetWindowShouldClose(window->m_Window, GLFW_TRUE);
+    }
+
+    if (action == GLFW_PRESS) {
+        KeyboardPressEvent event {};
+        event.keycode = key;
+        event.mods = mods;
+        window->post(event);
+    }
+}

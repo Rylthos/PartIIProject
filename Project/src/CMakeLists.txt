@@ -3,6 +3,7 @@ set (SOURCE_LIST
   "application.cpp" "application.hpp"
   "window.cpp" "window.hpp"
   "logger.cpp" "logger.hpp"
+  "events.cpp" "events.hpp"
 )
 
 add_executable(${PROJECT_NAME} ${SOURCE_LIST})
