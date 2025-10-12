@@ -6,6 +6,10 @@
 #include "logger.hpp"
 #include "window.hpp"
 
+#include "slang-com-helper.h"
+#include "slang-com-ptr.h"
+#include "slang.h"
+
 #define FRAMES_IN_FLIGHT 2
 
 struct Queue {
@@ -65,6 +69,9 @@ class Application {
     VkDescriptorPool m_VkDescriptorPool;
     VkDescriptorSetLayout m_ComputeDescriptorSetLayout;
 
+    Slang::ComPtr<slang::IGlobalSession> m_GlobalSession;
+    Slang::ComPtr<slang::ISession> m_Session;
+
     VkPipelineLayout m_VkPipelineLayout;
     VkPipeline m_VkPipeline;
 
@@ -89,6 +96,8 @@ class Application {
     void createDescriptorPool();
     void createDescriptors();
     void destroyDescriptorPool();
+
+    void setupSlang();
 
     void createPipelines();
     void destroyPipelines();

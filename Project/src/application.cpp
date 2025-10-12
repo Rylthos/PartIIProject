@@ -2,36 +2,76 @@
 
 #include "VkBootstrap.h"
 
-#include <iostream>
 #include <vector>
-#include <vulkan/vulkan_core.h>
 
-#include <fstream>
+#define SLANG_DIAG(diagnostics)                                                                    \
+    do {                                                                                           \
+        if ((diagnostics) != nullptr) {                                                            \
+            LOG_ERROR((const char*)(diagnostics)->getBufferPointer());                             \
+        }                                                                                          \
+    } while (0)
 
-VkShaderModule createShaderModule(VkDevice device, const std::string& filename)
+VkShaderModule createShaderModule(
+    VkDevice device, std::string filename, Slang::ComPtr<slang::ISession> session)
 {
-    std::ifstream file(filename, std::ios::binary);
+    LOG_INFO("Create shader module");
 
-    if (!file.is_open()) {
-        LOG_ERROR("Failed to open shader file: {}", filename);
-        return VK_NULL_HANDLE;
+    Slang::ComPtr<slang::IModule> slangModule;
+    {
+        Slang::ComPtr<slang::IBlob> diagnostics;
+        slangModule = session->loadModule(filename.c_str(), diagnostics.writeRef());
+        SLANG_DIAG(diagnostics);
     }
 
-    file.seekg(0, std::ios_base::end);
-    size_t size = file.tellg();
+    Slang::ComPtr<slang::IEntryPoint> entryPoint;
+    slangModule->findEntryPointByName("computeMain", entryPoint.writeRef());
 
-    std::vector<uint32_t> data(size / sizeof(uint32_t));
-    file.seekg(0, std::ios_base::beg);
+    if (!entryPoint)
+        LOG_ERROR("Error getting entry point");
 
-    file.read((char*)data.data(), size);
-    file.close();
+    std::array<slang::IComponentType*, 2> componentTypes = { slangModule, entryPoint };
 
+    Slang::ComPtr<slang::IComponentType> composedProgram;
+    {
+        Slang::ComPtr<slang::IBlob> diagnostics;
+        SlangResult result = session->createCompositeComponentType(componentTypes.data(),
+            componentTypes.size(), composedProgram.writeRef(), diagnostics.writeRef());
+
+        SLANG_DIAG(diagnostics);
+        if (SLANG_FAILED(result)) {
+            LOG_ERROR("Fail composing shader");
+        }
+    }
+
+    Slang::ComPtr<slang::IComponentType> linkedProgram;
+    {
+        Slang::ComPtr<slang::IBlob> diagnostics;
+        SlangResult result
+            = composedProgram->link(linkedProgram.writeRef(), diagnostics.writeRef());
+
+        SLANG_DIAG(diagnostics);
+        if (SLANG_FAILED(result)) {
+            LOG_ERROR("Fail composing shader");
+        }
+    }
+
+    Slang::ComPtr<slang::IBlob> spirvCode;
+    {
+        Slang::ComPtr<slang::IBlob> diagnostics;
+        SlangResult result
+            = linkedProgram->getTargetCode(0, spirvCode.writeRef(), diagnostics.writeRef());
+
+        SLANG_DIAG(diagnostics);
+        if (SLANG_FAILED(result)) {
+            LOG_ERROR("Fail linking shader");
+        }
+    }
     VkShaderModuleCreateInfo moduleCI {};
     moduleCI.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     moduleCI.pNext = nullptr;
     moduleCI.flags = 0;
-    moduleCI.codeSize = data.size() * sizeof(uint32_t);
-    moduleCI.pCode = data.data();
+    moduleCI.codeSize = spirvCode->getBufferSize();
+    moduleCI.pCode = (uint32_t*)spirvCode->getBufferPointer();
 
     VkShaderModule module;
     VK_CHECK(vkCreateShaderModule(device, &moduleCI, nullptr, &module),
@@ -126,6 +166,8 @@ void Application::init()
 
     createDescriptorPool();
     createDescriptors();
+
+    setupSlang();
 
     createPipelines();
 
@@ -514,6 +556,35 @@ void Application::destroyDescriptorPool()
     LOG_INFO("Destroyed descriptor pool");
 }
 
+void Application::setupSlang()
+{
+    slang::SessionDesc sessionDesc {};
+
+    slang::createGlobalSession(m_GlobalSession.writeRef());
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV;
+    targetDesc.profile = m_GlobalSession->findProfile("spirv_1_5");
+
+    sessionDesc.targets = &targetDesc;
+    sessionDesc.targetCount = 1;
+
+    std::array<slang::CompilerOptionEntry, 1> options = {
+        { slang::CompilerOptionName::EmitSpirvDirectly,
+         { slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr } }
+    };
+    sessionDesc.compilerOptionEntries = options.data();
+    sessionDesc.compilerOptionEntryCount = options.size();
+
+    const char* searchPaths[] = { "res/shaders/" };
+    sessionDesc.searchPaths = searchPaths;
+    sessionDesc.searchPathCount = 1;
+
+    m_GlobalSession->createSession(sessionDesc, m_Session.writeRef());
+
+    LOG_INFO("Setup slang session");
+}
+
 void Application::createPipelines()
 {
     VkPipelineLayoutCreateInfo pipelineLayoutCI {};
@@ -528,7 +599,7 @@ void Application::createPipelines()
     VK_CHECK(vkCreatePipelineLayout(m_VkDevice, &pipelineLayoutCI, nullptr, &m_VkPipelineLayout),
         "Failed to create pipeline layout");
 
-    VkShaderModule shaderModule = createShaderModule(m_VkDevice, "res/shaders/basic_compute.spv");
+    VkShaderModule shaderModule = createShaderModule(m_VkDevice, "basic_compute", m_Session);
 
     VkPipelineShaderStageCreateInfo shaderStageCI {};
     shaderStageCI.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;

@@ -13,3 +13,6 @@
 [submodule "Project/vendor/VulkanUtilityLibraries"]
 	path = Project/vendor/VulkanUtilityLibraries
 	url = https://github.com/KhronosGroup/Vulkan-Utility-Libraries.git
+[submodule "Project/vendor/slang"]
+	path = Project/vendor/slang
+	url = https://github.com/shader-slang/slang.git
