@@ -1,8 +1,12 @@
 #pragma once
 
+#include <glm/glm.hpp>
 
-enum class EventFamily { KEYBOARD, MOUSE, WINDOW };
+enum class EventFamily { KEYBOARD, MOUSE };
+
 enum class KeyboardEventType { PRESS, RELEASE };
+enum class MouseEventType { MOVE, ENTER_EXIT, CLICK, LIFT };
+
 class Event {
   public:
     Event() = default;
@@ -29,16 +33,65 @@ class KeyboardPressEvent : public KeyboardEvent {
     int mods;
 };
 
-class EventWatcher {
-    using EventFunction = std::function<void(const Event&)>;
+class KeyboardReleaseEvent : public KeyboardEvent {
+  public:
+    KeyboardReleaseEvent() = default;
+    ~KeyboardReleaseEvent() = default;
+
+    virtual KeyboardEventType type() const { return KeyboardEventType::RELEASE; }
 
   public:
-    EventWatcher() = default;
-    virtual ~EventWatcher() { }
+    int keycode;
+    int mods;
+};
 
-    virtual void subscribe(const EventFamily& family, EventFunction&& function);
-    virtual void post(const Event& event);
+class MouseEvent : public Event {
+  public:
+    virtual EventFamily family() const { return EventFamily::MOUSE; }
+    virtual MouseEventType type() const = 0;
+};
 
-  protected:
-    std::unordered_map<EventFamily, std::vector<EventFunction>> m_Observers;
+class MouseMoveEvent : public MouseEvent {
+  public:
+    MouseMoveEvent() = default;
+    ~MouseMoveEvent() = default;
+
+    virtual MouseEventType type() const { return MouseEventType::MOVE; }
+
+  public:
+    glm::vec2 position;
+    glm::vec2 delta;
+};
+
+class MouseEnterExitEvent : public MouseEvent {
+  public:
+    MouseEnterExitEvent() = default;
+    ~MouseEnterExitEvent() = default;
+
+    virtual MouseEventType type() const { return MouseEventType::ENTER_EXIT; }
+
+  public:
+    bool entered;
+};
+
+class MouseClickEvent : public MouseEvent {
+  public:
+    MouseClickEvent() = default;
+    ~MouseClickEvent() = default;
+
+    virtual MouseEventType type() const { return MouseEventType::CLICK; }
+
+  public:
+    int button;
+};
+
+class MouseLiftEvent : public MouseEvent {
+  public:
+    MouseLiftEvent() = default;
+    ~MouseLiftEvent() = default;
+
+    virtual MouseEventType type() const { return MouseEventType::LIFT; }
+
+  public:
+    int button;
 };

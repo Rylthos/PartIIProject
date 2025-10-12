@@ -30,6 +30,9 @@ void Window::init()
     glfwSetWindowUserPointer(m_Window, (void*)this);
 
     glfwSetKeyCallback(m_Window, handleKeyInput);
+    glfwSetMouseButtonCallback(m_Window, handleMouseButton);
+    glfwSetCursorEnterCallback(m_Window, handleMouseEnter);
+    glfwSetCursorPosCallback(m_Window, handleMouseMove);
 
     LOG_INFO("Created GLFW window");
 }
@@ -65,5 +68,69 @@ void Window::handleKeyInput(GLFWwindow* glfwWindow, int key, int scancode, int a
         event.keycode = key;
         event.mods = mods;
         window->post(event);
+    } else if (action == GLFW_RELEASE) {
+        KeyboardReleaseEvent event {};
+        event.keycode = key;
+        event.mods = mods;
+        window->post(event);
     }
+}
+
+void Window::handleMouseButton(GLFWwindow* glfwWindow, int button, int action, int mods)
+{
+    Window* window = (Window*)glfwGetWindowUserPointer(glfwWindow);
+
+    if (action == GLFW_PRESS) {
+        MouseClickEvent event;
+        event.button = button;
+        window->post(event);
+    } else if (action == GLFW_RELEASE) {
+        MouseLiftEvent event;
+        event.button = button;
+        window->post(event);
+    }
+}
+
+void Window::handleMouseMove(GLFWwindow* glfwWindow, double xPos, double yPos)
+{
+    Window* window = (Window*)glfwGetWindowUserPointer(glfwWindow);
+
+    static double prevX;
+    static double prevY;
+    static bool initial = true;
+
+    if (window->m_ResetDeltas) {
+        initial = true;
+        window->m_ResetDeltas = false;
+    }
+
+    if (initial) {
+        prevX = xPos;
+        prevY = yPos;
+
+        initial = false;
+    }
+
+    double xDelta = xPos - prevX;
+    double yDelta = yPos - prevY;
+
+    prevX = xPos;
+    prevY = yPos;
+
+    MouseMoveEvent event;
+    event.position = { xPos, yPos };
+    event.delta = { xDelta, yDelta };
+    window->post(event);
+}
+
+void Window::handleMouseEnter(GLFWwindow* glfwWindow, int entered)
+{
+    Window* window = (Window*)glfwGetWindowUserPointer(glfwWindow);
+
+    if (!entered)
+        window->m_ResetDeltas = true;
+
+    MouseEnterExitEvent event;
+    event.entered = entered;
+    window->post(event);
 }

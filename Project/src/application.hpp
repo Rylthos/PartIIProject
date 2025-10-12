@@ -106,4 +106,5 @@ class Application {
     void update();
 
     void handleKeyInput(const Event& event);
+    void handleMouse(const Event& event);
 };

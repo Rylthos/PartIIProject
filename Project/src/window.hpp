@@ -23,8 +23,13 @@ class Window : public EventWatcher {
   private:
     GLFWwindow* m_Window;
 
+    bool m_ResetDeltas = false;
+
     glm::uvec2 m_WindowSize;
 
   private:
     static void handleKeyInput(GLFWwindow* window, int key, int scancode, int action, int mods);
+    static void handleMouseButton(GLFWwindow* window, int button, int action, int mods);
+    static void handleMouseMove(GLFWwindow* window, double xPos, double yPos);
+    static void handleMouseEnter(GLFWwindow* window, int entered);
 };

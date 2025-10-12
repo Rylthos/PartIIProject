@@ -1,6 +1,7 @@
 #include "application.hpp"
 
 #include "VkBootstrap.h"
+#include "events.hpp"
 
 #include <vector>
 
@@ -173,6 +174,8 @@ void Application::init()
 
     m_Window.subscribe(EventFamily::KEYBOARD,
         std::bind(&Application::handleKeyInput, *this, std::placeholders::_1));
+    m_Window.subscribe(
+        EventFamily::MOUSE, std::bind(&Application::handleMouse, *this, std::placeholders::_1));
 
     LOG_INFO("Initialised application");
 }
@@ -754,5 +757,20 @@ void Application::handleKeyInput(const Event& event)
 
     if (kEvent.type() == KeyboardEventType::PRESS) {
         LOG_INFO("Press key");
+    }
+}
+
+void Application::handleMouse(const Event& event)
+{
+    const MouseEvent& mEvent = static_cast<const MouseEvent&>(event);
+
+    if (mEvent.type() == MouseEventType::MOVE) {
+        const MouseMoveEvent& moveEvent = static_cast<const MouseMoveEvent&>(mEvent);
+        LOG_INFO("X: {} | Y: {} | DX: {} | DY : {}", moveEvent.position.x, moveEvent.position.y,
+            moveEvent.delta.x, moveEvent.delta.y);
+    }
+    if (mEvent.type() == MouseEventType::ENTER_EXIT) {
+        const MouseEnterExitEvent& enterEvent = static_cast<const MouseEnterExitEvent&>(mEvent);
+        LOG_INFO(enterEvent.entered ? "Entered" : "Exit");
     }
 }
