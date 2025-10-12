@@ -173,9 +173,9 @@ void Application::init()
     createPipelines();
 
     m_Window.subscribe(EventFamily::KEYBOARD,
-        std::bind(&Application::handleKeyInput, *this, std::placeholders::_1));
+        std::bind(&Application::handleKeyInput, this, std::placeholders::_1));
     m_Window.subscribe(
-        EventFamily::MOUSE, std::bind(&Application::handleMouse, *this, std::placeholders::_1));
+        EventFamily::MOUSE, std::bind(&Application::handleMouse, this, std::placeholders::_1));
 
     LOG_INFO("Initialised application");
 }
