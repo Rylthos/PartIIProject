@@ -7,6 +7,8 @@ set (SOURCE_LIST
   "events.hpp"
 )
 
+add_compile_definitions(GLM_ENABLE_EXPERIMENTAL)
+
 add_executable(${PROJECT_NAME} ${SOURCE_LIST})
 
 target_link_libraries(${PROJECT_NAME} PRIVATE

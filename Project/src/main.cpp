@@ -6,7 +6,6 @@
     } while (false)
 #endif
 
-#define GLM_ENABLE_EXPERIMENTAL
 #define VMA_IMPLEMENTATION
 
 #include "application.hpp"

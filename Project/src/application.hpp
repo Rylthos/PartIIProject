@@ -35,6 +35,11 @@ struct PerFrameData {
     VkDescriptorSet drawImageDescriptorSet;
 };
 
+struct PushConstants {
+    glm::vec2 mousePos;
+    bool renderFull;
+};
+
 class Application {
   public:
     void init();
@@ -77,6 +82,9 @@ class Application {
 
     uint32_t m_CurrentFrameIndex { 0 };
     uint32_t m_CurrentSemaphore { 0 };
+
+    glm::vec2 m_MousePos { 100, 0 };
+    bool m_RenderFull = true;
 
   private:
     void initVulkan();

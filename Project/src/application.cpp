@@ -3,6 +3,8 @@
 #include "VkBootstrap.h"
 #include "events.hpp"
 
+#include "glm/gtx/string_cast.hpp"
+
 #include <vector>
 
 #define SLANG_DIAG(diagnostics)                                                                    \
@@ -593,14 +595,19 @@ void Application::setupSlang()
 
 void Application::createPipelines()
 {
+    VkPushConstantRange pushConstantRange {};
+    pushConstantRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    pushConstantRange.offset = 0;
+    pushConstantRange.size = sizeof(PushConstants);
+
     VkPipelineLayoutCreateInfo pipelineLayoutCI {};
     pipelineLayoutCI.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutCI.pNext = nullptr;
     pipelineLayoutCI.flags = 0;
     pipelineLayoutCI.setLayoutCount = 1;
     pipelineLayoutCI.pSetLayouts = &m_ComputeDescriptorSetLayout;
-    pipelineLayoutCI.pushConstantRangeCount = 0;
-    pipelineLayoutCI.pPushConstantRanges = nullptr;
+    pipelineLayoutCI.pushConstantRangeCount = 1;
+    pipelineLayoutCI.pPushConstantRanges = &pushConstantRange;
 
     VK_CHECK(vkCreatePipelineLayout(m_VkDevice, &pipelineLayoutCI, nullptr, &m_VkPipelineLayout),
         "Failed to create pipeline layout");
@@ -676,6 +683,13 @@ void Application::render()
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_VkPipeline);
         vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_VkPipelineLayout,
             0, 1, &currentFrame.drawImageDescriptorSet, 0, nullptr);
+
+        PushConstants pushConstant {};
+        pushConstant.mousePos = m_MousePos;
+        pushConstant.renderFull = m_RenderFull;
+
+        vkCmdPushConstants(commandBuffer, m_VkPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
+            sizeof(pushConstant), &pushConstant);
 
         vkCmdDispatch(commandBuffer, currentFrame.drawImage.extent.width / 8,
             currentFrame.drawImage.extent.height / 8, 1);
@@ -756,7 +770,10 @@ void Application::handleKeyInput(const Event& event)
     const KeyboardEvent& kEvent = static_cast<const KeyboardEvent&>(event);
 
     if (kEvent.type() == KeyboardEventType::PRESS) {
-        LOG_INFO("Press key");
+        const KeyboardPressEvent& keyEvent = static_cast<const KeyboardPressEvent&>(kEvent);
+        if (keyEvent.keycode == GLFW_KEY_LEFT_ALT) {
+            m_RenderFull = !m_RenderFull;
+        }
     }
 }
 
@@ -766,9 +783,11 @@ void Application::handleMouse(const Event& event)
 
     if (mEvent.type() == MouseEventType::MOVE) {
         const MouseMoveEvent& moveEvent = static_cast<const MouseMoveEvent&>(mEvent);
-        LOG_INFO("X: {} | Y: {} | DX: {} | DY : {}", moveEvent.position.x, moveEvent.position.y,
-            moveEvent.delta.x, moveEvent.delta.y);
+
+        m_MousePos = glm::vec2(moveEvent.position.x / (float)m_Window.getWindowSize().x,
+            moveEvent.position.y / (float)m_Window.getWindowSize().y);
     }
+
     if (mEvent.type() == MouseEventType::ENTER_EXIT) {
         const MouseEnterExitEvent& enterEvent = static_cast<const MouseEnterExitEvent&>(mEvent);
         LOG_INFO(enterEvent.entered ? "Entered" : "Exit");
