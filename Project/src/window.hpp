@@ -5,7 +5,7 @@
 #include "GLFW/glfw3.h"
 #include "glm/glm.hpp"
 
-#include "events.hpp"
+#include "event_watcher.hpp"
 
 class Window : public EventWatcher {
   public:

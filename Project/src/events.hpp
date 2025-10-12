@@ -1,8 +1,5 @@
 #pragma once
 
-#include <functional>
-#include <unordered_map>
-#include <vector>
 
 enum class EventFamily { KEYBOARD, MOUSE, WINDOW };
 enum class KeyboardEventType { PRESS, RELEASE };
