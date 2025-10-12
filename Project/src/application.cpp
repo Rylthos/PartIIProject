@@ -178,6 +178,8 @@ void Application::init()
         std::bind(&Application::handleKeyInput, this, std::placeholders::_1));
     m_Window.subscribe(
         EventFamily::MOUSE, std::bind(&Application::handleMouse, this, std::placeholders::_1));
+    m_Window.subscribe(
+        EventFamily::WINDOW, std::bind(&Application::handleWindow, this, std::placeholders::_1));
 
     LOG_INFO("Initialised application");
 }
@@ -791,5 +793,28 @@ void Application::handleMouse(const Event& event)
     if (mEvent.type() == MouseEventType::ENTER_EXIT) {
         const MouseEnterExitEvent& enterEvent = static_cast<const MouseEnterExitEvent&>(mEvent);
         LOG_INFO(enterEvent.entered ? "Entered" : "Exit");
+    }
+}
+
+void Application::handleWindow(const Event& event)
+{
+    const WindowEvent& wEvent = static_cast<const WindowEvent&>(event);
+
+    if (wEvent.type() == WindowEventType::RESIZE) {
+        const WindowResizeEvent& resizeEvent = static_cast<const WindowResizeEvent&>(wEvent);
+
+        LOG_INFO("Resizing window");
+        vkDeviceWaitIdle(m_VkDevice);
+
+        vkResetDescriptorPool(m_VkDevice, m_VkDescriptorPool, 0);
+        vkDestroyDescriptorSetLayout(m_VkDevice, m_ComputeDescriptorSetLayout, nullptr);
+        destroySyncStructures();
+        destroyDrawImages();
+        destroySwapchain();
+
+        createSwapchain();
+        createDrawImages();
+        createSyncStructures();
+        createDescriptors();
     }
 }

@@ -18,6 +18,8 @@ void Window::init()
     LOG_INFO("Initialised GLFW");
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    glfwWindowHintString(GLFW_X11_CLASS_NAME, "GLFW");
+    glfwWindowHintString(GLFW_WAYLAND_APP_ID, "GLFW");
 
     m_Window
         = glfwCreateWindow(m_WindowSize.x, m_WindowSize.y, "Voxel Raymarching", nullptr, nullptr);
@@ -33,6 +35,7 @@ void Window::init()
     glfwSetMouseButtonCallback(m_Window, handleMouseButton);
     glfwSetCursorEnterCallback(m_Window, handleMouseEnter);
     glfwSetCursorPosCallback(m_Window, handleMouseMove);
+    glfwSetWindowSizeCallback(m_Window, handleWindowResize);
 
     LOG_INFO("Created GLFW window");
 }
@@ -132,5 +135,16 @@ void Window::handleMouseEnter(GLFWwindow* glfwWindow, int entered)
 
     MouseEnterExitEvent event;
     event.entered = entered;
+    window->post(event);
+}
+
+void Window::handleWindowResize(GLFWwindow* glfwWindow, int width, int height)
+{
+    Window* window = (Window*)glfwGetWindowUserPointer(glfwWindow);
+
+    window->m_WindowSize = glm::ivec2(width, height);
+
+    WindowResizeEvent event;
+    event.newSize = glm::ivec2(width, height);
     window->post(event);
 }

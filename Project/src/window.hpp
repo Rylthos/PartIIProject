@@ -32,4 +32,6 @@ class Window : public EventWatcher {
     static void handleMouseButton(GLFWwindow* window, int button, int action, int mods);
     static void handleMouseMove(GLFWwindow* window, double xPos, double yPos);
     static void handleMouseEnter(GLFWwindow* window, int entered);
+
+    static void handleWindowResize(GLFWwindow* window, int width, int height);
 };
