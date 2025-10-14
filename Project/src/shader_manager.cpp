@@ -1,13 +1,8 @@
 #include "shader_manager.hpp"
 
-#include "sys/inotify.h"
-#include "unistd.h"
+#include "file_watcher.hpp"
 
 #include "logger.hpp"
-#include <algorithm>
-#include <mutex>
-#include <sys/inotify.h>
-#include <thread>
 
 #define SLANG_DIAG(diagnostics)                                                                    \
     do {                                                                                           \
@@ -46,7 +41,7 @@ void ShaderManager::init(VkDevice device)
     m_SessionDesc.searchPaths = searchPaths;
     m_SessionDesc.searchPathCount = 1;
 
-    m_FileThread = std::thread(&ShaderManager::fileWatch, this);
+    FileWatcher::getInstance()->init();
 
     LOG_INFO("Setup slang session");
 }
@@ -57,8 +52,8 @@ void ShaderManager::cleanup()
         vkDestroyShaderModule(m_VkDevice, module.second, nullptr);
     }
     m_ShaderModules.clear();
-    m_RunThread = false;
-    m_FileThread.join();
+
+    FileWatcher::getInstance()->stop();
 }
 
 void ShaderManager::addModule(const ModuleName& module, std::function<void()>&& createPipeline,
@@ -209,56 +204,8 @@ void ShaderManager::addDependencies(const ModuleName& module)
 
         m_FileMapping[path].push_back(module);
 
-        addFileWatch(path);
+        FileWatcher::getInstance()->addWatcher(
+            path, std::bind(&ShaderManager::updated, this, std::placeholders::_1));
     }
     m_FileMapping[module].push_back(module);
-}
-
-void ShaderManager::addFileWatch(const FileName& file)
-{
-    std::lock_guard<std::mutex> _lock(m_FileMutex);
-
-    int id = inotify_init1(IN_NONBLOCK);
-
-    int watchFD = inotify_add_watch(id, file.c_str(), IN_DELETE_SELF | IN_MODIFY);
-    if (watchFD < 0) {
-        LOG_ERROR("Failed to add watch to inotify: {} | {}", file, std::strerror(errno));
-    } else {
-        LOG_INFO("Add watch {}", file);
-    }
-
-    m_FileWatches[file] = std::make_pair(id, watchFD);
-}
-
-void ShaderManager::fileWatch()
-{
-    size_t bufSize = sizeof(inotify_event) + PATH_MAX + 1;
-    inotify_event* event = (inotify_event*)malloc(bufSize);
-
-    int fd, watchFD;
-
-    while (m_RunThread) {
-        m_FileMutex.lock();
-        auto fileCopy = m_FileWatches;
-        m_FileMutex.unlock();
-
-        for (const auto& fileWatch : fileCopy) {
-            ssize_t len = read(fileWatch.second.first, event, bufSize);
-            if (len > 0) {
-                if (event->mask & IN_MODIFY) {
-                    LOG_INFO("Modified {}", fileWatch.first);
-                    updated(event->name);
-                }
-                if (event->mask & IN_DELETE_SELF) {
-                    LOG_INFO("Modified {}", fileWatch.first);
-                    updated(fileWatch.first);
-                    close(fileWatch.second.first);
-                    addFileWatch(fileWatch.first);
-                }
-            }
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    }
-
-    free(event);
 }

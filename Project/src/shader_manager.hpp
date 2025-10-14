@@ -35,9 +35,6 @@ class ShaderManager {
     void generateShaderModule(const ModuleName& moduleName);
     void addDependencies(const ModuleName& moduleName);
 
-    void addFileWatch(const FileName& file);
-    void fileWatch();
-
   private:
     struct PipelineFunction {
         std::function<void()> creator;
@@ -50,8 +47,6 @@ class ShaderManager {
     slang::SessionDesc m_SessionDesc;
 
     std::map<FileName, std::vector<ModuleName>> m_FileMapping;
-    std::map<FileName, std::pair<int, int>> m_FileWatches;
-
     std::map<ModuleName, std::vector<PipelineFunction>> m_FunctionMap;
 
     std::map<ModuleName, VkShaderModule> m_ShaderModules;
@@ -59,8 +54,4 @@ class ShaderManager {
 
     std::set<FileName> m_Updates;
     std::mutex m_UpdateMutex;
-
-    bool m_RunThread = true;
-    std::thread m_FileThread;
-    std::mutex m_FileMutex;
 };

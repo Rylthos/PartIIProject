@@ -6,6 +6,7 @@ set (SOURCE_LIST
   "event_watcher.cpp" "event_watcher.hpp"
   "events.hpp"
   "shader_manager.cpp" "shader_manager.hpp"
+  "file_watcher.cpp" "file_watcher.hpp"
 )
 
 add_compile_definitions(GLM_ENABLE_EXPERIMENTAL)
