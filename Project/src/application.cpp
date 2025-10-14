@@ -665,6 +665,8 @@ void Application::update()
 {
     m_CurrentFrameIndex = (m_CurrentFrameIndex + 1) % FRAMES_IN_FLIGHT;
     m_CurrentSemaphore = (m_CurrentSemaphore + 1) % m_VkSwapchainImages.size();
+
+    ShaderManager::getInstance()->updateAll();
 }
 
 void Application::handleKeyInput(const Event& event)

@@ -1,7 +1,13 @@
 #include "shader_manager.hpp"
 
+#include "sys/inotify.h"
+#include "unistd.h"
+
 #include "logger.hpp"
 #include <algorithm>
+#include <mutex>
+#include <sys/inotify.h>
+#include <thread>
 
 #define SLANG_DIAG(diagnostics)                                                                    \
     do {                                                                                           \
@@ -40,6 +46,8 @@ void ShaderManager::init(VkDevice device)
     m_SessionDesc.searchPaths = searchPaths;
     m_SessionDesc.searchPathCount = 1;
 
+    m_FileThread = std::thread(&ShaderManager::fileWatch, this);
+
     LOG_INFO("Setup slang session");
 }
 
@@ -49,9 +57,11 @@ void ShaderManager::cleanup()
         vkDestroyShaderModule(m_VkDevice, module.second, nullptr);
     }
     m_ShaderModules.clear();
+    m_RunThread = false;
+    m_FileThread.join();
 }
 
-void ShaderManager::addModule(ModuleName module, std::function<void()>&& createPipeline,
+void ShaderManager::addModule(const ModuleName& module, std::function<void()>&& createPipeline,
     std::function<void()>&& destroyPipeline)
 {
     PipelineFunction function {
@@ -65,39 +75,56 @@ void ShaderManager::addModule(ModuleName module, std::function<void()>&& createP
     addDependencies(module);
 }
 
-VkShaderModule ShaderManager::getShaderModule(const char* filename)
+VkShaderModule ShaderManager::getShaderModule(const ModuleName& module)
 {
-    return m_ShaderModules[filename];
+    return m_ShaderModules[module];
 }
 
-void ShaderManager::updated(FileName filename)
+void ShaderManager::updated(const FileName& file)
 {
-    std::vector<ModuleName> modules = m_FileMapping[filename];
+    std::lock_guard<std::mutex> _lock(m_UpdateMutex);
+    m_Updates.insert(file);
+}
+
+void ShaderManager::updateAll()
+{
+    if (m_Updates.empty()) {
+        return;
+    }
+
     vkDeviceWaitIdle(m_VkDevice);
+    std::lock_guard<std::mutex> _lock(m_UpdateMutex);
 
-    for (const ModuleName& module : modules) {
-        LOG_INFO("Reloading {}", module);
-        generateShaderModule(module);
+    for (FileName file : m_Updates) {
+        std::vector<ModuleName> modules = m_FileMapping[file];
 
-        std::vector<PipelineFunction> functions = m_FunctionMap[module];
-        for (const auto& function : functions) {
-            function.destructor();
-            function.creator();
+        for (const ModuleName& module : modules) {
+            LOG_INFO("Reloading {}", module);
+            generateShaderModule(module);
+
+            std::vector<PipelineFunction> functions = m_FunctionMap[module];
+            for (const auto& function : functions) {
+                function.destructor();
+                function.creator();
+            }
         }
     }
+    m_Updates.clear();
 }
 
-void ShaderManager::generateShaderModule(const char* filename)
+void ShaderManager::generateShaderModule(const ModuleName& moduleName)
 {
-    LOG_INFO("Start");
     Slang::ComPtr<slang::ISession> session;
     m_GlobalSession->createSession(m_SessionDesc, session.writeRef());
 
     Slang::ComPtr<slang::IModule> slangModule;
     {
         Slang::ComPtr<slang::IBlob> diagnostics;
-        slangModule = session->loadModule(filename, diagnostics.writeRef());
+        slangModule = session->loadModule(moduleName.c_str(), diagnostics.writeRef());
         SLANG_DIAG(diagnostics);
+        if (diagnostics != nullptr) {
+            return;
+        }
     }
 
     Slang::ComPtr<slang::IEntryPoint> entryPoint;
@@ -156,22 +183,22 @@ void ShaderManager::generateShaderModule(const char* filename)
     VK_CHECK(vkCreateShaderModule(m_VkDevice, &moduleCI, nullptr, &module),
         "Failed to create shader module");
 
-    if (m_ShaderModules.find(filename) != m_ShaderModules.end()) {
-        vkDestroyShaderModule(m_VkDevice, m_ShaderModules[filename], nullptr);
+    if (m_ShaderModules.find(moduleName) != m_ShaderModules.end()) {
+        vkDestroyShaderModule(m_VkDevice, m_ShaderModules[moduleName], nullptr);
     }
-    m_ShaderModules[filename] = module;
+    m_ShaderModules[moduleName] = module;
 
-    m_Sessions[filename] = session;
+    m_Sessions[moduleName] = session;
 
-    LOG_INFO("Compiled shader module: {}", filename);
+    LOG_INFO("Compiled shader module: {}", moduleName);
 }
 
-void ShaderManager::addDependencies(ModuleName module)
+void ShaderManager::addDependencies(const ModuleName& module)
 {
     Slang::ComPtr<slang::IModule> slangModule;
     {
         Slang::ComPtr<slang::IBlob> diagnostics;
-        slangModule = m_Sessions[module]->loadModule(module, diagnostics.writeRef());
+        slangModule = m_Sessions[module]->loadModule(module.c_str(), diagnostics.writeRef());
         SLANG_DIAG(diagnostics);
     }
 
@@ -181,6 +208,57 @@ void ShaderManager::addDependencies(ModuleName module)
         const char* path = slangModule->getDependencyFilePath(i);
 
         m_FileMapping[path].push_back(module);
+
+        addFileWatch(path);
     }
     m_FileMapping[module].push_back(module);
+}
+
+void ShaderManager::addFileWatch(const FileName& file)
+{
+    std::lock_guard<std::mutex> _lock(m_FileMutex);
+
+    int id = inotify_init1(IN_NONBLOCK);
+
+    int watchFD = inotify_add_watch(id, file.c_str(), IN_DELETE_SELF | IN_MODIFY);
+    if (watchFD < 0) {
+        LOG_ERROR("Failed to add watch to inotify: {} | {}", file, std::strerror(errno));
+    } else {
+        LOG_INFO("Add watch {}", file);
+    }
+
+    m_FileWatches[file] = std::make_pair(id, watchFD);
+}
+
+void ShaderManager::fileWatch()
+{
+    size_t bufSize = sizeof(inotify_event) + PATH_MAX + 1;
+    inotify_event* event = (inotify_event*)malloc(bufSize);
+
+    int fd, watchFD;
+
+    while (m_RunThread) {
+        m_FileMutex.lock();
+        auto fileCopy = m_FileWatches;
+        m_FileMutex.unlock();
+
+        for (const auto& fileWatch : fileCopy) {
+            ssize_t len = read(fileWatch.second.first, event, bufSize);
+            if (len > 0) {
+                if (event->mask & IN_MODIFY) {
+                    LOG_INFO("Modified {}", fileWatch.first);
+                    updated(event->name);
+                }
+                if (event->mask & IN_DELETE_SELF) {
+                    LOG_INFO("Modified {}", fileWatch.first);
+                    updated(fileWatch.first);
+                    close(fileWatch.second.first);
+                    addFileWatch(fileWatch.first);
+                }
+            }
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+
+    free(event);
 }
