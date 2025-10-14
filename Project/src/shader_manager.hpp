@@ -10,21 +10,26 @@
 #include "slang.h"
 
 class ShaderManager {
+    using ModuleName = const char*;
+    using FileName = const char*;
 
   public:
     static ShaderManager* getInstance();
     void init(VkDevice device);
     void cleanup();
 
-    void addShader(std::initializer_list<const char*> files, std::function<void()>&& createPipeline,
+    void addModule(ModuleName module, std::function<void()>&& createPipeline,
         std::function<void()>&& destroyPipeline);
 
-    VkShaderModule getShaderModule(const char* filename);
+    VkShaderModule getShaderModule(ModuleName moduleName);
+
+    void updated(FileName file);
 
   private:
     ShaderManager() { }
 
-    void generateShaderModule(const char* filename, size_t pipelineIndex);
+    void generateShaderModule(ModuleName moduleName);
+    void addDependencies(ModuleName moduleName);
 
   private:
     struct PipelineFunction {
@@ -35,10 +40,12 @@ class ShaderManager {
     VkDevice m_VkDevice;
 
     Slang::ComPtr<slang::IGlobalSession> m_GlobalSession;
-    Slang::ComPtr<slang::ISession> m_Session;
+    slang::SessionDesc m_SessionDesc;
 
-    std::unordered_map<const char*, size_t> m_FunctionMap;
-    std::vector<PipelineFunction> m_PipelineFunctions;
+    std::unordered_map<FileName, std::vector<ModuleName>> m_FileMapping;
 
-    std::unordered_map<const char*, VkShaderModule> m_ShaderModules;
+    std::unordered_map<ModuleName, std::vector<PipelineFunction>> m_FunctionMap;
+
+    std::unordered_map<ModuleName, VkShaderModule> m_ShaderModules;
+    std::unordered_map<ModuleName, Slang::ComPtr<slang::ISession>> m_Sessions;
 };

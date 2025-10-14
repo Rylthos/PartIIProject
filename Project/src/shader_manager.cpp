@@ -20,29 +20,25 @@ void ShaderManager::init(VkDevice device)
 {
     m_VkDevice = device;
 
-    slang::SessionDesc sessionDesc {};
-
     slang::createGlobalSession(m_GlobalSession.writeRef());
 
-    slang::TargetDesc targetDesc = {};
+    static slang::TargetDesc targetDesc = {};
     targetDesc.format = SLANG_SPIRV;
     targetDesc.profile = m_GlobalSession->findProfile("spirv_1_5");
 
-    sessionDesc.targets = &targetDesc;
-    sessionDesc.targetCount = 1;
+    m_SessionDesc.targets = &targetDesc;
+    m_SessionDesc.targetCount = 1;
 
-    std::array<slang::CompilerOptionEntry, 1> options = {
+    static std::array<slang::CompilerOptionEntry, 1> options = {
         { slang::CompilerOptionName::EmitSpirvDirectly,
          { slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr } }
     };
-    sessionDesc.compilerOptionEntries = options.data();
-    sessionDesc.compilerOptionEntryCount = options.size();
+    m_SessionDesc.compilerOptionEntries = options.data();
+    m_SessionDesc.compilerOptionEntryCount = options.size();
 
-    const char* searchPaths[] = { "res/shaders/" };
-    sessionDesc.searchPaths = searchPaths;
-    sessionDesc.searchPathCount = 1;
-
-    m_GlobalSession->createSession(sessionDesc, m_Session.writeRef());
+    static const char* searchPaths[] = { "res/shaders/" };
+    m_SessionDesc.searchPaths = searchPaths;
+    m_SessionDesc.searchPathCount = 1;
 
     LOG_INFO("Setup slang session");
 }
@@ -55,19 +51,18 @@ void ShaderManager::cleanup()
     m_ShaderModules.clear();
 }
 
-void ShaderManager::addShader(std::initializer_list<const char*> files,
-    std::function<void()>&& createPipeline, std::function<void()>&& destroyPipeline)
+void ShaderManager::addModule(ModuleName module, std::function<void()>&& createPipeline,
+    std::function<void()>&& destroyPipeline)
 {
     PipelineFunction function {
         .creator = createPipeline,
         .destructor = destroyPipeline,
     };
-    size_t index = m_PipelineFunctions.size();
-    m_PipelineFunctions.push_back(function);
 
-    for (auto file : files) {
-        generateShaderModule(file, index);
-    }
+    m_FunctionMap[module].push_back(function);
+
+    generateShaderModule(module);
+    addDependencies(module);
 }
 
 VkShaderModule ShaderManager::getShaderModule(const char* filename)
@@ -75,24 +70,39 @@ VkShaderModule ShaderManager::getShaderModule(const char* filename)
     return m_ShaderModules[filename];
 }
 
-void ShaderManager::generateShaderModule(const char* filename, size_t pipelineIndex)
+void ShaderManager::updated(FileName filename)
 {
+    std::vector<ModuleName> modules = m_FileMapping[filename];
+    vkDeviceWaitIdle(m_VkDevice);
+
+    for (const ModuleName& module : modules) {
+        LOG_INFO("Reloading {}", module);
+        generateShaderModule(module);
+
+        std::vector<PipelineFunction> functions = m_FunctionMap[module];
+        for (const auto& function : functions) {
+            function.destructor();
+            function.creator();
+        }
+    }
+}
+
+void ShaderManager::generateShaderModule(const char* filename)
+{
+    LOG_INFO("Start");
+    Slang::ComPtr<slang::ISession> session;
+    m_GlobalSession->createSession(m_SessionDesc, session.writeRef());
+
     Slang::ComPtr<slang::IModule> slangModule;
     {
         Slang::ComPtr<slang::IBlob> diagnostics;
-        slangModule = m_Session->loadModule(filename, diagnostics.writeRef());
+        slangModule = session->loadModule(filename, diagnostics.writeRef());
         SLANG_DIAG(diagnostics);
     }
 
     Slang::ComPtr<slang::IEntryPoint> entryPoint;
     // FIX: Doesn't work if not compute shader
     slangModule->findEntryPointByName("computeMain", entryPoint.writeRef());
-
-    uint32_t count = slangModule->getDependencyFileCount();
-    for (uint32_t i = 0; i < count; i++) {
-        // FIX: Add file hooks for changing
-        const char* path = slangModule->getDependencyFilePath(i);
-    }
 
     if (!entryPoint)
         LOG_ERROR("Error getting entry point");
@@ -102,7 +112,7 @@ void ShaderManager::generateShaderModule(const char* filename, size_t pipelineIn
     Slang::ComPtr<slang::IComponentType> composedProgram;
     {
         Slang::ComPtr<slang::IBlob> diagnostics;
-        SlangResult result = m_Session->createCompositeComponentType(componentTypes.data(),
+        SlangResult result = session->createCompositeComponentType(componentTypes.data(),
             componentTypes.size(), composedProgram.writeRef(), diagnostics.writeRef());
 
         SLANG_DIAG(diagnostics);
@@ -119,7 +129,7 @@ void ShaderManager::generateShaderModule(const char* filename, size_t pipelineIn
 
         SLANG_DIAG(diagnostics);
         if (SLANG_FAILED(result)) {
-            LOG_ERROR("Fail composing shader");
+            LOG_ERROR("Fail linking shader");
         }
     }
 
@@ -131,9 +141,10 @@ void ShaderManager::generateShaderModule(const char* filename, size_t pipelineIn
 
         SLANG_DIAG(diagnostics);
         if (SLANG_FAILED(result)) {
-            LOG_ERROR("Fail linking shader");
+            LOG_ERROR("Fail getting target code");
         }
     }
+
     VkShaderModuleCreateInfo moduleCI {};
     moduleCI.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     moduleCI.pNext = nullptr;
@@ -145,7 +156,31 @@ void ShaderManager::generateShaderModule(const char* filename, size_t pipelineIn
     VK_CHECK(vkCreateShaderModule(m_VkDevice, &moduleCI, nullptr, &module),
         "Failed to create shader module");
 
+    if (m_ShaderModules.find(filename) != m_ShaderModules.end()) {
+        vkDestroyShaderModule(m_VkDevice, m_ShaderModules[filename], nullptr);
+    }
     m_ShaderModules[filename] = module;
 
+    m_Sessions[filename] = session;
+
     LOG_INFO("Compiled shader module: {}", filename);
+}
+
+void ShaderManager::addDependencies(ModuleName module)
+{
+    Slang::ComPtr<slang::IModule> slangModule;
+    {
+        Slang::ComPtr<slang::IBlob> diagnostics;
+        slangModule = m_Sessions[module]->loadModule(module, diagnostics.writeRef());
+        SLANG_DIAG(diagnostics);
+    }
+
+    uint32_t count = slangModule->getDependencyFileCount();
+    for (uint32_t i = 0; i < count; i++) {
+        // FIX: Add file hooks for changing
+        const char* path = slangModule->getDependencyFilePath(i);
+
+        m_FileMapping[path].push_back(module);
+    }
+    m_FileMapping[module].push_back(module);
 }

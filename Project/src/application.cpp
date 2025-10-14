@@ -100,7 +100,7 @@ void Application::init()
 
     createPipelineLayouts();
 
-    ShaderManager::getInstance()->addShader({ "basic_compute" },
+    ShaderManager::getInstance()->addModule("basic_compute",
         std::bind(&Application::createComputePipeline, this),
         std::bind(&Application::destroyComputePipeline, this));
 
@@ -675,6 +675,8 @@ void Application::handleKeyInput(const Event& event)
         const KeyboardPressEvent& keyEvent = static_cast<const KeyboardPressEvent&>(kEvent);
         if (keyEvent.keycode == GLFW_KEY_LEFT_ALT) {
             m_RenderFull = !m_RenderFull;
+        } else if (keyEvent.keycode == GLFW_KEY_R) {
+            ShaderManager::getInstance()->updated("basic_compute");
         }
     }
 }
