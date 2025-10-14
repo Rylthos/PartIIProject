@@ -1,4 +1,4 @@
-import test_include;
+#include "test_include.slang"
 
 struct PushConstants {
   float2 mousePos;

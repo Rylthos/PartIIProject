@@ -4,86 +4,11 @@
 #include "events.hpp"
 
 #include "glm/gtx/string_cast.hpp"
+#include "shader_manager.hpp"
+
+#include "functional"
 
 #include <vector>
-
-#define SLANG_DIAG(diagnostics)                                                                    \
-    do {                                                                                           \
-        if ((diagnostics) != nullptr) {                                                            \
-            LOG_ERROR((const char*)(diagnostics)->getBufferPointer());                             \
-        }                                                                                          \
-    } while (0)
-
-VkShaderModule createShaderModule(
-    VkDevice device, std::string filename, Slang::ComPtr<slang::ISession> session)
-{
-    LOG_INFO("Create shader module");
-
-    Slang::ComPtr<slang::IModule> slangModule;
-    {
-        Slang::ComPtr<slang::IBlob> diagnostics;
-        slangModule = session->loadModule(filename.c_str(), diagnostics.writeRef());
-        SLANG_DIAG(diagnostics);
-    }
-
-    Slang::ComPtr<slang::IEntryPoint> entryPoint;
-    slangModule->findEntryPointByName("computeMain", entryPoint.writeRef());
-
-    if (!entryPoint)
-        LOG_ERROR("Error getting entry point");
-
-    std::array<slang::IComponentType*, 2> componentTypes = { slangModule, entryPoint };
-
-    Slang::ComPtr<slang::IComponentType> composedProgram;
-    {
-        Slang::ComPtr<slang::IBlob> diagnostics;
-        SlangResult result = session->createCompositeComponentType(componentTypes.data(),
-            componentTypes.size(), composedProgram.writeRef(), diagnostics.writeRef());
-
-        SLANG_DIAG(diagnostics);
-        if (SLANG_FAILED(result)) {
-            LOG_ERROR("Fail composing shader");
-        }
-    }
-
-    Slang::ComPtr<slang::IComponentType> linkedProgram;
-    {
-        Slang::ComPtr<slang::IBlob> diagnostics;
-        SlangResult result
-            = composedProgram->link(linkedProgram.writeRef(), diagnostics.writeRef());
-
-        SLANG_DIAG(diagnostics);
-        if (SLANG_FAILED(result)) {
-            LOG_ERROR("Fail composing shader");
-        }
-    }
-
-    Slang::ComPtr<slang::IBlob> spirvCode;
-    {
-        Slang::ComPtr<slang::IBlob> diagnostics;
-        SlangResult result
-            = linkedProgram->getTargetCode(0, spirvCode.writeRef(), diagnostics.writeRef());
-
-        SLANG_DIAG(diagnostics);
-        if (SLANG_FAILED(result)) {
-            LOG_ERROR("Fail linking shader");
-        }
-    }
-    VkShaderModuleCreateInfo moduleCI {};
-    moduleCI.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    moduleCI.pNext = nullptr;
-    moduleCI.flags = 0;
-    moduleCI.codeSize = spirvCode->getBufferSize();
-    moduleCI.pCode = (uint32_t*)spirvCode->getBufferPointer();
-
-    VkShaderModule module;
-    VK_CHECK(vkCreateShaderModule(device, &moduleCI, nullptr, &module),
-        "Failed to create shader module");
-
-    LOG_INFO("Compiled shader module: {}", filename);
-
-    return module;
-}
 
 void transitionImage(VkCommandBuffer commandBuffer, VkImage target, VkImageLayout currentLayout,
     VkImageLayout targetLayout)
@@ -155,10 +80,13 @@ void copyImageToImage(
 
 void Application::init()
 {
+    using namespace std::placeholders;
     Logger::init();
 
     m_Window.init();
     initVulkan();
+
+    ShaderManager::getInstance()->init(m_VkDevice);
 
     createSwapchain();
     createDrawImages();
@@ -170,16 +98,17 @@ void Application::init()
     createDescriptorPool();
     createDescriptors();
 
-    setupSlang();
+    createPipelineLayouts();
 
-    createPipelines();
+    ShaderManager::getInstance()->addShader({ "basic_compute" },
+        std::bind(&Application::createComputePipeline, this),
+        std::bind(&Application::destroyComputePipeline, this));
 
-    m_Window.subscribe(EventFamily::KEYBOARD,
-        std::bind(&Application::handleKeyInput, this, std::placeholders::_1));
-    m_Window.subscribe(
-        EventFamily::MOUSE, std::bind(&Application::handleMouse, this, std::placeholders::_1));
-    m_Window.subscribe(
-        EventFamily::WINDOW, std::bind(&Application::handleWindow, this, std::placeholders::_1));
+    createComputePipeline();
+
+    m_Window.subscribe(EventFamily::KEYBOARD, std::bind(&Application::handleKeyInput, this, _1));
+    m_Window.subscribe(EventFamily::MOUSE, std::bind(&Application::handleMouse, this, _1));
+    m_Window.subscribe(EventFamily::WINDOW, std::bind(&Application::handleWindow, this, _1));
 
     LOG_INFO("Initialised application");
 }
@@ -198,7 +127,10 @@ void Application::cleanup()
 {
     vkDeviceWaitIdle(m_VkDevice);
 
-    destroyPipelines();
+    ShaderManager::getInstance()->cleanup();
+
+    destroyComputePipeline();
+    destroyPipelineLayouts();
 
     destroyDescriptorPool();
 
@@ -565,37 +497,7 @@ void Application::destroyDescriptorPool()
 
     LOG_INFO("Destroyed descriptor pool");
 }
-
-void Application::setupSlang()
-{
-    slang::SessionDesc sessionDesc {};
-
-    slang::createGlobalSession(m_GlobalSession.writeRef());
-
-    slang::TargetDesc targetDesc = {};
-    targetDesc.format = SLANG_SPIRV;
-    targetDesc.profile = m_GlobalSession->findProfile("spirv_1_5");
-
-    sessionDesc.targets = &targetDesc;
-    sessionDesc.targetCount = 1;
-
-    std::array<slang::CompilerOptionEntry, 1> options = {
-        { slang::CompilerOptionName::EmitSpirvDirectly,
-         { slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr } }
-    };
-    sessionDesc.compilerOptionEntries = options.data();
-    sessionDesc.compilerOptionEntryCount = options.size();
-
-    const char* searchPaths[] = { "res/shaders/" };
-    sessionDesc.searchPaths = searchPaths;
-    sessionDesc.searchPathCount = 1;
-
-    m_GlobalSession->createSession(sessionDesc, m_Session.writeRef());
-
-    LOG_INFO("Setup slang session");
-}
-
-void Application::createPipelines()
+void Application::createPipelineLayouts()
 {
     VkPushConstantRange pushConstantRange {};
     pushConstantRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
@@ -613,8 +515,16 @@ void Application::createPipelines()
 
     VK_CHECK(vkCreatePipelineLayout(m_VkDevice, &pipelineLayoutCI, nullptr, &m_VkPipelineLayout),
         "Failed to create pipeline layout");
+}
 
-    VkShaderModule shaderModule = createShaderModule(m_VkDevice, "basic_compute", m_Session);
+void Application::destroyPipelineLayouts()
+{
+    vkDestroyPipelineLayout(m_VkDevice, m_VkPipelineLayout, nullptr);
+}
+
+void Application::createComputePipeline()
+{
+    VkShaderModule shaderModule = ShaderManager::getInstance()->getShaderModule("basic_compute");
 
     VkPipelineShaderStageCreateInfo shaderStageCI {};
     shaderStageCI.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -637,19 +547,9 @@ void Application::createPipelines()
     VK_CHECK(vkCreateComputePipelines(
                  m_VkDevice, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &m_VkPipeline),
         "Failed to create compute pipeline");
-
-    vkDestroyShaderModule(m_VkDevice, shaderModule, nullptr);
-
-    LOG_INFO("Created pipelines");
 }
 
-void Application::destroyPipelines()
-{
-    vkDestroyPipeline(m_VkDevice, m_VkPipeline, nullptr);
-    vkDestroyPipelineLayout(m_VkDevice, m_VkPipelineLayout, nullptr);
-
-    LOG_INFO("Destroyed pipelines");
-}
+void Application::destroyComputePipeline() { vkDestroyPipeline(m_VkDevice, m_VkPipeline, nullptr); }
 
 void Application::render()
 {
