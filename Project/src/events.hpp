@@ -2,11 +2,12 @@
 
 #include <glm/glm.hpp>
 
-enum class EventFamily { KEYBOARD, MOUSE, WINDOW };
+enum class EventFamily { KEYBOARD, MOUSE, WINDOW, FRAME };
 
 enum class KeyboardEventType { PRESS, RELEASE };
 enum class MouseEventType { MOVE, ENTER_EXIT, CLICK, LIFT };
 enum class WindowEventType { RESIZE };
+enum class FrameEventType { RENDER, UPDATE, UI };
 
 class Event {
   public:
@@ -112,4 +113,34 @@ class WindowResizeEvent : public WindowEvent {
 
   public:
     glm::ivec2 newSize;
+};
+
+class FrameEvent : public Event {
+  public:
+    virtual EventFamily family() const { return EventFamily::FRAME; }
+    virtual FrameEventType type() const = 0;
+};
+
+class RenderEvent : public FrameEvent {
+  public:
+    RenderEvent() = default;
+    ~RenderEvent() = default;
+
+    virtual FrameEventType type() const { return FrameEventType::RENDER; }
+};
+
+class UpdateEvent : public FrameEvent {
+  public:
+    UpdateEvent() = default;
+    ~UpdateEvent() = default;
+
+    virtual FrameEventType type() const { return FrameEventType::UPDATE; }
+};
+
+class UIEvent : public FrameEvent {
+  public:
+    UIEvent() = default;
+    ~UIEvent() = default;
+
+    virtual FrameEventType type() const { return FrameEventType::UI; }
 };

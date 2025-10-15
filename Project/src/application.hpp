@@ -36,7 +36,7 @@ struct PushConstants {
     bool renderFull;
 };
 
-class Application {
+class Application : public EventWatcher {
   public:
     void init();
     void start();
@@ -108,6 +108,7 @@ class Application {
     void destroyComputePipeline();
 
     void renderUI();
+    void UI(const Event& event);
 
     void render();
 

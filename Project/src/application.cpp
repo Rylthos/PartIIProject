@@ -117,6 +117,8 @@ void Application::init()
     m_Window.subscribe(EventFamily::MOUSE, std::bind(&Application::handleMouse, this, _1));
     m_Window.subscribe(EventFamily::WINDOW, std::bind(&Application::handleWindow, this, _1));
 
+    subscribe(EventFamily::FRAME, std::bind(&Application::UI, this, _1));
+
     LOG_INFO("Initialised application");
 }
 
@@ -626,9 +628,19 @@ void Application::renderUI()
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-    ImGui::ShowDemoWindow();
+    UIEvent event;
+    post(event);
 
     ImGui::Render();
+}
+
+void Application::UI(const Event& event)
+{
+    const FrameEvent& frameEvent = static_cast<const FrameEvent&>(event);
+    if (frameEvent.type() != FrameEventType::UI)
+        return;
+
+    ImGui::ShowDemoWindow();
 }
 
 void Application::render()
@@ -792,6 +804,9 @@ void Application::update()
     m_CurrentSemaphore = (m_CurrentSemaphore + 1) % m_VkSwapchainImages.size();
 
     ShaderManager::getInstance()->updateAll();
+
+    UpdateEvent event;
+    post(event);
 }
 
 void Application::handleKeyInput(const Event& event)
