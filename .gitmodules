@@ -16,3 +16,7 @@
 [submodule "Project/vendor/slang"]
 	path = Project/vendor/slang
 	url = https://github.com/shader-slang/slang.git
+[submodule "Project/vendor/imgui"]
+	path = Project/vendor/imgui
+	url = https://github.com/ocornut/imgui.git
+	branch = docking

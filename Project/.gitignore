@@ -4,3 +4,4 @@ build/*
 .envrc
 res/shaders/*
 !res/shaders/*.slang
+imgui.ini

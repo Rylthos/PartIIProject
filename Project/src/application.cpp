@@ -9,6 +9,11 @@
 #include "functional"
 
 #include <vector>
+#include <vulkan/vulkan_core.h>
+
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_vulkan.h"
 
 void transitionImage(VkCommandBuffer commandBuffer, VkImage target, VkImageLayout currentLayout,
     VkImageLayout targetLayout)
@@ -95,6 +100,8 @@ void Application::init()
 
     createSyncStructures();
 
+    createImGuiStructures();
+
     createDescriptorPool();
     createDescriptors();
 
@@ -118,6 +125,7 @@ void Application::start()
     while (!m_Window.shouldClose()) {
         m_Window.pollEvents();
 
+        renderUI();
         render();
         update();
     }
@@ -134,7 +142,10 @@ void Application::cleanup()
 
     destroyDescriptorPool();
 
+    destroyImGuiStructures();
+
     destroySyncStructures();
+
     destroyCommandPools();
 
     destroyDrawImages();
@@ -169,6 +180,7 @@ void Application::initVulkan()
     VkPhysicalDeviceVulkan14Features features14 {};
     VkPhysicalDeviceVulkan13Features features13 {};
     features13.synchronization2 = true;
+    features13.dynamicRendering = true;
 
     VkPhysicalDeviceVulkan12Features features12 {};
     features12.bufferDeviceAddress = true;
@@ -397,6 +409,63 @@ void Application::destroySyncStructures()
     LOG_INFO("Destroyed sync structures");
 }
 
+void Application::createImGuiStructures()
+{
+    // VkDescriptorPoolCreateInfo poolCI {};
+    // poolCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    // poolCI.pNext = nullptr;
+    // poolCI.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    // poolCI.maxSets = 1000;
+    // poolCI.poolSizeCount = poolSizes.size();
+    // poolCI.pPoolSizes = poolSizes.data();
+    //
+    // VK_CHECK(vkCreateDescriptorPool(m_VkDevice, &poolCI, nullptr, &m_ImGuiDescriptorPool),
+    //     "Failed to create ImGui descriptor pool");
+    //
+    ImGui::CreateContext();
+    ImGuiIO io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
+    ImGui::StyleColorsDark();
+    ImGui_ImplGlfw_InitForVulkan(m_Window.getWindow(), true);
+
+    VkPipelineRenderingCreateInfo pipelineCI {};
+    pipelineCI.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+    pipelineCI.pNext = nullptr;
+    pipelineCI.viewMask = 0;
+    pipelineCI.colorAttachmentCount = 1;
+    pipelineCI.pColorAttachmentFormats = &m_PerFrameData[0].drawImage.format;
+    pipelineCI.depthAttachmentFormat = VK_FORMAT_UNDEFINED;
+    pipelineCI.stencilAttachmentFormat = VK_FORMAT_UNDEFINED;
+
+    ImGui_ImplVulkan_InitInfo vulkanII {};
+    vulkanII.ApiVersion = VK_API_VERSION_1_4;
+    vulkanII.Instance = m_VkInstance;
+    vulkanII.PhysicalDevice = m_VkPhysicalDevice;
+    vulkanII.Device = m_VkDevice;
+    vulkanII.QueueFamily = m_GraphicsQueue.queueFamily;
+    vulkanII.Queue = m_GraphicsQueue.queue;
+    vulkanII.DescriptorPoolSize = 8;
+    vulkanII.RenderPass = VK_NULL_HANDLE;
+    vulkanII.MinImageCount = 3;
+    vulkanII.ImageCount = 3;
+    vulkanII.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+    vulkanII.UseDynamicRendering = true;
+    vulkanII.PipelineRenderingCreateInfo = pipelineCI;
+
+    ImGui_ImplVulkan_Init(&vulkanII);
+    LOG_INFO("Initialised ImGui");
+}
+
+void Application::destroyImGuiStructures()
+{
+    ImGui_ImplVulkan_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+
+    LOG_INFO("Destroyed ImGui");
+}
+
 void Application::createDescriptorPool()
 {
     std::vector<VkDescriptorPoolSize> poolSizes = {
@@ -551,6 +620,17 @@ void Application::createComputePipeline()
 
 void Application::destroyComputePipeline() { vkDestroyPipeline(m_VkDevice, m_VkPipeline, nullptr); }
 
+void Application::renderUI()
+{
+    ImGui_ImplVulkan_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+
+    ImGui::ShowDemoWindow();
+
+    ImGui::Render();
+}
+
 void Application::render()
 {
     PerFrameData& currentFrame = m_PerFrameData[m_CurrentFrameIndex];
@@ -582,22 +662,20 @@ void Application::render()
         transitionImage(commandBuffer, currentFrame.drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED,
             VK_IMAGE_LAYOUT_GENERAL);
 
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_VkPipeline);
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_VkPipelineLayout,
-            0, 1, &currentFrame.drawImageDescriptorSet, 0, nullptr);
-
-        PushConstants pushConstant {};
-        pushConstant.mousePos = m_MousePos;
-        pushConstant.renderFull = m_RenderFull;
-
-        vkCmdPushConstants(commandBuffer, m_VkPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
-            sizeof(pushConstant), &pushConstant);
-
-        vkCmdDispatch(commandBuffer, currentFrame.drawImage.extent.width / 8,
-            currentFrame.drawImage.extent.height / 8, 1);
+        renderCompute(commandBuffer, currentFrame);
 
         transitionImage(commandBuffer, currentFrame.drawImage.image, VK_IMAGE_LAYOUT_GENERAL,
-            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+        VkExtent2D extent = {
+            .width = currentFrame.drawImage.extent.width,
+            .height = currentFrame.drawImage.extent.height,
+        };
+
+        renderImGui(commandBuffer, currentFrame.drawImage.view, extent);
+
+        transitionImage(commandBuffer, currentFrame.drawImage.image,
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
         copyImageToImage(commandBuffer, currentFrame.drawImage.image,
             m_VkSwapchainImages[swapchainImageIndex], currentFrame.drawImage.extent,
@@ -659,6 +737,53 @@ void Application::render()
     }
 
     m_Window.swapBuffers();
+}
+
+void Application::renderCompute(VkCommandBuffer& commandBuffer, const PerFrameData& currentFrame)
+{
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_VkPipeline);
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_VkPipelineLayout, 0, 1,
+        &currentFrame.drawImageDescriptorSet, 0, nullptr);
+
+    PushConstants pushConstant {};
+    pushConstant.mousePos = m_MousePos;
+    pushConstant.renderFull = m_RenderFull;
+
+    vkCmdPushConstants(commandBuffer, m_VkPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
+        sizeof(pushConstant), &pushConstant);
+
+    vkCmdDispatch(commandBuffer, currentFrame.drawImage.extent.width / 8,
+        currentFrame.drawImage.extent.height / 8, 1);
+}
+
+void Application::renderImGui(VkCommandBuffer& commandBuffer, VkImageView target, VkExtent2D extent)
+{
+    VkRenderingAttachmentInfo colourAI {};
+    colourAI.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    colourAI.pNext = nullptr;
+    colourAI.imageView = target;
+    colourAI.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    colourAI.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    colourAI.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+    VkRenderingInfo renderInfo {};
+    renderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+    renderInfo.pNext = nullptr;
+    renderInfo.flags = 0;
+    renderInfo.renderArea = VkRect2D {
+        { 0, 0 },
+        extent
+    };
+    renderInfo.layerCount = 1;
+    renderInfo.viewMask = 0;
+    renderInfo.colorAttachmentCount = 1;
+    renderInfo.pColorAttachments = &colourAI;
+    renderInfo.pDepthAttachment = nullptr;
+    renderInfo.pStencilAttachment = nullptr;
+
+    vkCmdBeginRendering(commandBuffer, &renderInfo);
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
+    vkCmdEndRendering(commandBuffer);
 }
 
 void Application::update()

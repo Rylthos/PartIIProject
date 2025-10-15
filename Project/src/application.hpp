@@ -94,6 +94,9 @@ class Application {
     void createSyncStructures();
     void destroySyncStructures();
 
+    void createImGuiStructures();
+    void destroyImGuiStructures();
+
     void createDescriptorPool();
     void createDescriptors();
     void destroyDescriptorPool();
@@ -104,7 +107,13 @@ class Application {
     void createComputePipeline();
     void destroyComputePipeline();
 
+    void renderUI();
+
     void render();
+
+    void renderCompute(VkCommandBuffer& commandBuffer, const PerFrameData& currentFrame);
+    void renderImGui(VkCommandBuffer& commandBuffer, VkImageView target, VkExtent2D extent);
+
     void update();
 
     void handleKeyInput(const Event& event);
