@@ -764,8 +764,8 @@ void Application::renderCompute(VkCommandBuffer& commandBuffer, const PerFrameDa
     vkCmdPushConstants(commandBuffer, m_VkPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
         sizeof(pushConstant), &pushConstant);
 
-    vkCmdDispatch(commandBuffer, currentFrame.drawImage.extent.width / 8,
-        currentFrame.drawImage.extent.height / 8, 1);
+    vkCmdDispatch(commandBuffer, std::ceil(currentFrame.drawImage.extent.width / 8.),
+        std::ceil(currentFrame.drawImage.extent.height / 8.), 1);
 }
 
 void Application::renderImGui(VkCommandBuffer& commandBuffer, VkImageView target, VkExtent2D extent)
