@@ -32,7 +32,7 @@ void FileWatcher::addWatcher(const std::string& filename, FunctionCallback callb
     if (watchFD < 0) {
         LOG_ERROR("Failed to add watch to inotify: {} | {}", filename, std::strerror(errno));
     } else {
-        LOG_INFO("Add watch {}", filename);
+        LOG_DEBUG("Add watch {}", filename);
     }
 
     m_FileWatches[filename] = std::make_tuple(id, watchFD, callback);
@@ -57,11 +57,11 @@ void FileWatcher::runThread()
             ssize_t len = read(fd, event, bufSize);
             if (len > 0) {
                 if (event->mask & IN_MODIFY) {
-                    LOG_INFO("Modified {}", fileWatch.first);
+                    LOG_DEBUG("Modified {}", fileWatch.first);
                     callback(fileWatch.first);
                 }
                 if (event->mask & IN_DELETE_SELF) {
-                    LOG_INFO("Modified {}", fileWatch.first);
+                    LOG_DEBUG("Modified {}", fileWatch.first);
                     callback(fileWatch.first);
                     close(fd);
                     addWatcher(fileWatch.first, callback);

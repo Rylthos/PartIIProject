@@ -15,7 +15,7 @@ void Window::init()
 
     m_WindowSize = glm::ivec2 { 500, 500 };
 
-    LOG_INFO("Initialised GLFW");
+    LOG_DEBUG("Initialised GLFW");
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_SCALE_FRAMEBUFFER, GLFW_FALSE);
@@ -38,7 +38,7 @@ void Window::init()
     glfwSetCursorPosCallback(m_Window, handleMouseMove);
     glfwSetWindowSizeCallback(m_Window, handleWindowResize);
 
-    LOG_INFO("Created GLFW window");
+    LOG_DEBUG("Created GLFW window");
 }
 
 void Window::cleanup()

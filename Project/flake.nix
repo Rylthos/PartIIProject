@@ -18,6 +18,8 @@
           vulkan-tools-lunarg
 
           glfw-wayland
+
+          renderdoc
         ];
 
         buildInputs = with pkgs; [

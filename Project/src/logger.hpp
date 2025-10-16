@@ -1,5 +1,10 @@
 #pragma once
 
+#include "events.hpp"
+
+#include <functional>
+
+#include "spdlog/sinks/ringbuffer_sink.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
 #include "spdlog/spdlog.h"
 
@@ -12,8 +17,16 @@ class Logger {
     static void init();
     static std::shared_ptr<spdlog::logger> getLogger() { return s_Logger; }
 
+    static std::function<void(const Event&)> getFrameEvent()
+    {
+        return std::bind(&Logger::UI, std::placeholders::_1);
+    }
+
   private:
     inline static std::shared_ptr<spdlog::logger> s_Logger;
+    inline static std::shared_ptr<spdlog::sinks::ringbuffer_sink_st> s_Ringbuffer;
+
+    static void UI(const Event& event);
 
   private:
     Logger() = delete;

@@ -118,8 +118,9 @@ void Application::init()
     m_Window.subscribe(EventFamily::WINDOW, std::bind(&Application::handleWindow, this, _1));
 
     subscribe(EventFamily::FRAME, std::bind(&Application::UI, this, _1));
+    subscribe(EventFamily::FRAME, Logger::getFrameEvent());
 
-    LOG_INFO("Initialised application");
+    LOG_DEBUG("Initialised application");
 }
 
 void Application::start()
@@ -161,12 +162,12 @@ void Application::cleanup()
 
     m_Window.cleanup();
 
-    LOG_INFO("Cleaned up");
+    LOG_DEBUG("Cleaned up");
 }
 
 void Application::initVulkan()
 {
-    LOG_INFO("Init Vulkan");
+    LOG_DEBUG("Init Vulkan");
     vkb::InstanceBuilder builder;
     auto builderRet = builder.set_app_name("Voxel Raymarcher")
                           .request_validation_layers(true)
@@ -251,7 +252,7 @@ void Application::createSwapchain()
     m_VkSwapchainImages = vkbSwapchain.get_images().value();
     m_VkSwapchainImageViews = vkbSwapchain.get_image_views().value();
 
-    LOG_INFO("Created swapchain");
+    LOG_DEBUG("Created swapchain");
 }
 
 void Application::destroySwapchain()
@@ -262,7 +263,7 @@ void Application::destroySwapchain()
         vkDestroyImageView(m_VkDevice, m_VkSwapchainImageViews[i], nullptr);
     }
 
-    LOG_INFO("Destroyed swapchain");
+    LOG_DEBUG("Destroyed swapchain");
 }
 
 void Application::createDrawImages()
@@ -316,7 +317,7 @@ void Application::createDrawImages()
             "Failed to create image view");
     }
 
-    LOG_INFO("Created draw images");
+    LOG_DEBUG("Created draw images");
 }
 
 void Application::destroyDrawImages()
@@ -327,7 +328,7 @@ void Application::destroyDrawImages()
             m_PerFrameData[i].drawImage.allocation);
     }
 
-    LOG_INFO("Destroyed draw images");
+    LOG_DEBUG("Destroyed draw images");
 }
 
 void Application::createCommandPools()
@@ -355,7 +356,7 @@ void Application::createCommandPools()
             "Failed to allocate command buffer");
     }
 
-    LOG_INFO("Created command pools");
+    LOG_DEBUG("Created command pools");
 }
 
 void Application::destroyCommandPools()
@@ -364,7 +365,7 @@ void Application::destroyCommandPools()
         vkDestroyCommandPool(m_VkDevice, m_PerFrameData[i].commandPool, nullptr);
     }
 
-    LOG_INFO("Destroyed command pools");
+    LOG_DEBUG("Destroyed command pools");
 }
 
 void Application::createSyncStructures()
@@ -394,7 +395,7 @@ void Application::createSyncStructures()
             "Failed to create swapchain semaphore");
     }
 
-    LOG_INFO("Created sync structures");
+    LOG_DEBUG("Created sync structures");
 }
 
 void Application::destroySyncStructures()
@@ -408,7 +409,7 @@ void Application::destroySyncStructures()
         vkDestroySemaphore(m_VkDevice, m_SwapchainSemaphores[i], nullptr);
     }
 
-    LOG_INFO("Destroyed sync structures");
+    LOG_DEBUG("Destroyed sync structures");
 }
 
 void Application::createImGuiStructures()
@@ -456,7 +457,7 @@ void Application::createImGuiStructures()
     vulkanII.PipelineRenderingCreateInfo = pipelineCI;
 
     ImGui_ImplVulkan_Init(&vulkanII);
-    LOG_INFO("Initialised ImGui");
+    LOG_DEBUG("Initialised ImGui");
 }
 
 void Application::destroyImGuiStructures()
@@ -465,7 +466,7 @@ void Application::destroyImGuiStructures()
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
 
-    LOG_INFO("Destroyed ImGui");
+    LOG_DEBUG("Destroyed ImGui");
 }
 
 void Application::createDescriptorPool()
@@ -488,7 +489,7 @@ void Application::createDescriptorPool()
     VK_CHECK(vkCreateDescriptorPool(m_VkDevice, &descriptorPoolCI, nullptr, &m_VkDescriptorPool),
         "Failed to create descriptor pool");
 
-    LOG_INFO("Created descriptor pool");
+    LOG_DEBUG("Created descriptor pool");
 }
 
 void Application::createDescriptors()
@@ -558,7 +559,7 @@ void Application::createDescriptors()
         m_PerFrameData[i].drawImageDescriptorSet = descriptorSets[i];
     }
 
-    LOG_INFO("Created descriptors");
+    LOG_DEBUG("Created descriptors");
 }
 
 void Application::destroyDescriptorPool()
@@ -566,7 +567,7 @@ void Application::destroyDescriptorPool()
     vkDestroyDescriptorSetLayout(m_VkDevice, m_ComputeDescriptorSetLayout, nullptr);
     vkDestroyDescriptorPool(m_VkDevice, m_VkDescriptorPool, nullptr);
 
-    LOG_INFO("Destroyed descriptor pool");
+    LOG_DEBUG("Destroyed descriptor pool");
 }
 void Application::createPipelineLayouts()
 {
@@ -842,7 +843,7 @@ void Application::handleWindow(const Event& event)
     if (wEvent.type() == WindowEventType::RESIZE) {
         const WindowResizeEvent& resizeEvent = static_cast<const WindowResizeEvent&>(wEvent);
 
-        LOG_INFO("Resizing window");
+        LOG_DEBUG("Resizing window");
         vkDeviceWaitIdle(m_VkDevice);
 
         vkResetDescriptorPool(m_VkDevice, m_VkDescriptorPool, 0);

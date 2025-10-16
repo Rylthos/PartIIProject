@@ -43,7 +43,7 @@ void ShaderManager::init(VkDevice device)
 
     FileWatcher::getInstance()->init();
 
-    LOG_INFO("Setup slang session");
+    LOG_DEBUG("Setup slang session");
 }
 
 void ShaderManager::cleanup()
@@ -94,7 +94,7 @@ void ShaderManager::updateAll()
         std::set<ModuleName> modules = m_FileMapping[file];
 
         for (const ModuleName& module : modules) {
-            LOG_INFO("Reloading {}", module);
+            LOG_DEBUG("Reloading {}", module);
             if (!generateShaderModule(module)) {
                 continue;
             }
@@ -205,6 +205,7 @@ void ShaderManager::setDependencies(const ModuleName& module)
         SLANG_DIAG(diagnostics);
     }
 
+    // Readds watch multiple times
     for (auto file : m_InverseFileMapping[module]) {
         m_FileMapping[file].erase(module);
     }
