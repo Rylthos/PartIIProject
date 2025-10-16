@@ -18,6 +18,7 @@ void Window::init()
     LOG_INFO("Initialised GLFW");
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    glfwWindowHint(GLFW_SCALE_FRAMEBUFFER, GLFW_FALSE);
     glfwWindowHintString(GLFW_X11_CLASS_NAME, "GLFW");
     glfwWindowHintString(GLFW_WAYLAND_APP_ID, "GLFW");
 
