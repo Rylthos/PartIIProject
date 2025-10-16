@@ -67,7 +67,7 @@ void ShaderManager::addModule(const ModuleName& module, std::function<void()>&& 
     m_FunctionMap[module].push_back(function);
 
     generateShaderModule(module);
-    addDependencies(module);
+    setDependencies(module);
 }
 
 VkShaderModule ShaderManager::getShaderModule(const ModuleName& module)
@@ -91,11 +91,14 @@ void ShaderManager::updateAll()
     std::lock_guard<std::mutex> _lock(m_UpdateMutex);
 
     for (FileName file : m_Updates) {
-        std::vector<ModuleName> modules = m_FileMapping[file];
+        std::set<ModuleName> modules = m_FileMapping[file];
 
         for (const ModuleName& module : modules) {
             LOG_INFO("Reloading {}", module);
-            generateShaderModule(module);
+            if (!generateShaderModule(module)) {
+                continue;
+            }
+            setDependencies(module);
 
             std::vector<PipelineFunction> functions = m_FunctionMap[module];
             for (const auto& function : functions) {
@@ -107,7 +110,7 @@ void ShaderManager::updateAll()
     m_Updates.clear();
 }
 
-void ShaderManager::generateShaderModule(const ModuleName& moduleName)
+bool ShaderManager::generateShaderModule(const ModuleName& moduleName)
 {
     Slang::ComPtr<slang::ISession> session;
     m_GlobalSession->createSession(m_SessionDesc, session.writeRef());
@@ -118,7 +121,7 @@ void ShaderManager::generateShaderModule(const ModuleName& moduleName)
         slangModule = session->loadModule(moduleName.c_str(), diagnostics.writeRef());
         SLANG_DIAG(diagnostics);
         if (diagnostics != nullptr) {
-            return;
+            return false;
         }
     }
 
@@ -140,6 +143,7 @@ void ShaderManager::generateShaderModule(const ModuleName& moduleName)
         SLANG_DIAG(diagnostics);
         if (SLANG_FAILED(result)) {
             LOG_ERROR("Fail composing shader");
+            return false;
         }
     }
 
@@ -152,6 +156,7 @@ void ShaderManager::generateShaderModule(const ModuleName& moduleName)
         SLANG_DIAG(diagnostics);
         if (SLANG_FAILED(result)) {
             LOG_ERROR("Fail linking shader");
+            return false;
         }
     }
 
@@ -164,6 +169,7 @@ void ShaderManager::generateShaderModule(const ModuleName& moduleName)
         SLANG_DIAG(diagnostics);
         if (SLANG_FAILED(result)) {
             LOG_ERROR("Fail getting target code");
+            return false;
         }
     }
 
@@ -186,9 +192,11 @@ void ShaderManager::generateShaderModule(const ModuleName& moduleName)
     m_Sessions[moduleName] = session;
 
     LOG_INFO("Compiled shader module: {}", moduleName);
+
+    return true;
 }
 
-void ShaderManager::addDependencies(const ModuleName& module)
+void ShaderManager::setDependencies(const ModuleName& module)
 {
     Slang::ComPtr<slang::IModule> slangModule;
     {
@@ -197,15 +205,21 @@ void ShaderManager::addDependencies(const ModuleName& module)
         SLANG_DIAG(diagnostics);
     }
 
+    for (auto file : m_InverseFileMapping[module]) {
+        m_FileMapping[file].erase(module);
+    }
+    m_InverseFileMapping[module].clear();
+
     uint32_t count = slangModule->getDependencyFileCount();
     for (uint32_t i = 0; i < count; i++) {
-        // FIX: Add file hooks for changing
         const char* path = slangModule->getDependencyFilePath(i);
 
-        m_FileMapping[path].push_back(module);
+        m_FileMapping[path].insert(module);
+        m_InverseFileMapping[module].insert(path);
 
         FileWatcher::getInstance()->addWatcher(
             path, std::bind(&ShaderManager::updated, this, std::placeholders::_1));
     }
-    m_FileMapping[module].push_back(module);
+    m_FileMapping[module].insert(module);
+    m_InverseFileMapping[module].insert(module);
 }

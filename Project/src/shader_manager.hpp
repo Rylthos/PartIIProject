@@ -32,8 +32,8 @@ class ShaderManager {
   private:
     ShaderManager() { }
 
-    void generateShaderModule(const ModuleName& moduleName);
-    void addDependencies(const ModuleName& moduleName);
+    bool generateShaderModule(const ModuleName& moduleName);
+    void setDependencies(const ModuleName& moduleName);
 
   private:
     struct PipelineFunction {
@@ -46,7 +46,8 @@ class ShaderManager {
     Slang::ComPtr<slang::IGlobalSession> m_GlobalSession;
     slang::SessionDesc m_SessionDesc;
 
-    std::map<FileName, std::vector<ModuleName>> m_FileMapping;
+    std::map<FileName, std::set<ModuleName>> m_FileMapping;
+    std::map<ModuleName, std::set<FileName>> m_InverseFileMapping;
     std::map<ModuleName, std::vector<PipelineFunction>> m_FunctionMap;
 
     std::map<ModuleName, VkShaderModule> m_ShaderModules;
