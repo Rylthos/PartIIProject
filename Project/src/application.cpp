@@ -833,11 +833,6 @@ void Application::handleMouse(const Event& event)
         m_MousePos = glm::vec2(moveEvent.position.x / (float)m_Window.getWindowSize().x,
             moveEvent.position.y / (float)m_Window.getWindowSize().y);
     }
-
-    if (mEvent.type() == MouseEventType::ENTER_EXIT) {
-        const MouseEnterExitEvent& enterEvent = static_cast<const MouseEnterExitEvent&>(mEvent);
-        LOG_INFO(enterEvent.entered ? "Entered" : "Exit");
-    }
 }
 
 void Application::handleWindow(const Event& event)
