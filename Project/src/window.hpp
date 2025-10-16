@@ -5,9 +5,9 @@
 #include "GLFW/glfw3.h"
 #include "glm/glm.hpp"
 
-#include "event_watcher.hpp"
+#include "event_dispatcher.hpp"
 
-class Window : public EventWatcher {
+class Window : public EventDispatcher {
   public:
     void init();
     void cleanup();

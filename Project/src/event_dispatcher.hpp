@@ -6,12 +6,12 @@
 
 #include "events.hpp"
 
-class EventWatcher {
+class EventDispatcher {
     using EventFunction = std::function<void(const Event&)>;
 
   public:
-    EventWatcher() = default;
-    virtual ~EventWatcher() { }
+    EventDispatcher() = default;
+    virtual ~EventDispatcher() { }
 
     virtual void subscribe(const EventFamily& family, EventFunction&& function);
     virtual void post(const Event& event);

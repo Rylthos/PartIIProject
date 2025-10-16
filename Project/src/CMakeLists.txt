@@ -3,7 +3,7 @@ set (SOURCE_LIST
   "application.cpp" "application.hpp"
   "window.cpp" "window.hpp"
   "logger.cpp" "logger.hpp"
-  "event_watcher.cpp" "event_watcher.hpp"
+  "event_dispatcher.cpp" "event_dispatcher.hpp"
   "events.hpp"
   "shader_manager.cpp" "shader_manager.hpp"
   "file_watcher.cpp" "file_watcher.hpp"

@@ -1,11 +1,11 @@
-#include "event_watcher.hpp"
+#include "event_dispatcher.hpp"
 
-void EventWatcher::subscribe(const EventFamily& family, EventFunction&& function)
+void EventDispatcher::subscribe(const EventFamily& family, EventFunction&& function)
 {
     m_Observers[family].push_back(function);
 }
 
-void EventWatcher::post(const Event& event)
+void EventDispatcher::post(const Event& event)
 {
     auto family = event.family();
     if (m_Observers.find(family) == m_Observers.end())

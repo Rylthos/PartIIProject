@@ -36,7 +36,7 @@ struct PushConstants {
     bool renderFull;
 };
 
-class Application : public EventWatcher {
+class Application : public EventDispatcher {
   public:
     void init();
     void start();
