@@ -43,7 +43,7 @@ class Camera {
     glm::vec3 m_Right;
     glm::vec3 m_Up;
 
-    float m_MovementSpeed = 1.0f;
+    float m_MovementSpeed = 2.0f;
     std::set<uint32_t> m_PressedKeys;
 
   private:

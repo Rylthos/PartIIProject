@@ -74,9 +74,9 @@ void Camera::frameEvent(const Event& event)
 
         // Delta
         if (m_PressedKeys.count(GLFW_KEY_W))
-            resultantForce += m_Forward;
+            resultantForce += m_Forward * glm::vec3(1.f, 0.f, 1.f);
         if (m_PressedKeys.count(GLFW_KEY_S))
-            resultantForce -= m_Forward;
+            resultantForce -= m_Forward * glm::vec3(1.f, 0.f, 1.f);
         if (m_PressedKeys.count(GLFW_KEY_A))
             resultantForce -= m_Right;
         if (m_PressedKeys.count(GLFW_KEY_D))
@@ -96,7 +96,7 @@ void Camera::updateVectors()
     float pitch = glm::radians(m_Pitch);
 
     m_Forward.x = glm::sin(yaw) * glm::cos(pitch);
-    m_Forward.y = glm::sin(pitch);
+    m_Forward.y = -glm::sin(pitch);
     m_Forward.z = glm::cos(yaw) * glm::cos(pitch);
 
     m_Forward = glm::normalize(m_Forward);
