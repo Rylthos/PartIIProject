@@ -3,6 +3,7 @@
 #include "vk_mem_alloc.h"
 #include "vulkan/vulkan.h"
 
+#include "camera.hpp"
 #include "logger.hpp"
 #include "window.hpp"
 
@@ -75,6 +76,8 @@ class Application : public EventDispatcher {
 
     uint32_t m_CurrentFrameIndex { 0 };
     uint32_t m_CurrentSemaphore { 0 };
+
+    Camera m_Camera;
 
     glm::vec2 m_MousePos { 100, 0 };
     bool m_RenderFull = true;
