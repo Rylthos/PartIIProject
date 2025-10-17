@@ -86,7 +86,7 @@ void Camera::frameEvent(const Event& event)
         if (m_PressedKeys.count(GLFW_KEY_LEFT_CONTROL))
             resultantForce -= m_WorldUp;
 
-        m_Position += resultantForce * m_MovementSpeed;
+        m_Position += resultantForce * m_MovementSpeed * updateEvent.delta;
     }
 }
 

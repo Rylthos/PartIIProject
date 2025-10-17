@@ -129,12 +129,20 @@ void Application::init()
 
 void Application::start()
 {
+    std::chrono::steady_clock timer;
+    auto previous = timer.now();
+
     while (!m_Window.shouldClose()) {
         m_Window.pollEvents();
 
+        auto current = timer.now();
+        std::chrono::duration<float, std::milli> difference = current - previous;
+        float delta = difference.count() / 1000.f;
+        previous = current;
+
         renderUI();
         render();
-        update();
+        update(delta);
     }
 }
 
@@ -800,7 +808,7 @@ void Application::renderImGui(VkCommandBuffer& commandBuffer, const PerFrameData
     vkCmdEndRendering(commandBuffer);
 }
 
-void Application::update()
+void Application::update(float delta)
 {
     m_CurrentFrameIndex = (m_CurrentFrameIndex + 1) % FRAMES_IN_FLIGHT;
     m_CurrentSemaphore = (m_CurrentSemaphore + 1) % m_VkSwapchainImages.size();
@@ -808,6 +816,7 @@ void Application::update()
     ShaderManager::getInstance()->updateAll();
 
     UpdateEvent event;
+    event.delta = delta;
     post(event);
 }
 

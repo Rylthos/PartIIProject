@@ -118,7 +118,7 @@ class Application : public EventDispatcher {
     void renderCompute(VkCommandBuffer& commandBuffer, const PerFrameData& currentFrame);
     void renderImGui(VkCommandBuffer& commandBuffer, const PerFrameData& currentFrame);
 
-    void update();
+    void update(float delta);
 
     void handleKeyInput(const Event& event);
     void handleMouse(const Event& event);

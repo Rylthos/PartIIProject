@@ -135,6 +135,9 @@ class UpdateEvent : public FrameEvent {
     ~UpdateEvent() = default;
 
     virtual FrameEventType type() const { return FrameEventType::UPDATE; }
+
+  public:
+    float delta;
 };
 
 class UIEvent : public FrameEvent {
