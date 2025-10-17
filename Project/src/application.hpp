@@ -33,8 +33,10 @@ struct PerFrameData {
 };
 
 struct PushConstants {
-    glm::vec2 mousePos;
-    bool renderFull;
+    alignas(16) glm::vec3 cameraPosition;
+    alignas(16) glm::vec3 cameraFront;
+    alignas(16) glm::vec3 cameraRight;
+    alignas(16) glm::vec3 cameraUp;
 };
 
 class Application : public EventDispatcher {

@@ -765,8 +765,10 @@ void Application::renderCompute(VkCommandBuffer& commandBuffer, const PerFrameDa
         &currentFrame.drawImageDescriptorSet, 0, nullptr);
 
     PushConstants pushConstant {};
-    pushConstant.mousePos = m_MousePos;
-    pushConstant.renderFull = m_RenderFull;
+    pushConstant.cameraPosition = m_Camera.getPosition();
+    pushConstant.cameraFront = m_Camera.getForwardVector();
+    pushConstant.cameraRight = m_Camera.getRightVector();
+    pushConstant.cameraUp = m_Camera.getUpVector();
 
     vkCmdPushConstants(commandBuffer, m_VkPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
         sizeof(pushConstant), &pushConstant);
