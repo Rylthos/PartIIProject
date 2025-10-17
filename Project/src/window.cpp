@@ -67,6 +67,15 @@ void Window::handleKeyInput(GLFWwindow* glfwWindow, int key, int scancode, int a
         glfwSetWindowShouldClose(window->m_Window, GLFW_TRUE);
     }
 
+    if (key == GLFW_KEY_LEFT_ALT && action == GLFW_PRESS) {
+        int currentMode = glfwGetInputMode(window->m_Window, GLFW_CURSOR);
+        if (currentMode == GLFW_CURSOR_DISABLED) {
+            glfwSetInputMode(window->m_Window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        } else {
+            glfwSetInputMode(window->m_Window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        }
+    }
+
     if (action == GLFW_PRESS) {
         KeyboardPressEvent event {};
         event.keycode = key;
@@ -121,10 +130,13 @@ void Window::handleMouseMove(GLFWwindow* glfwWindow, double xPos, double yPos)
     prevX = xPos;
     prevY = yPos;
 
-    MouseMoveEvent event;
-    event.position = { xPos, yPos };
-    event.delta = { xDelta, yDelta };
-    window->post(event);
+    int currentMode = glfwGetInputMode(window->m_Window, GLFW_CURSOR);
+    if (currentMode == GLFW_CURSOR_DISABLED) {
+        MouseMoveEvent event;
+        event.position = { xPos, yPos };
+        event.delta = { xDelta, yDelta };
+        window->post(event);
+    }
 }
 
 void Window::handleMouseEnter(GLFWwindow* glfwWindow, int entered)
