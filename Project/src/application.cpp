@@ -414,22 +414,18 @@ void Application::destroySyncStructures()
 
 void Application::createImGuiStructures()
 {
-    // VkDescriptorPoolCreateInfo poolCI {};
-    // poolCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    // poolCI.pNext = nullptr;
-    // poolCI.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-    // poolCI.maxSets = 1000;
-    // poolCI.poolSizeCount = poolSizes.size();
-    // poolCI.pPoolSizes = poolSizes.data();
-    //
-    // VK_CHECK(vkCreateDescriptorPool(m_VkDevice, &poolCI, nullptr, &m_ImGuiDescriptorPool),
-    //     "Failed to create ImGui descriptor pool");
-    //
     ImGui::CreateContext();
-    ImGuiIO io = ImGui::GetIO();
+    ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
     ImGui::StyleColorsDark();
+    auto& style = ImGui::GetStyle();
+    ImVec4* colours = style.Colors;
+
+    ImVec4 bgColour = colours[ImGuiCol_WindowBg];
+    bgColour.w = 0.5;
+    colours[ImGuiCol_WindowBg] = bgColour;
+
     ImGui_ImplGlfw_InitForVulkan(m_Window.getWindow(), true);
 
     VkPipelineRenderingCreateInfo pipelineCI {};
@@ -629,6 +625,9 @@ void Application::renderUI()
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
+    ImGui::DockSpaceOverViewport(
+        0, ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
+
     UIEvent event;
     post(event);
 
@@ -680,12 +679,7 @@ void Application::render()
         transitionImage(commandBuffer, currentFrame.drawImage.image, VK_IMAGE_LAYOUT_GENERAL,
             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
-        VkExtent2D extent = {
-            .width = currentFrame.drawImage.extent.width,
-            .height = currentFrame.drawImage.extent.height,
-        };
-
-        renderImGui(commandBuffer, currentFrame.drawImage.view, extent);
+        renderImGui(commandBuffer, currentFrame);
 
         transitionImage(commandBuffer, currentFrame.drawImage.image,
             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
@@ -769,12 +763,12 @@ void Application::renderCompute(VkCommandBuffer& commandBuffer, const PerFrameDa
         std::ceil(currentFrame.drawImage.extent.height / 8.), 1);
 }
 
-void Application::renderImGui(VkCommandBuffer& commandBuffer, VkImageView target, VkExtent2D extent)
+void Application::renderImGui(VkCommandBuffer& commandBuffer, const PerFrameData& currentFrame)
 {
     VkRenderingAttachmentInfo colourAI {};
     colourAI.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
     colourAI.pNext = nullptr;
-    colourAI.imageView = target;
+    colourAI.imageView = currentFrame.drawImage.view;
     colourAI.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     colourAI.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
     colourAI.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -785,7 +779,10 @@ void Application::renderImGui(VkCommandBuffer& commandBuffer, VkImageView target
     renderInfo.flags = 0;
     renderInfo.renderArea = VkRect2D {
         { 0, 0 },
-        extent
+        VkExtent2D {
+         .width = currentFrame.drawImage.extent.width,
+         .height = currentFrame.drawImage.extent.height,
+         },
     };
     renderInfo.layerCount = 1;
     renderInfo.viewMask = 0;

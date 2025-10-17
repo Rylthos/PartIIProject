@@ -13,7 +13,7 @@ void Window::init()
         exit(-1);
     }
 
-    m_WindowSize = glm::ivec2 { 500, 500 };
+    m_WindowSize = glm::ivec2 { 1600, 900 };
 
     LOG_DEBUG("Initialised GLFW");
 

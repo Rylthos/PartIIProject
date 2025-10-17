@@ -113,7 +113,7 @@ class Application : public EventDispatcher {
     void render();
 
     void renderCompute(VkCommandBuffer& commandBuffer, const PerFrameData& currentFrame);
-    void renderImGui(VkCommandBuffer& commandBuffer, VkImageView target, VkExtent2D extent);
+    void renderImGui(VkCommandBuffer& commandBuffer, const PerFrameData& currentFrame);
 
     void update();
 
