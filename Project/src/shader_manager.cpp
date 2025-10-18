@@ -30,10 +30,18 @@ void ShaderManager::init(VkDevice device)
     m_SessionDesc.targets = &targetDesc;
     m_SessionDesc.targetCount = 1;
 
-    static std::array<slang::CompilerOptionEntry, 1> options = {
+    static std::vector<slang::CompilerOptionEntry> options = {
         { slang::CompilerOptionName::EmitSpirvDirectly,
-         { slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr } }
+         { slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr }                    },
+        { slang::CompilerOptionName::DebugInformation,
+         { slang::CompilerOptionValueKind::Int,
+                SlangDebugInfoLevel::SLANG_DEBUG_INFO_LEVEL_STANDARD, 0, nullptr, nullptr } },
+        { slang::CompilerOptionName::Capability,
+         { slang::CompilerOptionValueKind::Int,
+                m_GlobalSession->findCapability("SPV_KHR_non_semantic_info"), 0, nullptr,
+                nullptr }                                                                   },
     };
+
     m_SessionDesc.compilerOptionEntries = options.data();
     m_SessionDesc.compilerOptionEntryCount = options.size();
 
