@@ -9,9 +9,22 @@
 
 #define FRAMES_IN_FLIGHT 2
 
+#define SPHERE_SIDE 10
+#define SPHERE_COUNT SPHERE_SIDE* SPHERE_SIDE
+
+struct Sphere {
+    glm::vec3 origin;
+    float radius;
+};
+
 struct Queue {
     VkQueue queue;
     uint32_t queueFamily;
+};
+
+struct Buffer {
+    VkBuffer buffer;
+    VmaAllocation allocation;
 };
 
 struct Image {
@@ -68,7 +81,13 @@ class Application : public EventDispatcher {
     std::vector<VkSemaphore> m_RenderSemaphores;
     std::vector<VkSemaphore> m_SwapchainSemaphores;
 
+    VkCommandPool m_GeneralPool;
     std::array<PerFrameData, FRAMES_IN_FLIGHT> m_PerFrameData;
+
+    Buffer m_SphereBuffer;
+    Buffer m_StagingBuffer;
+    std::vector<Sphere> m_Spheres;
+    bool m_UploadSpheres;
 
     VkDescriptorPool m_VkDescriptorPool;
     VkDescriptorSetLayout m_ComputeDescriptorSetLayout;
@@ -101,6 +120,10 @@ class Application : public EventDispatcher {
 
     void createImGuiStructures();
     void destroyImGuiStructures();
+
+    void createBuffer();
+    void uploadBuffer();
+    void destroyBuffer();
 
     void createDescriptorPool();
     void createDescriptors();

@@ -1,11 +1,19 @@
 #include "push_constants.slang"
 #include "ray.slang"
 
+struct Sphere {
+  float3 origin;
+  float radius;
+};
+
 [[vk_push_constant]]
 PushConstants push_constants;
 
 [[vk::binding(0, 0)]]
 RWTexture2D<float4> image;
+
+[[vk::binding(1, 0)]]
+StructuredBuffer<Sphere> buffer;
 
 [shader("compute")]
 [numthreads(8, 8, 1)]
@@ -33,7 +41,23 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
   target.y = target.y * -1;
 
   Ray ray = Ray(push_constants.camera_position, target);
-  HitRecord record = sphereIntersection(ray, float3(0.0, 0.0, 3.0), 1.0);
+  HitRecord record;
+
+  Sphere spheres[5];
+  for (int i = 0; i < 5; i++) {
+    spheres[i].origin = float3(i*2, 0, 2);
+    spheres[i].radius = 1.0;
+  }
+
+  for (int i = 0; i < buffer.getCount(); i++) {
+    HitRecord newRecord = sphereIntersection(ray, buffer[i].origin, buffer[i].radius);
+
+    if (!(record.hit)) {
+      record = newRecord;
+    } else if (newRecord.t < record.t) {
+      record = newRecord;
+    }
+  }
 
   if (record.hit) {
     float3 colour = abs(record.normal);
