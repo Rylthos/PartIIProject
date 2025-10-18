@@ -2,6 +2,7 @@
 
 #include "VkBootstrap.h"
 #include "events.hpp"
+#include "ring_buffer.hpp"
 
 #include "glm/gtx/string_cast.hpp"
 #include "glm/vector_relational.hpp"
@@ -826,6 +827,21 @@ void Application::UI(const Event& event)
     const FrameEvent& frameEvent = static_cast<const FrameEvent&>(event);
     if (frameEvent.type() != FrameEventType::UI)
         return;
+
+    if (ImGui::Begin("Timing")) {
+        static RingBuffer<float, 100> previousFrames;
+
+        static float count = 0.0f;
+
+        previousFrames.pushBack(m_PreviousRenderTime);
+
+        ImGui::Text("FPS                : %3f", 1.0f / (m_PreviousRenderTime / 1000.0f));
+        ImGui::Text("Previous frame time: %6.2f ms", m_PreviousRenderTime);
+        ImGui::Text("Frame times");
+        ImGui::PlotLines("##Timing", previousFrames.getData().data(), previousFrames.getSize(), 0,
+            nullptr, 0.0f, 50.0f, ImVec2(0, 80.0f));
+    }
+    ImGui::End();
 
     ImGui::ShowDemoWindow();
 }

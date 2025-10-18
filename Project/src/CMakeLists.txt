@@ -8,6 +8,7 @@ set (SOURCE_LIST
   "shader_manager.cpp" "shader_manager.hpp"
   "file_watcher.cpp" "file_watcher.hpp"
   "camera.cpp" "camera.hpp"
+  "ring_buffer.hpp"
 )
 
 add_compile_definitions(GLM_ENABLE_EXPERIMENTAL)
