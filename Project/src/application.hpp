@@ -9,7 +9,7 @@
 
 #define FRAMES_IN_FLIGHT 2
 
-#define SPHERE_SIDE 10
+#define SPHERE_SIDE 12
 #define SPHERE_COUNT SPHERE_SIDE* SPHERE_SIDE
 
 struct Sphere {
@@ -95,6 +95,10 @@ class Application : public EventDispatcher {
     VkPipelineLayout m_VkPipelineLayout;
     VkPipeline m_VkPipeline;
 
+    VkQueryPool m_VkQueryPool;
+    double m_PreviousRenderTime = 0.;
+    float m_TimestampInterval = 0.f;
+
     uint32_t m_CurrentFrameIndex { 0 };
     uint32_t m_CurrentSemaphore { 0 };
 
@@ -134,6 +138,9 @@ class Application : public EventDispatcher {
 
     void createComputePipeline();
     void destroyComputePipeline();
+
+    void createQueryPool();
+    void destroyQueryPool();
 
     void renderUI();
     void UI(const Event& event);

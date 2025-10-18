@@ -116,6 +116,8 @@ void Application::init()
 
     createComputePipeline();
 
+    createQueryPool();
+
     m_Window.subscribe(EventFamily::KEYBOARD, std::bind(&Application::handleKeyInput, this, _1));
     m_Window.subscribe(EventFamily::MOUSE, std::bind(&Application::handleMouse, this, _1));
     m_Window.subscribe(EventFamily::WINDOW, std::bind(&Application::handleWindow, this, _1));
@@ -154,6 +156,8 @@ void Application::cleanup()
     vkDeviceWaitIdle(m_VkDevice);
 
     ShaderManager::getInstance()->cleanup();
+
+    destroyQueryPool();
 
     destroyComputePipeline();
     destroyPipelineLayouts();
@@ -782,6 +786,26 @@ void Application::createComputePipeline()
 
 void Application::destroyComputePipeline() { vkDestroyPipeline(m_VkDevice, m_VkPipeline, nullptr); }
 
+void Application::createQueryPool()
+{
+    VkQueryPoolCreateInfo queryPoolCI {};
+    queryPoolCI.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+    queryPoolCI.pNext = nullptr;
+    queryPoolCI.flags = 0;
+    queryPoolCI.queryType = VK_QUERY_TYPE_TIMESTAMP;
+    queryPoolCI.queryCount = FRAMES_IN_FLIGHT * 2;
+    queryPoolCI.pipelineStatistics = 0;
+
+    VK_CHECK(vkCreateQueryPool(m_VkDevice, &queryPoolCI, nullptr, &m_VkQueryPool),
+        "Failed to create query pool");
+
+    VkPhysicalDeviceProperties deviceProperties;
+    vkGetPhysicalDeviceProperties(m_VkPhysicalDevice, &deviceProperties);
+    m_TimestampInterval = deviceProperties.limits.timestampPeriod;
+}
+
+void Application::destroyQueryPool() { vkDestroyQueryPool(m_VkDevice, m_VkQueryPool, nullptr); }
+
 void Application::renderUI()
 {
     ImGui_ImplVulkan_NewFrame();
@@ -832,6 +856,11 @@ void Application::render()
     {
         VK_CHECK(vkBeginCommandBuffer(commandBuffer, &commandBufferBI), "Begin command buffer");
 
+        vkCmdResetQueryPool(commandBuffer, m_VkQueryPool, m_CurrentFrameIndex * 2, 2);
+
+        vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, m_VkQueryPool,
+            m_CurrentFrameIndex * 2);
+
         transitionImage(commandBuffer, m_VkSwapchainImages[swapchainImageIndex],
             VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
         transitionImage(commandBuffer, currentFrame.drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED,
@@ -853,6 +882,9 @@ void Application::render()
 
         transitionImage(commandBuffer, m_VkSwapchainImages[swapchainImageIndex],
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+
+        vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_VkQueryPool,
+            m_CurrentFrameIndex * 2 + 1);
 
         VK_CHECK(vkEndCommandBuffer(commandBuffer), "End command buffer");
     }
@@ -904,6 +936,17 @@ void Application::render()
         presentInfo.pImageIndices = &swapchainImageIndex;
         presentInfo.pResults = nullptr;
         vkQueuePresentKHR(m_GraphicsQueue.queue, &presentInfo);
+    }
+
+    {
+        static uint64_t timeQueryBuffer[2];
+        VkResult result = vkGetQueryPoolResults(m_VkDevice, m_VkQueryPool, m_CurrentFrameIndex * 2,
+            2, sizeof(uint64_t) * 2, &timeQueryBuffer, sizeof(uint64_t), VK_QUERY_RESULT_64_BIT);
+
+        if (result == VK_SUCCESS) {
+            m_PreviousRenderTime
+                = ((timeQueryBuffer[1] - timeQueryBuffer[0]) * m_TimestampInterval) / 1e6;
+        }
     }
 
     m_Window.swapBuffers();
