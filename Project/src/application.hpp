@@ -104,8 +104,7 @@ class Application : public EventDispatcher {
 
     Camera m_Camera;
 
-    glm::vec2 m_MousePos { 100, 0 };
-    bool m_RenderFull = true;
+    bool m_RenderImGui = true;
 
   private:
     void initVulkan();

@@ -1015,6 +1015,9 @@ void Application::renderImGui(VkCommandBuffer& commandBuffer, const PerFrameData
     renderInfo.pDepthAttachment = nullptr;
     renderInfo.pStencilAttachment = nullptr;
 
+    if (!m_RenderImGui)
+        return;
+
     vkCmdBeginRendering(commandBuffer, &renderInfo);
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
     vkCmdEndRendering(commandBuffer);
@@ -1038,10 +1041,9 @@ void Application::handleKeyInput(const Event& event)
 
     if (kEvent.type() == KeyboardEventType::PRESS) {
         const KeyboardPressEvent& keyEvent = static_cast<const KeyboardPressEvent&>(kEvent);
-        if (keyEvent.keycode == GLFW_KEY_LEFT_ALT) {
-            m_RenderFull = !m_RenderFull;
-        } else if (keyEvent.keycode == GLFW_KEY_R) {
-            ShaderManager::getInstance()->updated("basic_compute");
+
+        if (keyEvent.keycode == GLFW_KEY_I) {
+            m_RenderImGui = !m_RenderImGui;
         }
     }
 }
@@ -1052,9 +1054,6 @@ void Application::handleMouse(const Event& event)
 
     if (mEvent.type() == MouseEventType::MOVE) {
         const MouseMoveEvent& moveEvent = static_cast<const MouseMoveEvent&>(mEvent);
-
-        m_MousePos = glm::vec2(moveEvent.position.x / (float)m_Window.getWindowSize().x,
-            moveEvent.position.y / (float)m_Window.getWindowSize().y);
     }
 }
 
