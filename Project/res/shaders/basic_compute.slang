@@ -15,6 +15,32 @@ RWTexture2D<float4> image;
 [[vk::binding(1, 0)]]
 StructuredBuffer<Sphere> buffer;
 
+func lightPixel(in record : HitRecord, in ray : Ray) -> float4 {
+  const float3 light_colour = float3(1.0);
+  const float ambient_strength = 0.15;
+  float3 ambient = light_colour * ambient_strength;
+
+  const float3 object_colour = float3(0.3, 0.55, 0.6);
+  const float3 light_pos = float3(7.5, -10.0, 9.5);
+
+  float3 light_dir = normalize(light_pos - record.hit_position);
+  float diff = max(dot(record.normal, light_dir), 0.0);
+  float3 diffuse = diff * light_colour;
+
+  float3 result = (diffuse + ambient) * object_colour;
+
+  return float4(result, 1.0);
+}
+
+func missColour(in ray : Ray) -> float4 {
+  float mix = ray.direction.y;
+
+  float4 top_colour = float4(0.3, 0.4, 0.9, 1.0);
+  float4 bottom_colour = float4(0.1, 0.1, 0.1, 1.0);
+
+  return lerp(top_colour, bottom_colour, float4(mix));
+}
+
 [shader("compute")]
 [numthreads(8, 8, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
@@ -42,12 +68,6 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
   Ray ray = Ray(push_constants.camera_position, target);
   HitRecord record;
 
-  Sphere spheres[5];
-  for (int i = 0; i < 5; i++) {
-    spheres[i].origin = float3(i*2, 0, 2);
-    spheres[i].radius = 1.0;
-  }
-
   for (int i = 0; i < buffer.getCount(); i++) {
     HitRecord newRecord = sphereIntersection(ray, buffer[i].origin, buffer[i].radius);
 
@@ -59,9 +79,8 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
   }
 
   if (record.hit) {
-    float3 colour = abs(record.normal);
-    image[pixelCoord] = float4(colour, 1.0);
+    image[pixelCoord] = lightPixel(record, ray);
   } else {
-    image[pixelCoord] = float4(float3(0.0), 1.0);
+    image[pixelCoord] = missColour(ray);
   }
 }
