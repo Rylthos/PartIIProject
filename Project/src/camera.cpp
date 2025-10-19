@@ -43,7 +43,7 @@ void Camera::mouseEvent(const Event& event)
     if (mouseEvent.type() == MouseEventType::MOVE) {
         const MouseMoveEvent& mmEvent = static_cast<const MouseMoveEvent&>(mouseEvent);
         m_Yaw += mmEvent.delta.x / 30.0f;
-        m_Pitch += mmEvent.delta.y / 30.0f;
+        m_Pitch -= mmEvent.delta.y / 30.0f;
 
         m_Pitch = std::clamp(m_Pitch, -89.9f, 89.9f);
 
@@ -101,6 +101,6 @@ void Camera::updateVectors()
 
     m_Forward = glm::normalize(m_Forward);
 
-    m_Right = glm::cross(m_Forward, m_WorldUp);
-    m_Up = glm::cross(m_Forward, m_Right);
+    m_Right = glm::normalize(glm::cross(m_Forward, m_WorldUp));
+    m_Up = glm::normalize(glm::cross(m_Right, m_Forward));
 }

@@ -38,7 +38,6 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
   const float3 down_length = -push_constants.camera_up * viewport_height;
 
   float3 target = normalize(top_left + right_length * uv.x + down_length * uv.y);
-  target.y = target.y * -1;
 
   Ray ray = Ray(push_constants.camera_position, target);
   HitRecord record;
