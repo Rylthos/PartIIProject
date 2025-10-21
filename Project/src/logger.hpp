@@ -33,6 +33,7 @@ class Logger {
 };
 
 #ifdef DEBUG
+// #if true
 #define LOG_DEBUG(...) Logger::getLogger()->debug(__VA_ARGS__)
 #define LOG_INFO(...) Logger::getLogger()->info(__VA_ARGS__)
 #define LOG_ERROR(...) Logger::getLogger()->error(__VA_ARGS__)
@@ -50,5 +51,5 @@ class Logger {
 #define LOG_INFO(...)
 #define LOG_ERROR(...)
 #define LOG_CRITICAL(...)
-#define VK_CHECK(result, msg)
+#define VK_CHECK(result, msg) result
 #endif
