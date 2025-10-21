@@ -1,6 +1,7 @@
 #include "application.hpp"
 
 #include "VkBootstrap.h"
+#include "debug_utils.hpp"
 #include "events.hpp"
 #include "ring_buffer.hpp"
 
@@ -10,6 +11,7 @@
 
 #include "functional"
 
+#include <cstdint>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
@@ -193,6 +195,7 @@ void Application::initVulkan()
     vkb::InstanceBuilder builder;
     auto builderRet = builder.set_app_name("Voxel Raymarcher")
                           .request_validation_layers(true)
+                          .enable_validation_layers(true)
                           .use_default_debug_messenger()
                           .require_api_version(1, 4, 0)
                           .build();
@@ -246,6 +249,12 @@ void Application::initVulkan()
     allocatorCI.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
 
     VK_CHECK(vmaCreateAllocator(&allocatorCI, &m_VmaAllocator), "Failed to create allocator");
+
+    setupDebugUtils(m_VkDevice);
+
+    setDebugName(m_VkDevice, VK_OBJECT_TYPE_DEVICE, (uint64_t)m_VkDevice, "Device");
+    setDebugName(
+        m_VkDevice, VK_OBJECT_TYPE_QUEUE, (uint64_t)m_GraphicsQueue.queue, "Graphics queue");
 }
 
 void Application::createSwapchain()
@@ -273,6 +282,8 @@ void Application::createSwapchain()
     };
     m_VkSwapchainImages = vkbSwapchain.get_images().value();
     m_VkSwapchainImageViews = vkbSwapchain.get_image_views().value();
+
+    setDebugName(m_VkDevice, VK_OBJECT_TYPE_SWAPCHAIN_KHR, (uint64_t)m_VkSwapchain, "Swapchain");
 
     LOG_DEBUG("Created swapchain");
 }
@@ -333,10 +344,16 @@ void Application::createDrawImages()
                      nullptr),
             "Failed to allocate draw image");
 
+        setDebugName(m_VkDevice, VK_OBJECT_TYPE_IMAGE, (uint64_t)m_PerFrameData[i].drawImage.image,
+            "Draw image");
+
         imageViewCI.image = m_PerFrameData[i].drawImage.image;
         VK_CHECK(
             vkCreateImageView(m_VkDevice, &imageViewCI, nullptr, &m_PerFrameData[i].drawImage.view),
             "Failed to create image view");
+
+        setDebugName(m_VkDevice, VK_OBJECT_TYPE_IMAGE_VIEW,
+            (uint64_t)m_PerFrameData[i].drawImage.view, "Draw image view");
     }
 
     LOG_DEBUG("Created draw images");
@@ -369,6 +386,8 @@ void Application::createCommandPools()
 
     VK_CHECK(vkCreateCommandPool(m_VkDevice, &commandPoolCI, nullptr, &m_GeneralPool),
         "Failed to create command pool");
+    setDebugName(
+        m_VkDevice, VK_OBJECT_TYPE_COMMAND_POOL, (uint64_t)m_GeneralPool, "General command pool");
 
     for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
         VK_CHECK(vkCreateCommandPool(
@@ -379,6 +398,11 @@ void Application::createCommandPools()
         VK_CHECK(vkAllocateCommandBuffers(
                      m_VkDevice, &commandBufferAI, &m_PerFrameData[i].commandBuffer),
             "Failed to allocate command buffer");
+
+        setDebugName(m_VkDevice, VK_OBJECT_TYPE_COMMAND_POOL,
+            (uint64_t)m_PerFrameData[i].commandPool, "Per frame command pool");
+        setDebugName(m_VkDevice, VK_OBJECT_TYPE_COMMAND_BUFFER,
+            (uint64_t)m_PerFrameData[i].commandBuffer, "Per frame command buffer");
     }
 
     LOG_DEBUG("Created command pools");
@@ -404,6 +428,9 @@ void Application::createSyncStructures()
     for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
         VK_CHECK(vkCreateFence(m_VkDevice, &fenceCI, nullptr, &m_PerFrameData[i].fence),
             "Failed to create fence");
+
+        setDebugName(
+            m_VkDevice, VK_OBJECT_TYPE_FENCE, (uint64_t)m_PerFrameData[i].fence, "Per frame fence");
     }
 
     VkSemaphoreCreateInfo semaphoreCI {};
@@ -419,6 +446,11 @@ void Application::createSyncStructures()
             "Failed to create render semaphore");
         VK_CHECK(vkCreateSemaphore(m_VkDevice, &semaphoreCI, nullptr, &m_SwapchainSemaphores[i]),
             "Failed to create swapchain semaphore");
+
+        setDebugName(m_VkDevice, VK_OBJECT_TYPE_SEMAPHORE, (uint64_t)m_RenderSemaphores[i],
+            "Per swapchain render semaphore");
+        setDebugName(m_VkDevice, VK_OBJECT_TYPE_SEMAPHORE, (uint64_t)m_SwapchainSemaphores[i],
+            "Per swapchain present semaphore");
     }
 
     LOG_DEBUG("Created sync structures");
@@ -510,6 +542,9 @@ void Application::createBuffer()
         VK_CHECK(vmaCreateBuffer(m_VmaAllocator, &bufferCI, &allocationCI, &m_SphereBuffer.buffer,
                      &m_SphereBuffer.allocation, nullptr),
             "Failed to create buffer");
+
+        setDebugName(
+            m_VkDevice, VK_OBJECT_TYPE_BUFFER, (uint64_t)m_SphereBuffer.buffer, "Sphere buffer");
     }
 
     {
@@ -528,6 +563,9 @@ void Application::createBuffer()
         VK_CHECK(vmaCreateBuffer(m_VmaAllocator, &bufferCI, &allocationCI, &m_StagingBuffer.buffer,
                      &m_StagingBuffer.allocation, nullptr),
             "Failed to create staging buffer");
+
+        setDebugName(
+            m_VkDevice, VK_OBJECT_TYPE_BUFFER, (uint64_t)m_StagingBuffer.buffer, "Staging buffer");
     }
 
     m_Spheres.resize(SPHERE_COUNT);
@@ -630,6 +668,9 @@ void Application::createDescriptorPool()
     VK_CHECK(vkCreateDescriptorPool(m_VkDevice, &descriptorPoolCI, nullptr, &m_VkDescriptorPool),
         "Failed to create descriptor pool");
 
+    setDebugName(m_VkDevice, VK_OBJECT_TYPE_DESCRIPTOR_POOL, (uint64_t)m_VkDescriptorPool,
+        "General descriptor pool");
+
     LOG_DEBUG("Created descriptor pool");
 }
 
@@ -661,6 +702,9 @@ void Application::createDescriptors()
     VK_CHECK(vkCreateDescriptorSetLayout(
                  m_VkDevice, &descriptorSetLayoutCI, nullptr, &m_ComputeDescriptorSetLayout),
         "Failed to create compute descriptor set layout");
+
+    setDebugName(m_VkDevice, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT,
+        (uint64_t)m_ComputeDescriptorSetLayout, "Compute descriptor layout");
 
     std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
     for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++)
@@ -717,6 +761,9 @@ void Application::createDescriptors()
         };
 
         vkUpdateDescriptorSets(m_VkDevice, writeSets.size(), writeSets.data(), 0, nullptr);
+
+        setDebugName(m_VkDevice, VK_OBJECT_TYPE_DESCRIPTOR_SET, (uint64_t)descriptorSets[i],
+            "Compute descriptor set");
     }
 
     for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
@@ -733,6 +780,7 @@ void Application::destroyDescriptorPool()
 
     LOG_DEBUG("Destroyed descriptor pool");
 }
+
 void Application::createPipelineLayouts()
 {
     VkPushConstantRange pushConstantRange {};
@@ -751,6 +799,9 @@ void Application::createPipelineLayouts()
 
     VK_CHECK(vkCreatePipelineLayout(m_VkDevice, &pipelineLayoutCI, nullptr, &m_VkPipelineLayout),
         "Failed to create pipeline layout");
+
+    setDebugName(m_VkDevice, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)m_VkPipelineLayout,
+        "Compute pipeline layout");
 }
 
 void Application::destroyPipelineLayouts()
@@ -783,6 +834,8 @@ void Application::createComputePipeline()
     VK_CHECK(vkCreateComputePipelines(
                  m_VkDevice, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &m_VkPipeline),
         "Failed to create compute pipeline");
+
+    setDebugName(m_VkDevice, VK_OBJECT_TYPE_PIPELINE, (uint64_t)m_VkPipeline, "Compute pipeline");
 }
 
 void Application::destroyComputePipeline() { vkDestroyPipeline(m_VkDevice, m_VkPipeline, nullptr); }
@@ -799,6 +852,8 @@ void Application::createQueryPool()
 
     VK_CHECK(vkCreateQueryPool(m_VkDevice, &queryPoolCI, nullptr, &m_VkQueryPool),
         "Failed to create query pool");
+
+    setDebugName(m_VkDevice, VK_OBJECT_TYPE_QUERY_POOL, (uint64_t)m_VkQueryPool, "Query pool");
 
     VkPhysicalDeviceProperties deviceProperties;
     vkGetPhysicalDeviceProperties(m_VkPhysicalDevice, &deviceProperties);
@@ -872,15 +927,21 @@ void Application::render()
     {
         VK_CHECK(vkBeginCommandBuffer(commandBuffer, &commandBufferBI), "Begin command buffer");
 
-        vkCmdResetQueryPool(commandBuffer, m_VkQueryPool, m_CurrentFrameIndex * 2, 2);
+        {
+            beginCmdDebugLabel(commandBuffer, "Setup", { 0.f, 1.f, 0.f, 1.f });
 
-        vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, m_VkQueryPool,
-            m_CurrentFrameIndex * 2);
+            vkCmdResetQueryPool(commandBuffer, m_VkQueryPool, m_CurrentFrameIndex * 2, 2);
 
-        transitionImage(commandBuffer, m_VkSwapchainImages[swapchainImageIndex],
-            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-        transitionImage(commandBuffer, currentFrame.drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED,
-            VK_IMAGE_LAYOUT_GENERAL);
+            vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, m_VkQueryPool,
+                m_CurrentFrameIndex * 2);
+
+            transitionImage(commandBuffer, m_VkSwapchainImages[swapchainImageIndex],
+                VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+            transitionImage(commandBuffer, currentFrame.drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED,
+                VK_IMAGE_LAYOUT_GENERAL);
+
+            endCmdDebugLabel(commandBuffer);
+        }
 
         renderCompute(commandBuffer, currentFrame);
 
@@ -889,18 +950,23 @@ void Application::render()
 
         renderImGui(commandBuffer, currentFrame);
 
-        transitionImage(commandBuffer, currentFrame.drawImage.image,
-            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+        {
+            beginCmdDebugLabel(commandBuffer, "Present", { 0.f, 1.f, 0.f, 1.f });
+            transitionImage(commandBuffer, currentFrame.drawImage.image,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
-        copyImageToImage(commandBuffer, currentFrame.drawImage.image,
-            m_VkSwapchainImages[swapchainImageIndex], currentFrame.drawImage.extent,
-            m_VkSwapchainImageExtent);
+            copyImageToImage(commandBuffer, currentFrame.drawImage.image,
+                m_VkSwapchainImages[swapchainImageIndex], currentFrame.drawImage.extent,
+                m_VkSwapchainImageExtent);
 
-        transitionImage(commandBuffer, m_VkSwapchainImages[swapchainImageIndex],
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+            transitionImage(commandBuffer, m_VkSwapchainImages[swapchainImageIndex],
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
-        vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_VkQueryPool,
-            m_CurrentFrameIndex * 2 + 1);
+            vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_VkQueryPool,
+                m_CurrentFrameIndex * 2 + 1);
+
+            endCmdDebugLabel(commandBuffer);
+        }
 
         VK_CHECK(vkEndCommandBuffer(commandBuffer), "End command buffer");
     }
@@ -970,6 +1036,8 @@ void Application::render()
 
 void Application::renderCompute(VkCommandBuffer& commandBuffer, const PerFrameData& currentFrame)
 {
+    beginCmdDebugLabel(commandBuffer, "Compute render", { 0.f, 0.f, 1.f, 1.f });
+
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_VkPipeline);
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_VkPipelineLayout, 0, 1,
         &currentFrame.drawImageDescriptorSet, 0, nullptr);
@@ -985,6 +1053,8 @@ void Application::renderCompute(VkCommandBuffer& commandBuffer, const PerFrameDa
 
     vkCmdDispatch(commandBuffer, std::ceil(currentFrame.drawImage.extent.width / 8.),
         std::ceil(currentFrame.drawImage.extent.height / 8.), 1);
+
+    endCmdDebugLabel(commandBuffer);
 }
 
 void Application::renderImGui(VkCommandBuffer& commandBuffer, const PerFrameData& currentFrame)
@@ -1018,9 +1088,13 @@ void Application::renderImGui(VkCommandBuffer& commandBuffer, const PerFrameData
     if (!m_RenderImGui)
         return;
 
+    beginCmdDebugLabel(commandBuffer, "Render ImGui", { 1.f, 0.f, 0.f, 1.f });
+
     vkCmdBeginRendering(commandBuffer, &renderInfo);
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
     vkCmdEndRendering(commandBuffer);
+
+    endCmdDebugLabel(commandBuffer);
 }
 
 void Application::update(float delta)

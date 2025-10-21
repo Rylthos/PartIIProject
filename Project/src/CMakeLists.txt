@@ -9,6 +9,7 @@ set (SOURCE_LIST
   "file_watcher.cpp" "file_watcher.hpp"
   "camera.cpp" "camera.hpp"
   "ring_buffer.hpp"
+  "debug_utils.cpp" "debug_utils.hpp"
 )
 
 add_compile_definitions(GLM_ENABLE_EXPERIMENTAL)
