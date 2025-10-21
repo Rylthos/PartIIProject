@@ -10,11 +10,13 @@ set (SOURCE_LIST
   "camera.cpp" "camera.hpp"
   "ring_buffer.hpp"
   "debug_utils.cpp" "debug_utils.hpp"
+  "acceleration_structure_manager.cpp" "acceleration_structure_manager.cpp"
 )
 
 add_compile_definitions(GLM_ENABLE_EXPERIMENTAL)
 
 add_executable(${PROJECT_NAME} ${SOURCE_LIST})
+add_subdirectory(accelerationStructures)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
   glm::glm

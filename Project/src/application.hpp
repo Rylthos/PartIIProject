@@ -124,19 +124,19 @@ class Application : public EventDispatcher {
     void createImGuiStructures();
     void destroyImGuiStructures();
 
-    void createBuffer();
-    void uploadBuffer();
-    void destroyBuffer();
+    // void createBuffer();
+    // void uploadBuffer();
+    // void destroyBuffer();
 
-    void createDescriptorPool();
-    void createDescriptors();
-    void destroyDescriptorPool();
+    // void createDescriptorPool();
+    // void createDescriptors();
+    // void destroyDescriptorPool();
 
-    void createPipelineLayouts();
-    void destroyPipelineLayouts();
+    // void createPipelineLayouts();
+    // void destroyPipelineLayouts();
 
-    void createComputePipeline();
-    void destroyComputePipeline();
+    // void createComputePipeline();
+    // void destroyComputePipeline();
 
     void createQueryPool();
     void destroyQueryPool();
@@ -146,7 +146,7 @@ class Application : public EventDispatcher {
 
     void render();
 
-    void renderCompute(VkCommandBuffer& commandBuffer, const PerFrameData& currentFrame);
+    // void renderCompute(VkCommandBuffer& commandBuffer, const PerFrameData& currentFrame);
     void renderImGui(VkCommandBuffer& commandBuffer, const PerFrameData& currentFrame);
 
     void update(float delta);

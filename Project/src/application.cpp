@@ -1,13 +1,14 @@
 #include "application.hpp"
 
 #include "VkBootstrap.h"
+#include "acceleration_structure_manager.hpp"
 #include "debug_utils.hpp"
 #include "events.hpp"
 #include "ring_buffer.hpp"
+#include "shader_manager.hpp"
 
 #include "glm/gtx/string_cast.hpp"
 #include "glm/vector_relational.hpp"
-#include "shader_manager.hpp"
 
 #include "functional"
 
@@ -106,18 +107,21 @@ void Application::init()
 
     createImGuiStructures();
 
-    createBuffer();
+    // createBuffer();
 
-    createDescriptorPool();
-    createDescriptors();
+    // createDescriptorPool();
+    // createDescriptors();
 
-    createPipelineLayouts();
+    // createPipelineLayouts();
 
-    ShaderManager::getInstance()->addModule("basic_compute",
-        std::bind(&Application::createComputePipeline, this),
-        std::bind(&Application::destroyComputePipeline, this));
+    // ShaderManager::getInstance()->addModule("basic_compute",
+    //     std::bind(&Application::createComputePipeline, this),
+    //     std::bind(&Application::destroyComputePipeline, this));
+    //
+    // createComputePipeline();
 
-    createComputePipeline();
+    ASManager::getManager()->init(m_VkDevice, m_VmaAllocator);
+    ASManager::getManager()->setAS(ASType::GRID);
 
     createQueryPool();
 
@@ -158,18 +162,20 @@ void Application::cleanup()
 {
     vkDeviceWaitIdle(m_VkDevice);
 
+    ASManager::getManager()->cleanup();
+
     ShaderManager::getInstance()->cleanup();
 
     destroyQueryPool();
 
-    destroyComputePipeline();
-    destroyPipelineLayouts();
-
-    destroyDescriptorPool();
+    // destroyComputePipeline();
+    // destroyPipelineLayouts();
+    //
+    // destroyDescriptorPool();
 
     destroyImGuiStructures();
 
-    destroyBuffer();
+    // destroyBuffer();
 
     destroySyncStructures();
 
@@ -523,322 +529,327 @@ void Application::destroyImGuiStructures()
     LOG_DEBUG("Destroyed ImGui");
 }
 
-void Application::createBuffer()
-{
-    VkDeviceSize size = sizeof(Sphere) * SPHERE_COUNT;
+// void Application::createBuffer()
+// {
+//     VkDeviceSize size = sizeof(Sphere) * SPHERE_COUNT;
+//
+//     {
+//         VkBufferCreateInfo bufferCI {};
+//         bufferCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+//         bufferCI.pNext = nullptr;
+//         bufferCI.flags = 0;
+//         bufferCI.size = size;
+//         bufferCI.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+//         bufferCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+//
+//         VmaAllocationCreateInfo allocationCI {};
+//         allocationCI.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+//
+//         VK_CHECK(vmaCreateBuffer(m_VmaAllocator, &bufferCI, &allocationCI,
+//         &m_SphereBuffer.buffer,
+//                      &m_SphereBuffer.allocation, nullptr),
+//             "Failed to create buffer");
+//
+//         setDebugName(
+//             m_VkDevice, VK_OBJECT_TYPE_BUFFER, (uint64_t)m_SphereBuffer.buffer, "Sphere buffer");
+//     }
+//
+//     {
+//         VkBufferCreateInfo bufferCI {};
+//         bufferCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+//         bufferCI.pNext = nullptr;
+//         bufferCI.flags = 0;
+//         bufferCI.size = size;
+//         bufferCI.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+//         bufferCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+//
+//         VmaAllocationCreateInfo allocationCI {};
+//         allocationCI.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+//         allocationCI.usage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST;
+//
+//         VK_CHECK(vmaCreateBuffer(m_VmaAllocator, &bufferCI, &allocationCI,
+//         &m_StagingBuffer.buffer,
+//                      &m_StagingBuffer.allocation, nullptr),
+//             "Failed to create staging buffer");
+//
+//         setDebugName(
+//             m_VkDevice, VK_OBJECT_TYPE_BUFFER, (uint64_t)m_StagingBuffer.buffer, "Staging
+//             buffer");
+//     }
+//
+//     m_Spheres.resize(SPHERE_COUNT);
+//     for (size_t x = 0; x < SPHERE_SIDE; x++) {
+//         for (size_t z = 0; z < SPHERE_SIDE; z++) {
+//             size_t index = x * SPHERE_SIDE + z;
+//             float xOffset = ((rand() % 100) / 100.0f) - 0.5f;
+//             float yOffset = ((rand() % 100) / 100.0f) * 2.0f - 1.0f;
+//             float zOffset = ((rand() % 100) / 100.0f) - 0.5f;
+//             m_Spheres[index] = Sphere {
+//                 .origin = glm::vec3(x * 2 + xOffset, yOffset, (z * 2) + 2.0f + zOffset),
+//                 .radius = ((rand() % 100) / 100.0f) * 0.3f + 0.4f,
+//             };
+//         }
+//     }
+//
+//     Sphere* data;
+//     vmaMapMemory(m_VmaAllocator, m_StagingBuffer.allocation, (void**)&data);
+//     {
+//         memcpy(data, m_Spheres.data(), m_Spheres.size() * sizeof(Sphere));
+//     }
+//     vmaUnmapMemory(m_VmaAllocator, m_StagingBuffer.allocation);
+//
+//     LOG_DEBUG("Created buffers");
+//
+//     uploadBuffer();
+// }
 
-    {
-        VkBufferCreateInfo bufferCI {};
-        bufferCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        bufferCI.pNext = nullptr;
-        bufferCI.flags = 0;
-        bufferCI.size = size;
-        bufferCI.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-        bufferCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+// void Application::uploadBuffer()
+// {
+//     VkCommandBuffer buffer;
+//     VkCommandBufferAllocateInfo commandBufferAI {};
+//     commandBufferAI.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+//     commandBufferAI.pNext = nullptr;
+//     commandBufferAI.commandPool = m_GeneralPool;
+//     commandBufferAI.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+//     commandBufferAI.commandBufferCount = 1;
+//     VK_CHECK(vkAllocateCommandBuffers(m_VkDevice, &commandBufferAI, &buffer),
+//         "Failed to allocate command buffer");
+//
+//     VkCommandBufferBeginInfo beginInfo {};
+//     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+//     beginInfo.pNext = nullptr;
+//
+//     vkBeginCommandBuffer(buffer, &beginInfo);
+//
+//     VkBufferCopy region {};
+//     region.srcOffset = 0;
+//     region.dstOffset = 0;
+//     region.size = m_Spheres.size() * sizeof(Sphere);
+//
+//     vkCmdCopyBuffer(buffer, m_StagingBuffer.buffer, m_SphereBuffer.buffer, 1, &region);
+//     m_UploadSpheres = false;
+//
+//     vkEndCommandBuffer(buffer);
+//
+//     VkSubmitInfo submitInfo {};
+//     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+//     submitInfo.pNext = nullptr;
+//     submitInfo.commandBufferCount = 1;
+//     submitInfo.pCommandBuffers = &buffer;
+//
+//     vkQueueSubmit(m_GraphicsQueue.queue, 1, &submitInfo, VK_NULL_HANDLE);
+//     vkQueueWaitIdle(m_GraphicsQueue.queue);
+//
+//     vkFreeCommandBuffers(m_VkDevice, m_GeneralPool, 1, &buffer);
+//
+//     LOG_DEBUG("Copied buffers");
+// }
 
-        VmaAllocationCreateInfo allocationCI {};
-        allocationCI.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+// void Application::destroyBuffer()
+// {
+//     vmaDestroyBuffer(m_VmaAllocator, m_StagingBuffer.buffer, m_StagingBuffer.allocation);
+//     vmaDestroyBuffer(m_VmaAllocator, m_SphereBuffer.buffer, m_SphereBuffer.allocation);
+//
+//     LOG_DEBUG("Destroyed buffers");
+// }
 
-        VK_CHECK(vmaCreateBuffer(m_VmaAllocator, &bufferCI, &allocationCI, &m_SphereBuffer.buffer,
-                     &m_SphereBuffer.allocation, nullptr),
-            "Failed to create buffer");
+// void Application::createDescriptorPool()
+// {
+//     std::vector<VkDescriptorPoolSize> poolSizes = {
+//         {
+//          .type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+//          .descriptorCount = FRAMES_IN_FLIGHT,
+//          },
+//         {
+//          .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+//          .descriptorCount = FRAMES_IN_FLIGHT,
+//          },
+//     };
+//
+//     VkDescriptorPoolCreateInfo descriptorPoolCI {};
+//     descriptorPoolCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+//     descriptorPoolCI.pNext = nullptr;
+//     descriptorPoolCI.flags = 0;
+//     descriptorPoolCI.maxSets = FRAMES_IN_FLIGHT,
+//     descriptorPoolCI.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+//     descriptorPoolCI.pPoolSizes = poolSizes.data();
+//
+//     VK_CHECK(vkCreateDescriptorPool(m_VkDevice, &descriptorPoolCI, nullptr, &m_VkDescriptorPool),
+//         "Failed to create descriptor pool");
+//
+//     setDebugName(m_VkDevice, VK_OBJECT_TYPE_DESCRIPTOR_POOL, (uint64_t)m_VkDescriptorPool,
+//         "General descriptor pool");
+//
+//     LOG_DEBUG("Created descriptor pool");
+// }
 
-        setDebugName(
-            m_VkDevice, VK_OBJECT_TYPE_BUFFER, (uint64_t)m_SphereBuffer.buffer, "Sphere buffer");
-    }
+// void Application::createDescriptors()
+// {
+//     std::vector<VkDescriptorSetLayoutBinding> bindings = {
+//         {
+//          .binding = 0,
+//          .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+//          .descriptorCount = 1,
+//          .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+//          .pImmutableSamplers = VK_NULL_HANDLE,
+//          },
+//         {
+//          .binding = 1,
+//          .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+//          .descriptorCount = 1,
+//          .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+//          .pImmutableSamplers = VK_NULL_HANDLE,
+//          }
+//     };
+//     VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCI {};
+//     descriptorSetLayoutCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+//     descriptorSetLayoutCI.pNext = nullptr;
+//     descriptorSetLayoutCI.flags = 0;
+//     descriptorSetLayoutCI.bindingCount = static_cast<uint32_t>(bindings.size());
+//     descriptorSetLayoutCI.pBindings = bindings.data();
+//
+//     VK_CHECK(vkCreateDescriptorSetLayout(
+//                  m_VkDevice, &descriptorSetLayoutCI, nullptr, &m_ComputeDescriptorSetLayout),
+//         "Failed to create compute descriptor set layout");
+//
+//     setDebugName(m_VkDevice, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT,
+//         (uint64_t)m_ComputeDescriptorSetLayout, "Compute descriptor layout");
+//
+//     std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
+//     for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++)
+//         descriptorSetLayouts.push_back(m_ComputeDescriptorSetLayout);
+//
+//     VkDescriptorSetAllocateInfo descriptorSetAI {};
+//     descriptorSetAI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+//     descriptorSetAI.pNext = nullptr;
+//     descriptorSetAI.descriptorPool = m_VkDescriptorPool;
+//     descriptorSetAI.descriptorSetCount = descriptorSetLayouts.size();
+//     descriptorSetAI.pSetLayouts = descriptorSetLayouts.data();
+//
+//     std::vector<VkDescriptorSet> descriptorSets;
+//     descriptorSets.resize(FRAMES_IN_FLIGHT);
+//     VK_CHECK(vkAllocateDescriptorSets(m_VkDevice, &descriptorSetAI, descriptorSets.data()),
+//         "Failed to allocate descriptor set");
+//
+//     for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
+//         VkDescriptorImageInfo imageInfo {};
+//         imageInfo.sampler = VK_NULL_HANDLE;
+//         imageInfo.imageView = m_PerFrameData[i].drawImage.view;
+//         imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+//
+//         VkDescriptorBufferInfo bufferInfo {};
+//         bufferInfo.buffer = m_SphereBuffer.buffer;
+//         bufferInfo.offset = 0;
+//         bufferInfo.range = SPHERE_COUNT * sizeof(Sphere);
+//
+//         std::vector<VkWriteDescriptorSet> writeSets = {
+//             {
+//              .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+//              .pNext = nullptr,
+//              .dstSet = descriptorSets[i],
+//              .dstBinding = 0,
+//              .dstArrayElement = 0,
+//              .descriptorCount = 1,
+//              .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+//              .pImageInfo = &imageInfo,
+//              .pBufferInfo = nullptr,
+//              .pTexelBufferView = nullptr,
+//              },
+//             {
+//              .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+//              .pNext = nullptr,
+//              .dstSet = descriptorSets[i],
+//              .dstBinding = 1,
+//              .dstArrayElement = 0,
+//              .descriptorCount = 1,
+//              .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+//              .pImageInfo = nullptr,
+//              .pBufferInfo = &bufferInfo,
+//              .pTexelBufferView = nullptr,
+//              }
+//         };
+//
+//         vkUpdateDescriptorSets(m_VkDevice, writeSets.size(), writeSets.data(), 0, nullptr);
+//
+//         setDebugName(m_VkDevice, VK_OBJECT_TYPE_DESCRIPTOR_SET, (uint64_t)descriptorSets[i],
+//             "Compute descriptor set");
+//     }
+//
+//     for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
+//         m_PerFrameData[i].drawImageDescriptorSet = descriptorSets[i];
+//     }
+//
+//     LOG_DEBUG("Created descriptors");
+// }
 
-    {
-        VkBufferCreateInfo bufferCI {};
-        bufferCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        bufferCI.pNext = nullptr;
-        bufferCI.flags = 0;
-        bufferCI.size = size;
-        bufferCI.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-        bufferCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+// void Application::destroyDescriptorPool()
+// {
+//     vkDestroyDescriptorSetLayout(m_VkDevice, m_ComputeDescriptorSetLayout, nullptr);
+//     vkDestroyDescriptorPool(m_VkDevice, m_VkDescriptorPool, nullptr);
+//
+//     LOG_DEBUG("Destroyed descriptor pool");
+// }
 
-        VmaAllocationCreateInfo allocationCI {};
-        allocationCI.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
-        allocationCI.usage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST;
+// void Application::createPipelineLayouts()
+// {
+//     VkPushConstantRange pushConstantRange {};
+//     pushConstantRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+//     pushConstantRange.offset = 0;
+//     pushConstantRange.size = sizeof(PushConstants);
+//
+//     VkPipelineLayoutCreateInfo pipelineLayoutCI {};
+//     pipelineLayoutCI.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+//     pipelineLayoutCI.pNext = nullptr;
+//     pipelineLayoutCI.flags = 0;
+//     pipelineLayoutCI.setLayoutCount = 1;
+//     pipelineLayoutCI.pSetLayouts = &m_ComputeDescriptorSetLayout;
+//     pipelineLayoutCI.pushConstantRangeCount = 1;
+//     pipelineLayoutCI.pPushConstantRanges = &pushConstantRange;
+//
+//     VK_CHECK(vkCreatePipelineLayout(m_VkDevice, &pipelineLayoutCI, nullptr, &m_VkPipelineLayout),
+//         "Failed to create pipeline layout");
+//
+//     setDebugName(m_VkDevice, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)m_VkPipelineLayout,
+//         "Compute pipeline layout");
+// }
 
-        VK_CHECK(vmaCreateBuffer(m_VmaAllocator, &bufferCI, &allocationCI, &m_StagingBuffer.buffer,
-                     &m_StagingBuffer.allocation, nullptr),
-            "Failed to create staging buffer");
+// void Application::destroyPipelineLayouts()
+// {
+//     vkDestroyPipelineLayout(m_VkDevice, m_VkPipelineLayout, nullptr);
+// }
 
-        setDebugName(
-            m_VkDevice, VK_OBJECT_TYPE_BUFFER, (uint64_t)m_StagingBuffer.buffer, "Staging buffer");
-    }
+// void Application::createComputePipeline()
+// {
+//     VkShaderModule shaderModule = ShaderManager::getInstance()->getShaderModule("basic_compute");
+//
+//     VkPipelineShaderStageCreateInfo shaderStageCI {};
+//     shaderStageCI.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+//     shaderStageCI.pNext = nullptr;
+//     shaderStageCI.flags = 0;
+//     shaderStageCI.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+//     shaderStageCI.module = shaderModule;
+//     shaderStageCI.pName = "main";
+//     shaderStageCI.pSpecializationInfo = nullptr;
+//
+//     VkComputePipelineCreateInfo pipelineCI {};
+//     pipelineCI.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+//     pipelineCI.pNext = nullptr;
+//     pipelineCI.flags = 0;
+//     pipelineCI.stage = shaderStageCI;
+//     pipelineCI.layout = m_VkPipelineLayout;
+//     pipelineCI.basePipelineHandle = VK_NULL_HANDLE;
+//     pipelineCI.basePipelineIndex = 0;
+//
+//     VK_CHECK(vkCreateComputePipelines(
+//                  m_VkDevice, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &m_VkPipeline),
+//         "Failed to create compute pipeline");
+//
+//     setDebugName(m_VkDevice, VK_OBJECT_TYPE_PIPELINE, (uint64_t)m_VkPipeline, "Compute
+//     pipeline");
+// }
 
-    m_Spheres.resize(SPHERE_COUNT);
-    for (size_t x = 0; x < SPHERE_SIDE; x++) {
-        for (size_t z = 0; z < SPHERE_SIDE; z++) {
-            size_t index = x * SPHERE_SIDE + z;
-            float xOffset = ((rand() % 100) / 100.0f) - 0.5f;
-            float yOffset = ((rand() % 100) / 100.0f) * 2.0f - 1.0f;
-            float zOffset = ((rand() % 100) / 100.0f) - 0.5f;
-            m_Spheres[index] = Sphere {
-                .origin = glm::vec3(x * 2 + xOffset, yOffset, (z * 2) + 2.0f + zOffset),
-                .radius = ((rand() % 100) / 100.0f) * 0.3f + 0.4f,
-            };
-        }
-    }
-
-    Sphere* data;
-    vmaMapMemory(m_VmaAllocator, m_StagingBuffer.allocation, (void**)&data);
-    {
-        memcpy(data, m_Spheres.data(), m_Spheres.size() * sizeof(Sphere));
-    }
-    vmaUnmapMemory(m_VmaAllocator, m_StagingBuffer.allocation);
-
-    LOG_DEBUG("Created buffers");
-
-    uploadBuffer();
-}
-
-void Application::uploadBuffer()
-{
-    VkCommandBuffer buffer;
-    VkCommandBufferAllocateInfo commandBufferAI {};
-    commandBufferAI.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    commandBufferAI.pNext = nullptr;
-    commandBufferAI.commandPool = m_GeneralPool;
-    commandBufferAI.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    commandBufferAI.commandBufferCount = 1;
-    VK_CHECK(vkAllocateCommandBuffers(m_VkDevice, &commandBufferAI, &buffer),
-        "Failed to allocate command buffer");
-
-    VkCommandBufferBeginInfo beginInfo {};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.pNext = nullptr;
-
-    vkBeginCommandBuffer(buffer, &beginInfo);
-
-    VkBufferCopy region {};
-    region.srcOffset = 0;
-    region.dstOffset = 0;
-    region.size = m_Spheres.size() * sizeof(Sphere);
-
-    vkCmdCopyBuffer(buffer, m_StagingBuffer.buffer, m_SphereBuffer.buffer, 1, &region);
-    m_UploadSpheres = false;
-
-    vkEndCommandBuffer(buffer);
-
-    VkSubmitInfo submitInfo {};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.pNext = nullptr;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &buffer;
-
-    vkQueueSubmit(m_GraphicsQueue.queue, 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(m_GraphicsQueue.queue);
-
-    vkFreeCommandBuffers(m_VkDevice, m_GeneralPool, 1, &buffer);
-
-    LOG_DEBUG("Copied buffers");
-}
-
-void Application::destroyBuffer()
-{
-    vmaDestroyBuffer(m_VmaAllocator, m_StagingBuffer.buffer, m_StagingBuffer.allocation);
-    vmaDestroyBuffer(m_VmaAllocator, m_SphereBuffer.buffer, m_SphereBuffer.allocation);
-
-    LOG_DEBUG("Destroyed buffers");
-}
-
-void Application::createDescriptorPool()
-{
-    std::vector<VkDescriptorPoolSize> poolSizes = {
-        {
-         .type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-         .descriptorCount = FRAMES_IN_FLIGHT,
-         },
-        {
-         .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-         .descriptorCount = FRAMES_IN_FLIGHT,
-         },
-    };
-
-    VkDescriptorPoolCreateInfo descriptorPoolCI {};
-    descriptorPoolCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    descriptorPoolCI.pNext = nullptr;
-    descriptorPoolCI.flags = 0;
-    descriptorPoolCI.maxSets = FRAMES_IN_FLIGHT,
-    descriptorPoolCI.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
-    descriptorPoolCI.pPoolSizes = poolSizes.data();
-
-    VK_CHECK(vkCreateDescriptorPool(m_VkDevice, &descriptorPoolCI, nullptr, &m_VkDescriptorPool),
-        "Failed to create descriptor pool");
-
-    setDebugName(m_VkDevice, VK_OBJECT_TYPE_DESCRIPTOR_POOL, (uint64_t)m_VkDescriptorPool,
-        "General descriptor pool");
-
-    LOG_DEBUG("Created descriptor pool");
-}
-
-void Application::createDescriptors()
-{
-    std::vector<VkDescriptorSetLayoutBinding> bindings = {
-        {
-         .binding = 0,
-         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-         .descriptorCount = 1,
-         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-         .pImmutableSamplers = VK_NULL_HANDLE,
-         },
-        {
-         .binding = 1,
-         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-         .descriptorCount = 1,
-         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-         .pImmutableSamplers = VK_NULL_HANDLE,
-         }
-    };
-    VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCI {};
-    descriptorSetLayoutCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    descriptorSetLayoutCI.pNext = nullptr;
-    descriptorSetLayoutCI.flags = 0;
-    descriptorSetLayoutCI.bindingCount = static_cast<uint32_t>(bindings.size());
-    descriptorSetLayoutCI.pBindings = bindings.data();
-
-    VK_CHECK(vkCreateDescriptorSetLayout(
-                 m_VkDevice, &descriptorSetLayoutCI, nullptr, &m_ComputeDescriptorSetLayout),
-        "Failed to create compute descriptor set layout");
-
-    setDebugName(m_VkDevice, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT,
-        (uint64_t)m_ComputeDescriptorSetLayout, "Compute descriptor layout");
-
-    std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
-    for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++)
-        descriptorSetLayouts.push_back(m_ComputeDescriptorSetLayout);
-
-    VkDescriptorSetAllocateInfo descriptorSetAI {};
-    descriptorSetAI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    descriptorSetAI.pNext = nullptr;
-    descriptorSetAI.descriptorPool = m_VkDescriptorPool;
-    descriptorSetAI.descriptorSetCount = descriptorSetLayouts.size();
-    descriptorSetAI.pSetLayouts = descriptorSetLayouts.data();
-
-    std::vector<VkDescriptorSet> descriptorSets;
-    descriptorSets.resize(FRAMES_IN_FLIGHT);
-    VK_CHECK(vkAllocateDescriptorSets(m_VkDevice, &descriptorSetAI, descriptorSets.data()),
-        "Failed to allocate descriptor set");
-
-    for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
-        VkDescriptorImageInfo imageInfo {};
-        imageInfo.sampler = VK_NULL_HANDLE;
-        imageInfo.imageView = m_PerFrameData[i].drawImage.view;
-        imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-
-        VkDescriptorBufferInfo bufferInfo {};
-        bufferInfo.buffer = m_SphereBuffer.buffer;
-        bufferInfo.offset = 0;
-        bufferInfo.range = SPHERE_COUNT * sizeof(Sphere);
-
-        std::vector<VkWriteDescriptorSet> writeSets = {
-            {
-             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-             .pNext = nullptr,
-             .dstSet = descriptorSets[i],
-             .dstBinding = 0,
-             .dstArrayElement = 0,
-             .descriptorCount = 1,
-             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-             .pImageInfo = &imageInfo,
-             .pBufferInfo = nullptr,
-             .pTexelBufferView = nullptr,
-             },
-            {
-             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-             .pNext = nullptr,
-             .dstSet = descriptorSets[i],
-             .dstBinding = 1,
-             .dstArrayElement = 0,
-             .descriptorCount = 1,
-             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-             .pImageInfo = nullptr,
-             .pBufferInfo = &bufferInfo,
-             .pTexelBufferView = nullptr,
-             }
-        };
-
-        vkUpdateDescriptorSets(m_VkDevice, writeSets.size(), writeSets.data(), 0, nullptr);
-
-        setDebugName(m_VkDevice, VK_OBJECT_TYPE_DESCRIPTOR_SET, (uint64_t)descriptorSets[i],
-            "Compute descriptor set");
-    }
-
-    for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
-        m_PerFrameData[i].drawImageDescriptorSet = descriptorSets[i];
-    }
-
-    LOG_DEBUG("Created descriptors");
-}
-
-void Application::destroyDescriptorPool()
-{
-    vkDestroyDescriptorSetLayout(m_VkDevice, m_ComputeDescriptorSetLayout, nullptr);
-    vkDestroyDescriptorPool(m_VkDevice, m_VkDescriptorPool, nullptr);
-
-    LOG_DEBUG("Destroyed descriptor pool");
-}
-
-void Application::createPipelineLayouts()
-{
-    VkPushConstantRange pushConstantRange {};
-    pushConstantRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-    pushConstantRange.offset = 0;
-    pushConstantRange.size = sizeof(PushConstants);
-
-    VkPipelineLayoutCreateInfo pipelineLayoutCI {};
-    pipelineLayoutCI.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutCI.pNext = nullptr;
-    pipelineLayoutCI.flags = 0;
-    pipelineLayoutCI.setLayoutCount = 1;
-    pipelineLayoutCI.pSetLayouts = &m_ComputeDescriptorSetLayout;
-    pipelineLayoutCI.pushConstantRangeCount = 1;
-    pipelineLayoutCI.pPushConstantRanges = &pushConstantRange;
-
-    VK_CHECK(vkCreatePipelineLayout(m_VkDevice, &pipelineLayoutCI, nullptr, &m_VkPipelineLayout),
-        "Failed to create pipeline layout");
-
-    setDebugName(m_VkDevice, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)m_VkPipelineLayout,
-        "Compute pipeline layout");
-}
-
-void Application::destroyPipelineLayouts()
-{
-    vkDestroyPipelineLayout(m_VkDevice, m_VkPipelineLayout, nullptr);
-}
-
-void Application::createComputePipeline()
-{
-    VkShaderModule shaderModule = ShaderManager::getInstance()->getShaderModule("basic_compute");
-
-    VkPipelineShaderStageCreateInfo shaderStageCI {};
-    shaderStageCI.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    shaderStageCI.pNext = nullptr;
-    shaderStageCI.flags = 0;
-    shaderStageCI.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-    shaderStageCI.module = shaderModule;
-    shaderStageCI.pName = "main";
-    shaderStageCI.pSpecializationInfo = nullptr;
-
-    VkComputePipelineCreateInfo pipelineCI {};
-    pipelineCI.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-    pipelineCI.pNext = nullptr;
-    pipelineCI.flags = 0;
-    pipelineCI.stage = shaderStageCI;
-    pipelineCI.layout = m_VkPipelineLayout;
-    pipelineCI.basePipelineHandle = VK_NULL_HANDLE;
-    pipelineCI.basePipelineIndex = 0;
-
-    VK_CHECK(vkCreateComputePipelines(
-                 m_VkDevice, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &m_VkPipeline),
-        "Failed to create compute pipeline");
-
-    setDebugName(m_VkDevice, VK_OBJECT_TYPE_PIPELINE, (uint64_t)m_VkPipeline, "Compute pipeline");
-}
-
-void Application::destroyComputePipeline() { vkDestroyPipeline(m_VkDevice, m_VkPipeline, nullptr); }
+// void Application::destroyComputePipeline() { vkDestroyPipeline(m_VkDevice, m_VkPipeline,
+// nullptr); }
 
 void Application::createQueryPool()
 {
@@ -943,7 +954,8 @@ void Application::render()
             endCmdDebugLabel(commandBuffer);
         }
 
-        renderCompute(commandBuffer, currentFrame);
+        ASManager::getManager()->render(commandBuffer, m_CurrentFrameIndex);
+        // renderCompute(commandBuffer, currentFrame);
 
         transitionImage(commandBuffer, currentFrame.drawImage.image, VK_IMAGE_LAYOUT_GENERAL,
             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
@@ -1034,28 +1046,29 @@ void Application::render()
     m_Window.swapBuffers();
 }
 
-void Application::renderCompute(VkCommandBuffer& commandBuffer, const PerFrameData& currentFrame)
-{
-    beginCmdDebugLabel(commandBuffer, "Compute render", { 0.f, 0.f, 1.f, 1.f });
-
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_VkPipeline);
-    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_VkPipelineLayout, 0, 1,
-        &currentFrame.drawImageDescriptorSet, 0, nullptr);
-
-    PushConstants pushConstant {};
-    pushConstant.cameraPosition = m_Camera.getPosition();
-    pushConstant.cameraFront = m_Camera.getForwardVector();
-    pushConstant.cameraRight = m_Camera.getRightVector();
-    pushConstant.cameraUp = m_Camera.getUpVector();
-
-    vkCmdPushConstants(commandBuffer, m_VkPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
-        sizeof(pushConstant), &pushConstant);
-
-    vkCmdDispatch(commandBuffer, std::ceil(currentFrame.drawImage.extent.width / 8.),
-        std::ceil(currentFrame.drawImage.extent.height / 8.), 1);
-
-    endCmdDebugLabel(commandBuffer);
-}
+// void Application::renderCompute(VkCommandBuffer& commandBuffer, const PerFrameData& currentFrame)
+// {
+//     beginCmdDebugLabel(commandBuffer, "Compute render", { 0.f, 0.f, 1.f, 1.f });
+//
+//     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_VkPipeline);
+//     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_VkPipelineLayout, 0,
+//     1,
+//         &currentFrame.drawImageDescriptorSet, 0, nullptr);
+//
+//     PushConstants pushConstant {};
+//     pushConstant.cameraPosition = m_Camera.getPosition();
+//     pushConstant.cameraFront = m_Camera.getForwardVector();
+//     pushConstant.cameraRight = m_Camera.getRightVector();
+//     pushConstant.cameraUp = m_Camera.getUpVector();
+//
+//     vkCmdPushConstants(commandBuffer, m_VkPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
+//         sizeof(pushConstant), &pushConstant);
+//
+//     vkCmdDispatch(commandBuffer, std::ceil(currentFrame.drawImage.extent.width / 8.),
+//         std::ceil(currentFrame.drawImage.extent.height / 8.), 1);
+//
+//     endCmdDebugLabel(commandBuffer);
+// }
 
 void Application::renderImGui(VkCommandBuffer& commandBuffer, const PerFrameData& currentFrame)
 {
@@ -1150,6 +1163,6 @@ void Application::handleWindow(const Event& event)
         createSwapchain();
         createDrawImages();
         createSyncStructures();
-        createDescriptors();
+        // createDescriptors();
     }
 }
