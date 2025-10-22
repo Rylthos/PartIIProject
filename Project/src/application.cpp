@@ -113,15 +113,8 @@ void Application::init()
     // createBuffer();
 
     createDescriptorPool();
-    // createDescriptors();
-
-    // createPipelineLayouts();
-
-    // ShaderManager::getInstance()->addModule("basic_compute",
-    //     std::bind(&Application::createComputePipeline, this),
-    //     std::bind(&Application::destroyComputePipeline, this));
-    //
-    // createComputePipeline();
+    createDescriptorLayouts();
+    createDescriptors();
 
     ASManager::getManager()->init({
         .device = m_VkDevice,
@@ -129,8 +122,8 @@ void Application::init()
         .graphicsQueue = m_GraphicsQueue.queue,
         .graphicsQueueIndex = m_GraphicsQueue.queueFamily,
         .descriptorPool = m_VkDescriptorPool,
+        .drawImageDescriptorLayout = m_DrawImageDescriptorLayout,
     });
-    ASManager::getManager()->setAS(ASType::GRID);
 
     createQueryPool();
 
@@ -177,9 +170,7 @@ void Application::cleanup()
 
     destroyQueryPool();
 
-    // destroyComputePipeline();
-    // destroyPipelineLayouts();
-    //
+    destroyDescriptorLayouts();
     destroyDescriptorPool();
 
     destroyImGuiStructures();
@@ -692,104 +683,93 @@ void Application::createDescriptorPool()
     LOG_DEBUG("Created descriptor pool");
 }
 
-// void Application::createDescriptors()
-// {
-//     std::vector<VkDescriptorSetLayoutBinding> bindings = {
-//         {
-//          .binding = 0,
-//          .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-//          .descriptorCount = 1,
-//          .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-//          .pImmutableSamplers = VK_NULL_HANDLE,
-//          },
-//         {
-//          .binding = 1,
-//          .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-//          .descriptorCount = 1,
-//          .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-//          .pImmutableSamplers = VK_NULL_HANDLE,
-//          }
-//     };
-//     VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCI {};
-//     descriptorSetLayoutCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-//     descriptorSetLayoutCI.pNext = nullptr;
-//     descriptorSetLayoutCI.flags = 0;
-//     descriptorSetLayoutCI.bindingCount = static_cast<uint32_t>(bindings.size());
-//     descriptorSetLayoutCI.pBindings = bindings.data();
-//
-//     VK_CHECK(vkCreateDescriptorSetLayout(
-//                  m_VkDevice, &descriptorSetLayoutCI, nullptr, &m_ComputeDescriptorSetLayout),
-//         "Failed to create compute descriptor set layout");
-//
-//     setDebugName(m_VkDevice, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT,
-//         (uint64_t)m_ComputeDescriptorSetLayout, "Compute descriptor layout");
-//
-//     std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
-//     for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++)
-//         descriptorSetLayouts.push_back(m_ComputeDescriptorSetLayout);
-//
-//     VkDescriptorSetAllocateInfo descriptorSetAI {};
-//     descriptorSetAI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-//     descriptorSetAI.pNext = nullptr;
-//     descriptorSetAI.descriptorPool = m_VkDescriptorPool;
-//     descriptorSetAI.descriptorSetCount = descriptorSetLayouts.size();
-//     descriptorSetAI.pSetLayouts = descriptorSetLayouts.data();
-//
-//     std::vector<VkDescriptorSet> descriptorSets;
-//     descriptorSets.resize(FRAMES_IN_FLIGHT);
-//     VK_CHECK(vkAllocateDescriptorSets(m_VkDevice, &descriptorSetAI, descriptorSets.data()),
-//         "Failed to allocate descriptor set");
-//
-//     for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
-//         VkDescriptorImageInfo imageInfo {};
-//         imageInfo.sampler = VK_NULL_HANDLE;
-//         imageInfo.imageView = m_PerFrameData[i].drawImage.view;
-//         imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-//
-//         VkDescriptorBufferInfo bufferInfo {};
-//         bufferInfo.buffer = m_SphereBuffer.buffer;
-//         bufferInfo.offset = 0;
-//         bufferInfo.range = SPHERE_COUNT * sizeof(Sphere);
-//
-//         std::vector<VkWriteDescriptorSet> writeSets = {
-//             {
-//              .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-//              .pNext = nullptr,
-//              .dstSet = descriptorSets[i],
-//              .dstBinding = 0,
-//              .dstArrayElement = 0,
-//              .descriptorCount = 1,
-//              .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-//              .pImageInfo = &imageInfo,
-//              .pBufferInfo = nullptr,
-//              .pTexelBufferView = nullptr,
-//              },
-//             {
-//              .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-//              .pNext = nullptr,
-//              .dstSet = descriptorSets[i],
-//              .dstBinding = 1,
-//              .dstArrayElement = 0,
-//              .descriptorCount = 1,
-//              .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-//              .pImageInfo = nullptr,
-//              .pBufferInfo = &bufferInfo,
-//              .pTexelBufferView = nullptr,
-//              }
-//         };
-//
-//         vkUpdateDescriptorSets(m_VkDevice, writeSets.size(), writeSets.data(), 0, nullptr);
-//
-//         setDebugName(m_VkDevice, VK_OBJECT_TYPE_DESCRIPTOR_SET, (uint64_t)descriptorSets[i],
-//             "Compute descriptor set");
-//     }
-//
-//     for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
-//         m_PerFrameData[i].drawImageDescriptorSet = descriptorSets[i];
-//     }
-//
-//     LOG_DEBUG("Created descriptors");
-// }
+void Application::createDescriptorLayouts()
+{
+    std::vector<VkDescriptorSetLayoutBinding> bindings = {
+        {
+         .binding = 0,
+         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+         .descriptorCount = 1,
+         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+         .pImmutableSamplers = VK_NULL_HANDLE,
+         },
+    };
+    VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCI {};
+    descriptorSetLayoutCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    descriptorSetLayoutCI.pNext = nullptr;
+    descriptorSetLayoutCI.flags = 0;
+    descriptorSetLayoutCI.bindingCount = static_cast<uint32_t>(bindings.size());
+    descriptorSetLayoutCI.pBindings = bindings.data();
+
+    VK_CHECK(vkCreateDescriptorSetLayout(
+                 m_VkDevice, &descriptorSetLayoutCI, nullptr, &m_DrawImageDescriptorLayout),
+        "Failed to create compute descriptor set layout");
+
+    setDebugName(m_VkDevice, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT,
+        (uint64_t)m_DrawImageDescriptorLayout, "Draw image descriptor layout");
+}
+
+void Application::createDescriptors()
+{
+    std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
+    for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++)
+        descriptorSetLayouts.push_back(m_DrawImageDescriptorLayout);
+
+    VkDescriptorSetAllocateInfo descriptorSetAI {};
+    descriptorSetAI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    descriptorSetAI.pNext = nullptr;
+    descriptorSetAI.descriptorPool = m_VkDescriptorPool;
+    descriptorSetAI.descriptorSetCount = descriptorSetLayouts.size();
+    descriptorSetAI.pSetLayouts = descriptorSetLayouts.data();
+
+    std::vector<VkDescriptorSet> descriptorSets;
+    descriptorSets.resize(FRAMES_IN_FLIGHT);
+    VK_CHECK(vkAllocateDescriptorSets(m_VkDevice, &descriptorSetAI, descriptorSets.data()),
+        "Failed to allocate descriptor set");
+
+    for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
+        VkDescriptorImageInfo imageInfo {};
+        imageInfo.sampler = VK_NULL_HANDLE;
+        imageInfo.imageView = m_PerFrameData[i].drawImage.view;
+        imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+        VkDescriptorBufferInfo bufferInfo {};
+        bufferInfo.buffer = m_SphereBuffer.buffer;
+        bufferInfo.offset = 0;
+        bufferInfo.range = SPHERE_COUNT * sizeof(Sphere);
+
+        std::vector<VkWriteDescriptorSet> writeSets = {
+            {
+             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+             .pNext = nullptr,
+             .dstSet = descriptorSets[i],
+             .dstBinding = 0,
+             .dstArrayElement = 0,
+             .descriptorCount = 1,
+             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+             .pImageInfo = &imageInfo,
+             .pBufferInfo = nullptr,
+             .pTexelBufferView = nullptr,
+             },
+        };
+
+        vkUpdateDescriptorSets(m_VkDevice, writeSets.size(), writeSets.data(), 0, nullptr);
+
+        setDebugName(m_VkDevice, VK_OBJECT_TYPE_DESCRIPTOR_SET, (uint64_t)descriptorSets[i],
+            "Draw image descriptor");
+    }
+
+    for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
+        m_PerFrameData[i].drawImageDescriptorSet = descriptorSets[i];
+    }
+
+    LOG_DEBUG("Created descriptors");
+}
+
+void Application::destroyDescriptorLayouts()
+{
+    vkDestroyDescriptorSetLayout(m_VkDevice, m_DrawImageDescriptorLayout, nullptr);
+}
 
 void Application::destroyDescriptorPool()
 {
@@ -797,67 +777,6 @@ void Application::destroyDescriptorPool()
 
     LOG_DEBUG("Destroyed descriptor pool");
 }
-
-// void Application::createPipelineLayouts()
-// {
-//     VkPushConstantRange pushConstantRange {};
-//     pushConstantRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-//     pushConstantRange.offset = 0;
-//     pushConstantRange.size = sizeof(PushConstants);
-//
-//     VkPipelineLayoutCreateInfo pipelineLayoutCI {};
-//     pipelineLayoutCI.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-//     pipelineLayoutCI.pNext = nullptr;
-//     pipelineLayoutCI.flags = 0;
-//     pipelineLayoutCI.setLayoutCount = 1;
-//     pipelineLayoutCI.pSetLayouts = &m_ComputeDescriptorSetLayout;
-//     pipelineLayoutCI.pushConstantRangeCount = 1;
-//     pipelineLayoutCI.pPushConstantRanges = &pushConstantRange;
-//
-//     VK_CHECK(vkCreatePipelineLayout(m_VkDevice, &pipelineLayoutCI, nullptr, &m_VkPipelineLayout),
-//         "Failed to create pipeline layout");
-//
-//     setDebugName(m_VkDevice, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)m_VkPipelineLayout,
-//         "Compute pipeline layout");
-// }
-
-// void Application::destroyPipelineLayouts()
-// {
-//     vkDestroyPipelineLayout(m_VkDevice, m_VkPipelineLayout, nullptr);
-// }
-
-// void Application::createComputePipeline()
-// {
-//     VkShaderModule shaderModule = ShaderManager::getInstance()->getShaderModule("basic_compute");
-//
-//     VkPipelineShaderStageCreateInfo shaderStageCI {};
-//     shaderStageCI.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-//     shaderStageCI.pNext = nullptr;
-//     shaderStageCI.flags = 0;
-//     shaderStageCI.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-//     shaderStageCI.module = shaderModule;
-//     shaderStageCI.pName = "main";
-//     shaderStageCI.pSpecializationInfo = nullptr;
-//
-//     VkComputePipelineCreateInfo pipelineCI {};
-//     pipelineCI.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-//     pipelineCI.pNext = nullptr;
-//     pipelineCI.flags = 0;
-//     pipelineCI.stage = shaderStageCI;
-//     pipelineCI.layout = m_VkPipelineLayout;
-//     pipelineCI.basePipelineHandle = VK_NULL_HANDLE;
-//     pipelineCI.basePipelineIndex = 0;
-//
-//     VK_CHECK(vkCreateComputePipelines(
-//                  m_VkDevice, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &m_VkPipeline),
-//         "Failed to create compute pipeline");
-//
-//     setDebugName(m_VkDevice, VK_OBJECT_TYPE_PIPELINE, (uint64_t)m_VkPipeline, "Compute
-//     pipeline");
-// }
-
-// void Application::destroyComputePipeline() { vkDestroyPipeline(m_VkDevice, m_VkPipeline,
-// nullptr); }
 
 void Application::createQueryPool()
 {
@@ -962,7 +881,12 @@ void Application::render()
             endCmdDebugLabel(commandBuffer);
         }
 
-        ASManager::getManager()->render(commandBuffer, m_CurrentFrameIndex);
+        ASManager::getManager()->render(commandBuffer, m_Camera,
+            currentFrame.drawImageDescriptorSet,
+            {
+                .width = currentFrame.drawImage.extent.width,
+                .height = currentFrame.drawImage.extent.height,
+            });
         // renderCompute(commandBuffer, currentFrame);
 
         transitionImage(commandBuffer, currentFrame.drawImage.image, VK_IMAGE_LAYOUT_GENERAL,
@@ -1054,30 +978,6 @@ void Application::render()
     m_Window.swapBuffers();
 }
 
-// void Application::renderCompute(VkCommandBuffer& commandBuffer, const PerFrameData& currentFrame)
-// {
-//     beginCmdDebugLabel(commandBuffer, "Compute render", { 0.f, 0.f, 1.f, 1.f });
-//
-//     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_VkPipeline);
-//     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_VkPipelineLayout, 0,
-//     1,
-//         &currentFrame.drawImageDescriptorSet, 0, nullptr);
-//
-//     PushConstants pushConstant {};
-//     pushConstant.cameraPosition = m_Camera.getPosition();
-//     pushConstant.cameraFront = m_Camera.getForwardVector();
-//     pushConstant.cameraRight = m_Camera.getRightVector();
-//     pushConstant.cameraUp = m_Camera.getUpVector();
-//
-//     vkCmdPushConstants(commandBuffer, m_VkPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
-//         sizeof(pushConstant), &pushConstant);
-//
-//     vkCmdDispatch(commandBuffer, std::ceil(currentFrame.drawImage.extent.width / 8.),
-//         std::ceil(currentFrame.drawImage.extent.height / 8.), 1);
-//
-//     endCmdDebugLabel(commandBuffer);
-// }
-
 void Application::renderImGui(VkCommandBuffer& commandBuffer, const PerFrameData& currentFrame)
 {
     VkRenderingAttachmentInfo colourAI {};
@@ -1163,7 +1063,6 @@ void Application::handleWindow(const Event& event)
         vkDeviceWaitIdle(m_VkDevice);
 
         vkResetDescriptorPool(m_VkDevice, m_VkDescriptorPool, 0);
-        vkDestroyDescriptorSetLayout(m_VkDevice, m_ComputeDescriptorSetLayout, nullptr);
         destroySyncStructures();
         destroyDrawImages();
         destroySwapchain();
@@ -1171,6 +1070,6 @@ void Application::handleWindow(const Event& event)
         createSwapchain();
         createDrawImages();
         createSyncStructures();
-        // createDescriptors();
+        createDescriptors();
     }
 }

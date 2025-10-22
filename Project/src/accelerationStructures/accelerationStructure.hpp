@@ -2,6 +2,9 @@
 
 #include "vk_mem_alloc.h"
 #include "vulkan/vulkan.h"
+#include <vulkan/vulkan_core.h>
+
+#include "../camera.hpp"
 
 struct ASStructInfo {
     VkDevice device;
@@ -9,6 +12,8 @@ struct ASStructInfo {
     VkQueue graphicsQueue;
     uint32_t graphicsQueueIndex;
     VkDescriptorPool descriptorPool;
+
+    VkDescriptorSetLayout drawImageDescriptorLayout;
 };
 
 class IAccelerationStructure {
@@ -17,7 +22,10 @@ class IAccelerationStructure {
     ~IAccelerationStructure() { }
 
     virtual void init(ASStructInfo info) { }
-    virtual void render(VkCommandBuffer cmd, uint32_t currentFrame) { }
+    virtual void render(
+        VkCommandBuffer cmd, Camera camera, VkDescriptorSet drawImageSet, VkExtent2D imageSize)
+    {
+    }
 
   protected:
   private:

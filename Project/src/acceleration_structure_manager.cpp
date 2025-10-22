@@ -12,11 +12,12 @@ void ASManager::init(ASManagerStructureInfo initInfo)
 
 void ASManager::cleanup() { m_CurrentAS.reset(); }
 
-void ASManager::render(VkCommandBuffer cmd, uint32_t currentFrame)
+void ASManager::render(
+    VkCommandBuffer cmd, Camera camera, VkDescriptorSet drawImageSet, VkExtent2D imageSize)
 {
     assert(m_CurrentAS);
 
-    m_CurrentAS->render(cmd, currentFrame);
+    m_CurrentAS->render(cmd, camera, drawImageSet, imageSize);
 }
 
 void ASManager::setAS(ASType type)
@@ -30,6 +31,7 @@ void ASManager::setAS(ASType type)
             .graphicsQueue = m_InitInfo.graphicsQueue,
             .graphicsQueueIndex = m_InitInfo.graphicsQueueIndex,
             .descriptorPool = m_InitInfo.descriptorPool,
+            .drawImageDescriptorLayout = m_InitInfo.drawImageDescriptorLayout,
         });
         break;
     default:

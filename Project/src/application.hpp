@@ -90,7 +90,8 @@ class Application : public EventDispatcher {
     bool m_UploadSpheres;
 
     VkDescriptorPool m_VkDescriptorPool;
-    VkDescriptorSetLayout m_ComputeDescriptorSetLayout;
+
+    VkDescriptorSetLayout m_DrawImageDescriptorLayout;
 
     VkPipelineLayout m_VkPipelineLayout;
     VkPipeline m_VkPipeline;
@@ -129,14 +130,10 @@ class Application : public EventDispatcher {
     // void destroyBuffer();
 
     void createDescriptorPool();
-    // void createDescriptors();
+    void createDescriptorLayouts();
+    void createDescriptors();
+    void destroyDescriptorLayouts();
     void destroyDescriptorPool();
-
-    // void createPipelineLayouts();
-    // void destroyPipelineLayouts();
-
-    // void createComputePipeline();
-    // void destroyComputePipeline();
 
     void createQueryPool();
     void destroyQueryPool();
@@ -146,7 +143,6 @@ class Application : public EventDispatcher {
 
     void render();
 
-    // void renderCompute(VkCommandBuffer& commandBuffer, const PerFrameData& currentFrame);
     void renderImGui(VkCommandBuffer& commandBuffer, const PerFrameData& currentFrame);
 
     void update(float delta);

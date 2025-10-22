@@ -13,6 +13,8 @@ struct ASManagerStructureInfo {
     VkQueue graphicsQueue;
     uint32_t graphicsQueueIndex;
     VkDescriptorPool descriptorPool;
+
+    VkDescriptorSetLayout drawImageDescriptorLayout;
 };
 
 enum class ASType { GRID };
@@ -28,7 +30,8 @@ class ASManager {
     void init(ASManagerStructureInfo initInfo);
     void cleanup();
 
-    void render(VkCommandBuffer cmd, uint32_t currentFrame);
+    void render(
+        VkCommandBuffer cmd, Camera camera, VkDescriptorSet drawImageSet, VkExtent2D imageSize);
 
     void setAS(ASType type);
 

@@ -9,8 +9,19 @@ class GridAS : public IAccelerationStructure {
     ~GridAS();
 
     void init(ASStructInfo info) override;
-    void render(VkCommandBuffer cmd, uint32_t currentFrame) override;
+    void render(VkCommandBuffer cmd, Camera camera, VkDescriptorSet drawImageSet,
+        VkExtent2D imageSize) override;
+
+  private:
+    void createRenderPipelineLayout();
+    void destroyRenderPipelineLayout();
+
+    void createRenderPipeline();
+    void destroyRenderPipeline();
 
   private:
     ASStructInfo m_Info;
+
+    VkPipeline m_RenderPipeline;
+    VkPipelineLayout m_RenderPipelineLayout;
 };
