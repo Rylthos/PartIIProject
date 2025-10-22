@@ -29,7 +29,7 @@ void GridAS::init(ASStructInfo info)
     // Setup buffer
 
     createRenderPipelineLayout();
-    ShaderManager::getInstance()->addModule("Grid_AS",
+    ShaderManager::getInstance()->addModule("grid_AS",
         std::bind(&GridAS::createRenderPipeline, this),
         std::bind(&GridAS::destroyRenderPipeline, this));
     createRenderPipeline();
@@ -88,7 +88,7 @@ void GridAS::destroyRenderPipelineLayout()
 
 void GridAS::createRenderPipeline()
 {
-    VkShaderModule shaderModule = ShaderManager::getInstance()->getShaderModule("Grid_AS");
+    VkShaderModule shaderModule = ShaderManager::getInstance()->getShaderModule("grid_AS");
 
     VkPipelineShaderStageCreateInfo shaderStageCI {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
