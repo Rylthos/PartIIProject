@@ -4,10 +4,10 @@
 
 #include <cassert>
 
-void ASManager::init(VkDevice device, VmaAllocator allocator)
+void ASManager::init(ASManagerStructureInfo initInfo)
 {
-    m_VkDevice = device;
-    m_VmaAllocator = allocator;
+    m_InitInfo = initInfo;
+    setAS(m_CurrentType);
 }
 
 void ASManager::cleanup() { m_CurrentAS.reset(); }
@@ -24,7 +24,13 @@ void ASManager::setAS(ASType type)
     switch (type) {
     case ASType::GRID:
         m_CurrentAS = std::make_unique<GridAS>();
-        m_CurrentAS->init(m_VkDevice, m_VmaAllocator);
+        m_CurrentAS->init({
+            .device = m_InitInfo.device,
+            .allocator = m_InitInfo.allocator,
+            .graphicsQueue = m_InitInfo.graphicsQueue,
+            .graphicsQueueIndex = m_InitInfo.graphicsQueueIndex,
+            .descriptorPool = m_InitInfo.descriptorPool,
+        });
         break;
     default:
         assert(false && "Invalid Type provided");

@@ -20,6 +20,9 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_vulkan.h"
 
+#define STORAGE_IMAGE_SIZE 1000
+#define STORAGE_BUFFER_SIZE 1000
+
 void transitionImage(VkCommandBuffer commandBuffer, VkImage target, VkImageLayout currentLayout,
     VkImageLayout targetLayout)
 {
@@ -109,7 +112,7 @@ void Application::init()
 
     // createBuffer();
 
-    // createDescriptorPool();
+    createDescriptorPool();
     // createDescriptors();
 
     // createPipelineLayouts();
@@ -120,7 +123,13 @@ void Application::init()
     //
     // createComputePipeline();
 
-    ASManager::getManager()->init(m_VkDevice, m_VmaAllocator);
+    ASManager::getManager()->init({
+        .device = m_VkDevice,
+        .allocator = m_VmaAllocator,
+        .graphicsQueue = m_GraphicsQueue.queue,
+        .graphicsQueueIndex = m_GraphicsQueue.queueFamily,
+        .descriptorPool = m_VkDescriptorPool,
+    });
     ASManager::getManager()->setAS(ASType::GRID);
 
     createQueryPool();
@@ -171,7 +180,7 @@ void Application::cleanup()
     // destroyComputePipeline();
     // destroyPipelineLayouts();
     //
-    // destroyDescriptorPool();
+    destroyDescriptorPool();
 
     destroyImGuiStructures();
 
@@ -653,35 +662,35 @@ void Application::destroyImGuiStructures()
 //     LOG_DEBUG("Destroyed buffers");
 // }
 
-// void Application::createDescriptorPool()
-// {
-//     std::vector<VkDescriptorPoolSize> poolSizes = {
-//         {
-//          .type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-//          .descriptorCount = FRAMES_IN_FLIGHT,
-//          },
-//         {
-//          .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-//          .descriptorCount = FRAMES_IN_FLIGHT,
-//          },
-//     };
-//
-//     VkDescriptorPoolCreateInfo descriptorPoolCI {};
-//     descriptorPoolCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-//     descriptorPoolCI.pNext = nullptr;
-//     descriptorPoolCI.flags = 0;
-//     descriptorPoolCI.maxSets = FRAMES_IN_FLIGHT,
-//     descriptorPoolCI.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
-//     descriptorPoolCI.pPoolSizes = poolSizes.data();
-//
-//     VK_CHECK(vkCreateDescriptorPool(m_VkDevice, &descriptorPoolCI, nullptr, &m_VkDescriptorPool),
-//         "Failed to create descriptor pool");
-//
-//     setDebugName(m_VkDevice, VK_OBJECT_TYPE_DESCRIPTOR_POOL, (uint64_t)m_VkDescriptorPool,
-//         "General descriptor pool");
-//
-//     LOG_DEBUG("Created descriptor pool");
-// }
+void Application::createDescriptorPool()
+{
+    std::vector<VkDescriptorPoolSize> poolSizes = {
+        {
+         .type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+         .descriptorCount = STORAGE_IMAGE_SIZE,
+         },
+        {
+         .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+         .descriptorCount = STORAGE_BUFFER_SIZE,
+         },
+    };
+
+    VkDescriptorPoolCreateInfo descriptorPoolCI {};
+    descriptorPoolCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    descriptorPoolCI.pNext = nullptr;
+    descriptorPoolCI.flags = 0;
+    descriptorPoolCI.maxSets = 1000,
+    descriptorPoolCI.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+    descriptorPoolCI.pPoolSizes = poolSizes.data();
+
+    VK_CHECK(vkCreateDescriptorPool(m_VkDevice, &descriptorPoolCI, nullptr, &m_VkDescriptorPool),
+        "Failed to create descriptor pool");
+
+    setDebugName(m_VkDevice, VK_OBJECT_TYPE_DESCRIPTOR_POOL, (uint64_t)m_VkDescriptorPool,
+        "General descriptor pool");
+
+    LOG_DEBUG("Created descriptor pool");
+}
 
 // void Application::createDescriptors()
 // {
@@ -782,13 +791,12 @@ void Application::destroyImGuiStructures()
 //     LOG_DEBUG("Created descriptors");
 // }
 
-// void Application::destroyDescriptorPool()
-// {
-//     vkDestroyDescriptorSetLayout(m_VkDevice, m_ComputeDescriptorSetLayout, nullptr);
-//     vkDestroyDescriptorPool(m_VkDevice, m_VkDescriptorPool, nullptr);
-//
-//     LOG_DEBUG("Destroyed descriptor pool");
-// }
+void Application::destroyDescriptorPool()
+{
+    vkDestroyDescriptorPool(m_VkDevice, m_VkDescriptorPool, nullptr);
+
+    LOG_DEBUG("Destroyed descriptor pool");
+}
 
 // void Application::createPipelineLayouts()
 // {

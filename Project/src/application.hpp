@@ -128,9 +128,9 @@ class Application : public EventDispatcher {
     // void uploadBuffer();
     // void destroyBuffer();
 
-    // void createDescriptorPool();
+    void createDescriptorPool();
     // void createDescriptors();
-    // void destroyDescriptorPool();
+    void destroyDescriptorPool();
 
     // void createPipelineLayouts();
     // void destroyPipelineLayouts();

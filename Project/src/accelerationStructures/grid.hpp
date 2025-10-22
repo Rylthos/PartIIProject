@@ -3,15 +3,14 @@
 #include "accelerationStructure.hpp"
 #include <vulkan/vulkan_core.h>
 
-class GridAS : public AccelerationStructure {
+class GridAS : public IAccelerationStructure {
   public:
     GridAS();
     ~GridAS();
 
-    void init(VkDevice device, VmaAllocator allocator) override;
+    void init(ASStructInfo info) override;
     void render(VkCommandBuffer cmd, uint32_t currentFrame) override;
 
   private:
-    VkDevice p_VkDevice;
-    VmaAllocator p_VmaAllocator;
+    ASStructInfo m_Info;
 };

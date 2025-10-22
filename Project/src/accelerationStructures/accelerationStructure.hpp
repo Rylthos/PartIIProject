@@ -3,12 +3,20 @@
 #include "vk_mem_alloc.h"
 #include "vulkan/vulkan.h"
 
-class AccelerationStructure {
-  public:
-    AccelerationStructure() { }
-    ~AccelerationStructure() { }
+struct ASStructInfo {
+    VkDevice device;
+    VmaAllocator allocator;
+    VkQueue graphicsQueue;
+    uint32_t graphicsQueueIndex;
+    VkDescriptorPool descriptorPool;
+};
 
-    virtual void init(VkDevice device, VmaAllocator allocator) { }
+class IAccelerationStructure {
+  public:
+    IAccelerationStructure() { }
+    ~IAccelerationStructure() { }
+
+    virtual void init(ASStructInfo info) { }
     virtual void render(VkCommandBuffer cmd, uint32_t currentFrame) { }
 
   protected:
