@@ -18,8 +18,9 @@ StructuredBuffer<float> i_Colour;
 
 func traverse(in ray : Ray, in startingT : float) -> HitRecord {
   HitRecord hit;
+  hit.hit = false;
+
   if (startingT < 0.) {
-    hit.hit = false;
     return hit;
   }
 
@@ -30,6 +31,9 @@ func traverse(in ray : Ray, in startingT : float) -> HitRecord {
   float3 step_size = ray.inverse_direction;
 
   int3 voxel_pos = int3(floor(entry_pos));
+  if (voxel_pos.x < 0 || voxel_pos.y < 0 || voxel_pos.z < 0 || voxel_pos.x >= GRID_LENGTH || voxel_pos.y >= GRID_LENGTH || voxel_pos.z >= GRID_LENGTH)
+    return hit;
+
   float3 current_pos = entry_pos;
   float3 normal;
 
