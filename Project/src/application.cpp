@@ -19,6 +19,7 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_vulkan.h"
+#include "spdlog/fmt/bundled/base.h"
 
 #define STORAGE_IMAGE_SIZE 1000
 #define STORAGE_BUFFER_SIZE 1000
@@ -934,7 +935,10 @@ void Application::handleWindow(const Event& event)
         LOG_DEBUG("Resizing window");
         vkDeviceWaitIdle(m_VkDevice);
 
-        vkResetDescriptorPool(m_VkDevice, m_VkDescriptorPool, 0);
+        for (auto& frame : m_PerFrameData) {
+            vkFreeDescriptorSets(m_VkDevice, m_VkDescriptorPool, 1, &frame.drawImageDescriptorSet);
+        }
+
         destroySyncStructures();
         destroyDrawImages();
         destroySwapchain();
