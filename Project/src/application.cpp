@@ -217,6 +217,9 @@ void Application::initVulkan()
 
     VkPhysicalDeviceVulkan12Features features12 {};
     features12.bufferDeviceAddress = true;
+    features12.storageBuffer8BitAccess = true;
+    features12.uniformAndStorageBuffer8BitAccess = true;
+    features12.shaderInt8 = true;
 
     VkPhysicalDeviceVulkan11Features features11 {};
     VkPhysicalDeviceFeatures features {};

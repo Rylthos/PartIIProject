@@ -3,8 +3,9 @@
 struct Ray {
   float3 origin;
   float3 direction;
+  float3 inverse_direction;
 
-  __init(float3 o, float3 d) { origin = o; direction = d; }
+  __init(float3 o, float3 d) { origin = o; direction = d; inverse_direction = 1. / direction; }
 
 
   __init(float aspect, float2 uv, float3 camera_pos, float3 camera_front, float3 camera_right, float3 camera_up) {
@@ -21,10 +22,37 @@ struct Ray {
 
     origin = camera_pos;
     direction = normalize(top_left + right_length * uv.x + down_length * uv.y);
+    inverse_direction = 1. / direction;
   }
 
   float3 calculate(float t) {
     return origin + direction * t;
+  }
+
+  float aabb(float3 c1, float3 c2) {
+    float3 minB = min(c1, c2);
+    float3 maxB = max(c1, c2);
+
+    float tx1 = (minB.x - origin.x) * inverse_direction.x;
+    float tx2 = (maxB.x - origin.x) * inverse_direction.x;
+
+    float tmin = min(tx1, tx2);
+    float tmax = max(tx1, tx2);
+
+    float ty1 = (minB.y - origin.y) * inverse_direction.y;
+    float ty2 = (maxB.y - origin.y) * inverse_direction.y;
+
+    tmin = max(tmin, min(ty1, ty2));
+    tmax = min(tmax, max(ty1, ty2));
+
+    float tz1 = (minB.z - origin.z) * inverse_direction.z;
+    float tz2 = (maxB.z - origin.z) * inverse_direction.z;
+
+    tmin = max(tmin, min(tz1, tz2));
+    tmax = min(tmax, max(tz1, tz2));
+
+    if (tmax >= tmin) return max(tmin, 0.);
+    return -1.f;
   }
 };
 

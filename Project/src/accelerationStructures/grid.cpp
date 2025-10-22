@@ -37,9 +37,15 @@ void GridAS::init(ASStructInfo info)
 {
     m_Info = info;
 
+    int index = 0;
     for (auto& voxel : m_Voxels) {
         voxel.visible = true;
-        voxel.colour = glm::vec3(1.0f, 0.f, 0.f);
+        float r = (index % GRID_DIMENSIONS) / (float)GRID_DIMENSIONS;
+        float g = ((index / GRID_DIMENSIONS) % GRID_DIMENSIONS) / (float)GRID_DIMENSIONS;
+        float b = ((index / (GRID_DIMENSIONS * GRID_DIMENSIONS)) % GRID_DIMENSIONS)
+            / (float)GRID_DIMENSIONS;
+        voxel.colour = glm::vec3(r, g, b);
+        index++;
     }
 
     createDescriptorLayouts();
@@ -122,14 +128,8 @@ void GridAS::destroyDescriptorLayouts()
 
 void GridAS::createBuffer()
 {
-    uint32_t filledVoxels = 0;
-    for (const Voxel& v : m_Voxels) {
-        if (v.visible)
-            filledVoxels++;
-    }
-
     VkDeviceSize occupancyBufferSize = std::ceil(m_Voxels.size() / 8.); // Convert to bytes
-    VkDeviceSize colourBufferSize = sizeof(glm::vec3) * filledVoxels;
+    VkDeviceSize colourBufferSize = sizeof(glm::vec3) * m_Voxels.size();
 
     m_OccupancyBuffer.init(m_Info.device, m_Info.allocator, occupancyBufferSize,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
@@ -152,11 +152,9 @@ void GridAS::createBuffer()
     size_t colourIndex = 0;
     for (size_t i = 0; i < m_Voxels.size(); i++) {
         dataOccupancy[i / 8] |= (m_Voxels[i].visible & 1) << (7 - (i % 8));
-        if (m_Voxels[i].visible) {
-            dataColour[colourIndex++] = m_Voxels[i].colour.x;
-            dataColour[colourIndex++] = m_Voxels[i].colour.y;
-            dataColour[colourIndex++] = m_Voxels[i].colour.z;
-        }
+        dataColour[colourIndex++] = m_Voxels[i].colour.x;
+        dataColour[colourIndex++] = m_Voxels[i].colour.y;
+        dataColour[colourIndex++] = m_Voxels[i].colour.z;
     }
 
     VkCommandBuffer cmd;

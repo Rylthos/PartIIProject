@@ -7,11 +7,58 @@ PushConstants push_constants;
 [[vk::binding(0, 0)]]
 RWTexture2D<float4> o_Image;
 
-[[vk::binding(1, 0)]]
+[[vk::binding(0, 1)]]
 StructuredBuffer<uint8_t> i_Occupancy;
 
 [[vk::binding(1, 1)]]
-StructuredBuffer<float3> i_Colour;
+StructuredBuffer<float> i_Colour;
+
+#define GRID_LENGTH 32
+#define STEP_COUNT 100
+
+func traverse(in ray : Ray, in startingT : float) -> HitRecord {
+  HitRecord hit;
+  if (startingT < 0.) {
+    hit.hit = false;
+    return hit;
+  }
+
+  float3 entry_pos = ray.calculate(startingT + 0.0001);
+
+  float3 step_dir = sign(ray.direction);
+  float3 next_dist = (step_dir * 0.5 + 0.5 - fract(ray.origin)) * ray.inverse_direction;
+  float3 step_size = ray.inverse_direction;
+
+  int3 voxel_pos = int3(floor(entry_pos));
+  float3 current_pos = entry_pos;
+  float3 normal;
+
+  for (int i = 0; i < STEP_COUNT; i++) {
+    float closest_dist = min(next_dist.x, min(next_dist.y, next_dist.z));
+    current_pos += ray.direction * closest_dist;
+    int3 step_axis = int3(next_dist.equals(closest_dist));
+    voxel_pos += step_axis;
+    next_dist += step_axis * step_size - closest_dist;
+    normal = -step_axis * step_dir;
+
+    uint index = voxel_pos.x + voxel_pos.y * GRID_LENGTH + voxel_pos.z * GRID_LENGTH * GRID_LENGTH;
+    uint array_index = index / 8;
+    uint bit_index = index % 8;
+
+    bool is_occupied = bool((i_Occupancy[array_index] >> (7 - bit_index)) & 1);
+    if (is_occupied) {
+      hit.hit = true;
+      int colour_index = index * 3;
+      hit.colour.r = i_Colour[colour_index + 0];
+      hit.colour.g = i_Colour[colour_index + 1];
+      hit.colour.b = i_Colour[colour_index + 2];
+      hit.normal = normal;
+      break;
+    }
+  }
+
+  return hit;
+}
 
 [shader("compute")]
 [numthreads(8, 8, 1)]
@@ -32,11 +79,12 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
                 push_constants.camera_up
   );
 
-  HitRecord hit = sphereIntersection(ray, float3(0.0, 0.0, 2.0), 1.0);
+  float startingT = ray.aabb(float3(0), float3(GRID_LENGTH));
+  HitRecord hit = traverse(ray, startingT);
 
   if (hit.hit) {
-    o_Image[pixelCoord] = float4(abs(hit.normal), 1.0);
+    o_Image[pixelCoord] = float4(hit.colour, 1.0);
   } else {
-    o_Image[pixelCoord] = float4(0.0, 0.0, 0.0, 1.0);
+    o_Image[pixelCoord] = float4(float3(0.1), 1.0);
   }
 }
