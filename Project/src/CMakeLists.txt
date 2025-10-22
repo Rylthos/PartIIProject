@@ -11,6 +11,7 @@ set (SOURCE_LIST
   "ring_buffer.hpp"
   "debug_utils.cpp" "debug_utils.hpp"
   "acceleration_structure_manager.cpp" "acceleration_structure_manager.cpp"
+  "buffer.cpp" "buffer.hpp"
 )
 
 add_compile_definitions(GLM_ENABLE_EXPERIMENTAL)
