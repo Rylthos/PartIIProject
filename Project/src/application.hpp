@@ -22,11 +22,6 @@ struct Queue {
     uint32_t queueFamily;
 };
 
-struct Buffer {
-    VkBuffer buffer;
-    VmaAllocation allocation;
-};
-
 struct Image {
     VkImage image;
     VkImageView view;
@@ -84,11 +79,6 @@ class Application : public EventDispatcher {
     VkCommandPool m_GeneralPool;
     std::array<PerFrameData, FRAMES_IN_FLIGHT> m_PerFrameData;
 
-    Buffer m_SphereBuffer;
-    Buffer m_StagingBuffer;
-    std::vector<Sphere> m_Spheres;
-    bool m_UploadSpheres;
-
     VkDescriptorPool m_VkDescriptorPool;
 
     VkDescriptorSetLayout m_DrawImageDescriptorLayout;
@@ -124,10 +114,6 @@ class Application : public EventDispatcher {
 
     void createImGuiStructures();
     void destroyImGuiStructures();
-
-    // void createBuffer();
-    // void uploadBuffer();
-    // void destroyBuffer();
 
     void createDescriptorPool();
     void createDescriptorLayouts();

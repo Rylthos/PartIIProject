@@ -2,15 +2,17 @@
 #include "accelerationStructures/accelerationStructure.hpp"
 #include "accelerationStructures/grid.hpp"
 
+#include "logger.hpp"
+
 #include <cassert>
 
-void ASManager::init(ASManagerStructureInfo initInfo)
+void ASManager::init(ASStructInfo initInfo)
 {
     m_InitInfo = initInfo;
     setAS(m_CurrentType);
 }
 
-void ASManager::cleanup() { m_CurrentAS.reset(); }
+void ASManager::cleanup() { delete m_CurrentAS.release(); }
 
 void ASManager::render(
     VkCommandBuffer cmd, Camera camera, VkDescriptorSet drawImageSet, VkExtent2D imageSize)
@@ -25,14 +27,7 @@ void ASManager::setAS(ASType type)
     switch (type) {
     case ASType::GRID:
         m_CurrentAS = std::make_unique<GridAS>();
-        m_CurrentAS->init({
-            .device = m_InitInfo.device,
-            .allocator = m_InitInfo.allocator,
-            .graphicsQueue = m_InitInfo.graphicsQueue,
-            .graphicsQueueIndex = m_InitInfo.graphicsQueueIndex,
-            .descriptorPool = m_InitInfo.descriptorPool,
-            .drawImageDescriptorLayout = m_InitInfo.drawImageDescriptorLayout,
-        });
+        m_CurrentAS->init(m_InitInfo);
         break;
     default:
         assert(false && "Invalid Type provided");

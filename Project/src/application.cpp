@@ -110,8 +110,6 @@ void Application::init()
 
     createImGuiStructures();
 
-    // createBuffer();
-
     createDescriptorPool();
     createDescriptorLayouts();
     createDescriptors();
@@ -122,6 +120,7 @@ void Application::init()
         .graphicsQueue = m_GraphicsQueue.queue,
         .graphicsQueueIndex = m_GraphicsQueue.queueFamily,
         .descriptorPool = m_VkDescriptorPool,
+        .commandPool = m_GeneralPool,
         .drawImageDescriptorLayout = m_DrawImageDescriptorLayout,
     });
 
@@ -529,130 +528,6 @@ void Application::destroyImGuiStructures()
     LOG_DEBUG("Destroyed ImGui");
 }
 
-// void Application::createBuffer()
-// {
-//     VkDeviceSize size = sizeof(Sphere) * SPHERE_COUNT;
-//
-//     {
-//         VkBufferCreateInfo bufferCI {};
-//         bufferCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-//         bufferCI.pNext = nullptr;
-//         bufferCI.flags = 0;
-//         bufferCI.size = size;
-//         bufferCI.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-//         bufferCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-//
-//         VmaAllocationCreateInfo allocationCI {};
-//         allocationCI.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
-//
-//         VK_CHECK(vmaCreateBuffer(m_VmaAllocator, &bufferCI, &allocationCI,
-//         &m_SphereBuffer.buffer,
-//                      &m_SphereBuffer.allocation, nullptr),
-//             "Failed to create buffer");
-//
-//         setDebugName(
-//             m_VkDevice, VK_OBJECT_TYPE_BUFFER, (uint64_t)m_SphereBuffer.buffer, "Sphere buffer");
-//     }
-//
-//     {
-//         VkBufferCreateInfo bufferCI {};
-//         bufferCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-//         bufferCI.pNext = nullptr;
-//         bufferCI.flags = 0;
-//         bufferCI.size = size;
-//         bufferCI.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-//         bufferCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-//
-//         VmaAllocationCreateInfo allocationCI {};
-//         allocationCI.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
-//         allocationCI.usage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST;
-//
-//         VK_CHECK(vmaCreateBuffer(m_VmaAllocator, &bufferCI, &allocationCI,
-//         &m_StagingBuffer.buffer,
-//                      &m_StagingBuffer.allocation, nullptr),
-//             "Failed to create staging buffer");
-//
-//         setDebugName(
-//             m_VkDevice, VK_OBJECT_TYPE_BUFFER, (uint64_t)m_StagingBuffer.buffer, "Staging
-//             buffer");
-//     }
-//
-//     m_Spheres.resize(SPHERE_COUNT);
-//     for (size_t x = 0; x < SPHERE_SIDE; x++) {
-//         for (size_t z = 0; z < SPHERE_SIDE; z++) {
-//             size_t index = x * SPHERE_SIDE + z;
-//             float xOffset = ((rand() % 100) / 100.0f) - 0.5f;
-//             float yOffset = ((rand() % 100) / 100.0f) * 2.0f - 1.0f;
-//             float zOffset = ((rand() % 100) / 100.0f) - 0.5f;
-//             m_Spheres[index] = Sphere {
-//                 .origin = glm::vec3(x * 2 + xOffset, yOffset, (z * 2) + 2.0f + zOffset),
-//                 .radius = ((rand() % 100) / 100.0f) * 0.3f + 0.4f,
-//             };
-//         }
-//     }
-//
-//     Sphere* data;
-//     vmaMapMemory(m_VmaAllocator, m_StagingBuffer.allocation, (void**)&data);
-//     {
-//         memcpy(data, m_Spheres.data(), m_Spheres.size() * sizeof(Sphere));
-//     }
-//     vmaUnmapMemory(m_VmaAllocator, m_StagingBuffer.allocation);
-//
-//     LOG_DEBUG("Created buffers");
-//
-//     uploadBuffer();
-// }
-
-// void Application::uploadBuffer()
-// {
-//     VkCommandBuffer buffer;
-//     VkCommandBufferAllocateInfo commandBufferAI {};
-//     commandBufferAI.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-//     commandBufferAI.pNext = nullptr;
-//     commandBufferAI.commandPool = m_GeneralPool;
-//     commandBufferAI.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-//     commandBufferAI.commandBufferCount = 1;
-//     VK_CHECK(vkAllocateCommandBuffers(m_VkDevice, &commandBufferAI, &buffer),
-//         "Failed to allocate command buffer");
-//
-//     VkCommandBufferBeginInfo beginInfo {};
-//     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-//     beginInfo.pNext = nullptr;
-//
-//     vkBeginCommandBuffer(buffer, &beginInfo);
-//
-//     VkBufferCopy region {};
-//     region.srcOffset = 0;
-//     region.dstOffset = 0;
-//     region.size = m_Spheres.size() * sizeof(Sphere);
-//
-//     vkCmdCopyBuffer(buffer, m_StagingBuffer.buffer, m_SphereBuffer.buffer, 1, &region);
-//     m_UploadSpheres = false;
-//
-//     vkEndCommandBuffer(buffer);
-//
-//     VkSubmitInfo submitInfo {};
-//     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-//     submitInfo.pNext = nullptr;
-//     submitInfo.commandBufferCount = 1;
-//     submitInfo.pCommandBuffers = &buffer;
-//
-//     vkQueueSubmit(m_GraphicsQueue.queue, 1, &submitInfo, VK_NULL_HANDLE);
-//     vkQueueWaitIdle(m_GraphicsQueue.queue);
-//
-//     vkFreeCommandBuffers(m_VkDevice, m_GeneralPool, 1, &buffer);
-//
-//     LOG_DEBUG("Copied buffers");
-// }
-
-// void Application::destroyBuffer()
-// {
-//     vmaDestroyBuffer(m_VmaAllocator, m_StagingBuffer.buffer, m_StagingBuffer.allocation);
-//     vmaDestroyBuffer(m_VmaAllocator, m_SphereBuffer.buffer, m_SphereBuffer.allocation);
-//
-//     LOG_DEBUG("Destroyed buffers");
-// }
-
 void Application::createDescriptorPool()
 {
     std::vector<VkDescriptorPoolSize> poolSizes = {
@@ -669,7 +544,7 @@ void Application::createDescriptorPool()
     VkDescriptorPoolCreateInfo descriptorPoolCI {};
     descriptorPoolCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     descriptorPoolCI.pNext = nullptr;
-    descriptorPoolCI.flags = 0;
+    descriptorPoolCI.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
     descriptorPoolCI.maxSets = 1000,
     descriptorPoolCI.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
     descriptorPoolCI.pPoolSizes = poolSizes.data();
@@ -732,11 +607,6 @@ void Application::createDescriptors()
         imageInfo.sampler = VK_NULL_HANDLE;
         imageInfo.imageView = m_PerFrameData[i].drawImage.view;
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-
-        VkDescriptorBufferInfo bufferInfo {};
-        bufferInfo.buffer = m_SphereBuffer.buffer;
-        bufferInfo.offset = 0;
-        bufferInfo.range = SPHERE_COUNT * sizeof(Sphere);
 
         std::vector<VkWriteDescriptorSet> writeSets = {
             {
@@ -887,7 +757,6 @@ void Application::render()
                 .width = currentFrame.drawImage.extent.width,
                 .height = currentFrame.drawImage.extent.height,
             });
-        // renderCompute(commandBuffer, currentFrame);
 
         transitionImage(commandBuffer, currentFrame.drawImage.image, VK_IMAGE_LAYOUT_GENERAL,
             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);

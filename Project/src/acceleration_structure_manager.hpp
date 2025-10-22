@@ -7,16 +7,6 @@
 
 #include <memory>
 
-struct ASManagerStructureInfo {
-    VkDevice device;
-    VmaAllocator allocator;
-    VkQueue graphicsQueue;
-    uint32_t graphicsQueueIndex;
-    VkDescriptorPool descriptorPool;
-
-    VkDescriptorSetLayout drawImageDescriptorLayout;
-};
-
 enum class ASType { GRID };
 
 class ASManager {
@@ -27,7 +17,7 @@ class ASManager {
         return &manager;
     }
 
-    void init(ASManagerStructureInfo initInfo);
+    void init(ASStructInfo initInfo);
     void cleanup();
 
     void render(
@@ -39,7 +29,7 @@ class ASManager {
     ASManager() { };
 
   private:
-    ASManagerStructureInfo m_InitInfo;
+    ASStructInfo m_InitInfo;
 
     ASType m_CurrentType = ASType::GRID;
     std::unique_ptr<IAccelerationStructure> m_CurrentAS;

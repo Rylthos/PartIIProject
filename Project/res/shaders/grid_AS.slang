@@ -7,6 +7,12 @@ PushConstants push_constants;
 [[vk::binding(0, 0)]]
 RWTexture2D<float4> o_Image;
 
+[[vk::binding(1, 0)]]
+StructuredBuffer<uint8_t> i_Occupancy;
+
+[[vk::binding(1, 1)]]
+StructuredBuffer<float3> i_Colour;
+
 [shader("compute")]
 [numthreads(8, 8, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {

@@ -13,13 +13,14 @@ struct ASStructInfo {
     uint32_t graphicsQueueIndex;
     VkDescriptorPool descriptorPool;
 
+    VkCommandPool commandPool;
     VkDescriptorSetLayout drawImageDescriptorLayout;
 };
 
 class IAccelerationStructure {
   public:
     IAccelerationStructure() { }
-    ~IAccelerationStructure() { }
+    virtual ~IAccelerationStructure() { }
 
     virtual void init(ASStructInfo info) { }
     virtual void render(
