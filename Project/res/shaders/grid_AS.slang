@@ -29,10 +29,11 @@ func traverse(in ray : Ray, in startingT : float) -> HitRecord {
   int3 voxel_pos = int3(floor(entry_pos));
   if (voxel_pos.x < 0 || voxel_pos.y < 0 || voxel_pos.z < 0 || voxel_pos.x >= GRID_LENGTH || voxel_pos.y >= GRID_LENGTH || voxel_pos.z >= GRID_LENGTH)
     return hit;
+  voxel_pos = clamp(voxel_pos, int3(0), int3(GRID_LENGTH - 1));
 
   int3 step_dir = sign(ray.direction);
-  float3 next_dist = (voxel_pos - entry_pos + step_dir) * ray.inverse_direction;
-  float3 step_size = ray.inverse_direction;
+  float3 next_dist = abs((voxel_pos + max(step_dir, int3(0)) - ray.origin) * ray.inverse_direction);
+  float3 step_size = ray.inverse_direction * step_dir;
 
   // Needs to be initialized;
   float3 normal;
