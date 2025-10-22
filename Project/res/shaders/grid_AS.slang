@@ -26,25 +26,18 @@ func traverse(in ray : Ray, in startingT : float) -> HitRecord {
 
   float3 entry_pos = ray.calculate(startingT + 0.0001);
 
-  float3 step_dir = sign(ray.direction);
-  float3 next_dist = (step_dir * 0.5 + 0.5 - fract(ray.origin)) * ray.inverse_direction;
-  float3 step_size = ray.inverse_direction;
-
   int3 voxel_pos = int3(floor(entry_pos));
   if (voxel_pos.x < 0 || voxel_pos.y < 0 || voxel_pos.z < 0 || voxel_pos.x >= GRID_LENGTH || voxel_pos.y >= GRID_LENGTH || voxel_pos.z >= GRID_LENGTH)
     return hit;
 
-  float3 current_pos = entry_pos;
+  int3 step_dir = sign(ray.direction);
+  float3 next_dist = (voxel_pos - entry_pos + step_dir) * ray.inverse_direction;
+  float3 step_size = ray.inverse_direction;
+
+  // Needs to be initialized;
   float3 normal;
 
   for (int i = 0; i < STEP_COUNT; i++) {
-    float closest_dist = min(next_dist.x, min(next_dist.y, next_dist.z));
-    current_pos += ray.direction * closest_dist;
-    int3 step_axis = int3(next_dist.equals(closest_dist));
-    voxel_pos += step_axis;
-    next_dist += step_axis * step_size - closest_dist;
-    normal = -step_axis * step_dir;
-
     uint index = voxel_pos.x + voxel_pos.y * GRID_LENGTH + voxel_pos.z * GRID_LENGTH * GRID_LENGTH;
     uint array_index = index / 8;
     uint bit_index = index % 8;
@@ -57,8 +50,18 @@ func traverse(in ray : Ray, in startingT : float) -> HitRecord {
       hit.colour.g = i_Colour[colour_index + 1];
       hit.colour.b = i_Colour[colour_index + 2];
       hit.normal = normal;
-      break;
+      return hit;
     }
+
+    int3 step_axis = next_dist.xyz <= (min(next_dist.yzx, next_dist.zxy));
+
+    next_dist += float3(step_axis) * step_size;
+    voxel_pos += step_axis * step_dir;
+    normal     = -step_axis * step_dir;
+
+    // Outside bounds
+    if (voxel_pos.x < 0 || voxel_pos.y < 0 || voxel_pos.z < 0 || voxel_pos.x >= GRID_LENGTH || voxel_pos.y >= GRID_LENGTH || voxel_pos.z >= GRID_LENGTH)
+      return hit;
   }
 
   return hit;

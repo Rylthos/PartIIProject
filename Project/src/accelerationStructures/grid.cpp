@@ -39,11 +39,15 @@ void GridAS::init(ASStructInfo info)
 
     int index = 0;
     for (auto& voxel : m_Voxels) {
-        voxel.visible = true;
-        float r = (index % GRID_DIMENSIONS) / (float)GRID_DIMENSIONS;
-        float g = ((index / GRID_DIMENSIONS) % GRID_DIMENSIONS) / (float)GRID_DIMENSIONS;
-        float b = ((index / (GRID_DIMENSIONS * GRID_DIMENSIONS)) % GRID_DIMENSIONS)
-            / (float)GRID_DIMENSIONS;
+        int x = index % GRID_DIMENSIONS;
+        int y = (index / GRID_DIMENSIONS) % GRID_DIMENSIONS;
+        int z = (index / (GRID_DIMENSIONS * GRID_DIMENSIONS)) % GRID_DIMENSIONS;
+
+        voxel.visible = ((x + y + z) % 2) == 0;
+
+        float r = x / (float)GRID_DIMENSIONS;
+        float g = y / (float)GRID_DIMENSIONS;
+        float b = z / (float)GRID_DIMENSIONS;
         voxel.colour = glm::vec3(r, g, b);
         index++;
     }
@@ -150,12 +154,22 @@ void GridAS::createBuffer()
     float* dataColour = (float*)(dataOccupancy + occupancyBufferSize);
 
     size_t colourIndex = 0;
+    uint16_t current_index = 0;
+    uint8_t current_mask = 0;
     for (size_t i = 0; i < m_Voxels.size(); i++) {
-        dataOccupancy[i / 8] |= (m_Voxels[i].visible & 1) << (7 - (i % 8));
         dataColour[colourIndex++] = m_Voxels[i].colour.x;
         dataColour[colourIndex++] = m_Voxels[i].colour.y;
         dataColour[colourIndex++] = m_Voxels[i].colour.z;
+
+        if (i / 8 != current_index) {
+            dataOccupancy[current_index] = current_mask;
+            current_index = i / 8;
+            current_mask = 0;
+        }
+
+        current_mask |= (m_Voxels[i].visible & 1) << (7 - (i % 8));
     }
+    dataOccupancy[current_index] = current_mask;
 
     VkCommandBuffer cmd;
     VkCommandBufferAllocateInfo commandBufferAI {
