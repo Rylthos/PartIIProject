@@ -132,9 +132,9 @@ void ShaderManager::updateAll()
 std::optional<std::string> ShaderManager::getMacro(std::string name)
 {
     if (m_Macros.find(name) != m_Macros.end()) {
-        std::optional<std::string>(m_Macros.at(name));
+        return std::optional<std::string>(m_Macros.at(name));
     }
-    return std::optional<std::string>();
+    return std::nullopt;
 }
 
 void ShaderManager::setMacro(std::string name, std::string value) { m_Macros[name] = value; }

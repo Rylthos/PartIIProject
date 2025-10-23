@@ -5,6 +5,8 @@
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
 
+#include "events.hpp"
+
 #include <memory>
 
 enum class ASType { GRID };
@@ -25,8 +27,17 @@ class ASManager {
 
     void setAS(ASType type);
 
+    void updateShaders();
+
+    std::function<void(const Event& event)> getUIEvent()
+    {
+        return std::bind(&ASManager::UI, this, std::placeholders::_1);
+    }
+
   private:
     ASManager() { };
+
+    void UI(const Event& event);
 
   private:
     ASStructInfo m_InitInfo;

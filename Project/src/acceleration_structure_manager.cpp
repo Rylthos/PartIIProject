@@ -2,9 +2,15 @@
 #include "accelerationStructures/accelerationStructure.hpp"
 #include "accelerationStructures/grid.hpp"
 
+#include "events.hpp"
+#include "glm/common.hpp"
 #include "logger.hpp"
 
+#include "imgui.h"
+#include "shader_manager.hpp"
+
 #include <cassert>
+#include <format>
 
 void ASManager::init(ASStructInfo initInfo)
 {
@@ -31,5 +37,87 @@ void ASManager::setAS(ASType type)
         break;
     default:
         assert(false && "Invalid Type provided");
+    }
+}
+
+void ASManager::updateShaders()
+{
+    assert(m_CurrentAS);
+    m_CurrentAS->updateShaders();
+}
+
+void ASManager::UI(const Event& event)
+{
+    const FrameEvent& frameEvent = static_cast<const FrameEvent&>(event);
+
+    if (frameEvent.type() == FrameEventType::UI) {
+        if (ImGui::Begin("AS Manager")) {
+            bool updateShader = false;
+
+            {
+                ImGui::Text("Step limit");
+                ImGui::PushItemWidth(-1.);
+
+                auto currentStepLimitValue = ShaderManager::getInstance()->getMacro("STEP_LIMIT");
+                int stepLimit = std::atoi(currentStepLimitValue.value_or("100").c_str());
+                if (!currentStepLimitValue) {
+                    updateShader = true;
+                    ShaderManager::getInstance()->setMacro(
+                        "STEP_LIMIT", std::format("{}", stepLimit));
+                }
+
+                if (ImGui::SliderInt("##StepLimit", &stepLimit, 1, 1000)) {
+                    ShaderManager::getInstance()->setMacro(
+                        "STEP_LIMIT", std::format("{}", stepLimit));
+                }
+                if (ImGui::IsItemDeactivatedAfterEdit()) {
+                    updateShader = true;
+                }
+                ImGui::PopItemWidth();
+            }
+
+            {
+                bool heatMapActive
+                    = ShaderManager::getInstance()->getMacro("COUNT_INTERSECTIONS").has_value();
+                if (ImGui::Checkbox("Intersection heat map", &heatMapActive)) {
+                    if (heatMapActive) {
+                        ShaderManager::getInstance()->defineMacro("COUNT_INTERSECTIONS");
+                    } else {
+                        ShaderManager::getInstance()->removeMacro("COUNT_INTERSECTIONS");
+                    }
+                }
+                if (ImGui::IsItemDeactivatedAfterEdit()) {
+                    updateShader = true;
+                }
+            }
+
+            {
+                ImGui::Text("Intersection max");
+                ImGui::PushItemWidth(-1);
+
+                auto currentIntersectionValue
+                    = ShaderManager::getInstance()->getMacro("INTERSECTION_MAX");
+                int currentCount = std::atoi(currentIntersectionValue.value_or("100").c_str());
+
+                if (!currentIntersectionValue) {
+                    updateShader = true;
+                    ShaderManager::getInstance()->setMacro(
+                        "INTERSECTION_MAX", std::format("{}", currentCount));
+                }
+                if (ImGui::SliderInt("##IntersectionMax", &currentCount, 10, 1000)) {
+                    ShaderManager::getInstance()->setMacro(
+                        "INTERSECTION_MAX", std::format("{}", currentCount));
+                }
+                if (ImGui::IsItemDeactivatedAfterEdit()) {
+                    updateShader = true;
+                }
+                ImGui::PopItemWidth();
+            }
+
+            if (updateShader) {
+                updateShaders();
+            }
+        }
+        ImGui::End();
     }
 }

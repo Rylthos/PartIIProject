@@ -6,7 +6,7 @@ project(VoxelRaymarcher
 find_package(Vulkan REQUIRED)
 find_package(glfw3 REQUIRED)
 
-set (CMAKE_CXX_STANDARDA 20)
+set (CMAKE_CXX_STANDARD 20)
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
   message("Enabled Debug features")

@@ -25,6 +25,8 @@ class GridAS : public IAccelerationStructure {
     void render(VkCommandBuffer cmd, Camera camera, VkDescriptorSet drawImageSet,
         VkExtent2D imageSize) override;
 
+    void updateShaders() override;
+
   private:
     void createDescriptorLayouts();
     void destroyDescriptorLayouts();

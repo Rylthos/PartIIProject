@@ -102,9 +102,6 @@ void Application::init()
 
     ShaderManager::getInstance()->init(m_VkDevice);
 
-    ShaderManager::getInstance()->defineMacro("COUNT_INTERSECTIONS");
-    ShaderManager::getInstance()->setMacro("INTERSECTION_MAX", "100");
-
     createSwapchain();
     createDrawImages();
 
@@ -136,6 +133,7 @@ void Application::init()
 
     subscribe(EventFamily::FRAME, std::bind(&Application::UI, this, _1));
     subscribe(EventFamily::FRAME, Logger::getFrameEvent());
+    subscribe(EventFamily::FRAME, ASManager::getManager()->getUIEvent());
 
     m_Window.subscribe(EventFamily::KEYBOARD, m_Camera.getKeyboardEvent());
     m_Window.subscribe(EventFamily::MOUSE, m_Camera.getMouseEvent());

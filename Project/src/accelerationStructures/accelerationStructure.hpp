@@ -28,6 +28,8 @@ class IAccelerationStructure {
     {
     }
 
+    virtual void updateShaders() { }
+
   protected:
   private:
 };

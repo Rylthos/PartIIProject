@@ -90,6 +90,8 @@ void GridAS::render(
     endCmdDebugLabel(cmd);
 }
 
+void GridAS::updateShaders() { ShaderManager::getInstance()->regenerateModule("grid_AS"); }
+
 void GridAS::createDescriptorLayouts()
 {
     std::vector<VkDescriptorSetLayoutBinding> bindings = {

@@ -1,6 +1,9 @@
 // Set by application
 // #define COUNT_INTERSECTIONS
 // #define INTERSECTION_MAX 10
+#ifndef STEP_LIMIT
+#define STEP_LIMIT 100
+#endif
 
 #include "push_constants.slang"
 #include "ray.slang"
@@ -18,7 +21,6 @@ StructuredBuffer<uint8_t> i_Occupancy;
 StructuredBuffer<float> i_Colour;
 
 #define GRID_LENGTH 32
-#define STEP_COUNT 100
 
 #ifdef COUNT_INTERSECTIONS
 static const float3 min_colour = float3(0.2, 0.2, 0.8);
@@ -51,7 +53,7 @@ func traverse(in ray : Ray, in startingT : float) -> HitRecord {
   // Needs to be initialized;
   float3 normal;
 
-  for (int i = 0; i < STEP_COUNT; i++) {
+  for (int i = 0; i < STEP_LIMIT; i++) {
 #ifdef COUNT_INTERSECTIONS
   hit.intersection_checks += 1;
 #endif
