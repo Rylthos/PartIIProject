@@ -1,4 +1,6 @@
-#define COUNT_INTERSECTIONS
+// Set by application
+// #define COUNT_INTERSECTIONS
+// #define INTERSECTION_MAX 10
 
 #include "push_constants.slang"
 #include "ray.slang"
@@ -17,7 +19,6 @@ StructuredBuffer<float> i_Colour;
 
 #define GRID_LENGTH 32
 #define STEP_COUNT 100
-#define INTERSECTION_MAX 25
 
 #ifdef COUNT_INTERSECTIONS
 static const float3 min_colour = float3(0.2, 0.2, 0.8);

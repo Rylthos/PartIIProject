@@ -19,6 +19,10 @@ add_compile_definitions(GLM_ENABLE_EXPERIMENTAL)
 add_executable(${PROJECT_NAME} ${SOURCE_LIST})
 add_subdirectory(accelerationStructures)
 
+target_compile_options(${PROJECT_NAME}
+  PRIVATE -g -O0
+)
+
 target_link_libraries(${PROJECT_NAME} PRIVATE
   glm::glm
   GPUOpen::VulkanMemoryAllocator

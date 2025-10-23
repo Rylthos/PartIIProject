@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <mutex>
+#include <optional>
 #include <set>
 #include <thread>
 
@@ -27,13 +28,21 @@ class ShaderManager {
     VkShaderModule getShaderModule(const ModuleName& moduleName);
 
     void updated(const FileName& file);
+    void regenerateModule(const ModuleName& module);
     void updateAll();
+
+    std::optional<std::string> getMacro(std::string name);
+    void setMacro(std::string name, std::string value);
+    void defineMacro(std::string name);
+    void removeMacro(std::string name);
 
   private:
     ShaderManager() { }
 
     bool generateShaderModule(const ModuleName& moduleName);
     void setDependencies(const ModuleName& moduleName);
+
+    void updateSessionDesc();
 
   private:
     struct PipelineFunction {
@@ -42,6 +51,8 @@ class ShaderManager {
     };
 
     VkDevice m_VkDevice;
+
+    std::map<std::string, std::string> m_Macros;
 
     Slang::ComPtr<slang::IGlobalSession> m_GlobalSession;
     slang::SessionDesc m_SessionDesc;

@@ -102,6 +102,9 @@ void Application::init()
 
     ShaderManager::getInstance()->init(m_VkDevice);
 
+    ShaderManager::getInstance()->defineMacro("COUNT_INTERSECTIONS");
+    ShaderManager::getInstance()->setMacro("INTERSECTION_MAX", "100");
+
     createSwapchain();
     createDrawImages();
 

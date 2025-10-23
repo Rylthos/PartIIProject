@@ -3,6 +3,8 @@
 #include "file_watcher.hpp"
 
 #include "logger.hpp"
+#include "slang.h"
+#include <optional>
 
 #define SLANG_DIAG(diagnostics)                                                                    \
     do {                                                                                           \
@@ -89,11 +91,20 @@ void ShaderManager::updated(const FileName& file)
     m_Updates.insert(file);
 }
 
+void ShaderManager::regenerateModule(const ModuleName& module)
+{
+    std::lock_guard<std::mutex> _lock(m_UpdateMutex);
+    if (!m_InverseFileMapping[module].empty())
+        m_Updates.insert(*m_InverseFileMapping[module].begin());
+}
+
 void ShaderManager::updateAll()
 {
     if (m_Updates.empty()) {
         return;
     }
+
+    updateSessionDesc();
 
     vkDeviceWaitIdle(m_VkDevice);
     std::lock_guard<std::mutex> _lock(m_UpdateMutex);
@@ -118,8 +129,22 @@ void ShaderManager::updateAll()
     m_Updates.clear();
 }
 
+std::optional<std::string> ShaderManager::getMacro(std::string name)
+{
+    if (m_Macros.find(name) != m_Macros.end()) {
+        std::optional<std::string>(m_Macros.at(name));
+    }
+    return std::optional<std::string>();
+}
+
+void ShaderManager::setMacro(std::string name, std::string value) { m_Macros[name] = value; }
+
+void ShaderManager::defineMacro(std::string name) { m_Macros.insert({ name.c_str(), "" }); }
+void ShaderManager::removeMacro(std::string name) { m_Macros.erase(name); }
+
 bool ShaderManager::generateShaderModule(const ModuleName& moduleName)
 {
+    updateSessionDesc();
     Slang::ComPtr<slang::ISession> session;
     m_GlobalSession->createSession(m_SessionDesc, session.writeRef());
 
@@ -134,6 +159,7 @@ bool ShaderManager::generateShaderModule(const ModuleName& moduleName)
     }
 
     Slang::ComPtr<slang::IEntryPoint> entryPoint;
+
     // FIX: Doesn't work if not compute shader
     slangModule->findEntryPointByName("computeMain", entryPoint.writeRef());
 
@@ -231,4 +257,21 @@ void ShaderManager::setDependencies(const ModuleName& module)
     }
     m_FileMapping[module].insert(module);
     m_InverseFileMapping[module].insert(module);
+}
+
+void ShaderManager::updateSessionDesc()
+{
+    static std::vector<slang::PreprocessorMacroDesc> preprocessor;
+    preprocessor.resize(m_Macros.size());
+    int count = 0;
+    for (const auto& macro : m_Macros) {
+        preprocessor[count++] = {
+            .name = macro.first.c_str(),
+            .value = macro.second.c_str(),
+        };
+    }
+    m_SessionDesc.preprocessorMacroCount = preprocessor.size();
+    m_SessionDesc.preprocessorMacros = preprocessor.data();
+
+    LOG_INFO("Update macros");
 }
