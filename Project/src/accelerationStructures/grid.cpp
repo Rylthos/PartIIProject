@@ -43,7 +43,7 @@ void GridAS::init(ASStructInfo info)
         int y = (index / GRID_DIMENSIONS) % GRID_DIMENSIONS;
         int z = (index / (GRID_DIMENSIONS * GRID_DIMENSIONS)) % GRID_DIMENSIONS;
 
-        voxel.visible = (x % 2 == 0 && y % 4 == 0 && z % 8 == 0);
+        voxel.visible = (x % 2 == 0 && y % 2 == 0 && z % 2 == 0);
 
         float r = x / (float)GRID_DIMENSIONS;
         float g = y / (float)GRID_DIMENSIONS;

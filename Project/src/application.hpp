@@ -9,9 +9,6 @@
 
 #define FRAMES_IN_FLIGHT 2
 
-#define SPHERE_SIDE 12
-#define SPHERE_COUNT SPHERE_SIDE* SPHERE_SIDE
-
 struct Sphere {
     glm::vec3 origin;
     float radius;

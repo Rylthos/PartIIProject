@@ -1,3 +1,5 @@
+#define COUNT_INTERSECTIONS
+
 #include "push_constants.slang"
 #include "ray.slang"
 
@@ -15,6 +17,12 @@ StructuredBuffer<float> i_Colour;
 
 #define GRID_LENGTH 32
 #define STEP_COUNT 100
+#define INTERSECTION_MAX 25
+
+#ifdef COUNT_INTERSECTIONS
+static const float3 min_colour = float3(0.2, 0.2, 0.8);
+static const float3 max_colour = float3(0.9, 0.4, 0.05);
+#endif
 
 func traverse(in ray : Ray, in startingT : float) -> HitRecord {
   HitRecord hit;
@@ -23,6 +31,10 @@ func traverse(in ray : Ray, in startingT : float) -> HitRecord {
   if (startingT < 0.) {
     return hit;
   }
+
+#ifdef COUNT_INTERSECTIONS
+  hit.intersection_checks = 0;
+#endif
 
   float3 entry_pos = ray.calculate(startingT + 0.0001);
 
@@ -39,6 +51,10 @@ func traverse(in ray : Ray, in startingT : float) -> HitRecord {
   float3 normal;
 
   for (int i = 0; i < STEP_COUNT; i++) {
+#ifdef COUNT_INTERSECTIONS
+  hit.intersection_checks += 1;
+#endif
+
     uint index = voxel_pos.x + voxel_pos.y * GRID_LENGTH + voxel_pos.z * GRID_LENGTH * GRID_LENGTH;
     uint array_index = index / 8;
     uint bit_index = index % 8;
@@ -90,9 +106,18 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
   float startingT = ray.aabb(float3(0), float3(GRID_LENGTH));
   HitRecord hit = traverse(ray, startingT);
 
-  if (hit.hit) {
-    o_Image[pixelCoord] = float4(hit.colour, 1.0);
-  } else {
-    o_Image[pixelCoord] = float4(float3(0.1), 1.0);
-  }
+#ifdef COUNT_INTERSECTIONS
+    if (hit.intersection_checks != 0) {
+      float3 mix = lerp(min_colour, max_colour, float3(hit.intersection_checks / float(INTERSECTION_MAX)));
+      o_Image[pixelCoord] = float4(mix, 1.);
+    } else {
+      o_Image[pixelCoord] = float4(0);
+    }
+#else
+    if (hit.hit) {
+      o_Image[pixelCoord] = float4(hit.colour, 1.0);
+    } else {
+      o_Image[pixelCoord] = float4(float3(0.1), 1.0);
+    }
+#endif
 }
