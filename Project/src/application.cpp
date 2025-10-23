@@ -175,8 +175,6 @@ void Application::cleanup()
 
     destroyImGuiStructures();
 
-    // destroyBuffer();
-
     destroySyncStructures();
 
     destroyCommandPools();
@@ -700,13 +698,17 @@ void Application::UI(const Event& event)
 
         static float count = 0.0f;
 
-        previousFrames.pushBack(m_PreviousRenderTime);
+        previousFrames.pushBack(m_PreviousGPUTime);
 
-        ImGui::Text("FPS                : %3f", 1.0f / (m_PreviousRenderTime / 1000.0f));
-        ImGui::Text("Previous frame time: %6.2f ms", m_PreviousRenderTime);
+        ImGui::Text("FPS                : %3f", 1.0f / (m_PreviousFrameTime));
+        ImGui::Text("Previous Frame time: %6.2f ms", (m_PreviousFrameTime * 1000.f));
+        ImGui::Spacing();
+        ImGui::Text("GPU FPS            : %3f", 1.0f / (m_PreviousGPUTime / 1000.0f));
+        ImGui::Text("Previous GPU time  : %6.2f ms", m_PreviousGPUTime);
+        ImGui::Spacing();
         ImGui::Text("Frame times");
         ImGui::PlotLines("##Timing", previousFrames.getData().data(), previousFrames.getSize(), 0,
-            nullptr, 0.0f, 50.0f, ImVec2(0, 80.0f));
+            nullptr, 0.0f, 50.0f, ImVec2(-1, 80.0f));
     }
     ImGui::End();
 
@@ -843,7 +845,7 @@ void Application::render()
             2, sizeof(uint64_t) * 2, &timeQueryBuffer, sizeof(uint64_t), VK_QUERY_RESULT_64_BIT);
 
         if (result == VK_SUCCESS) {
-            m_PreviousRenderTime
+            m_PreviousGPUTime
                 = ((timeQueryBuffer[1] - timeQueryBuffer[0]) * m_TimestampInterval) / 1e6;
         }
     }
@@ -895,6 +897,8 @@ void Application::update(float delta)
 {
     m_CurrentFrameIndex = (m_CurrentFrameIndex + 1) % FRAMES_IN_FLIGHT;
     m_CurrentSemaphore = (m_CurrentSemaphore + 1) % m_VkSwapchainImages.size();
+
+    m_PreviousFrameTime = delta;
 
     ShaderManager::getInstance()->updateAll();
 

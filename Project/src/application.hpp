@@ -87,8 +87,10 @@ class Application : public EventDispatcher {
     VkPipeline m_VkPipeline;
 
     VkQueryPool m_VkQueryPool;
-    double m_PreviousRenderTime = 0.;
+    double m_PreviousGPUTime = 0.;
     float m_TimestampInterval = 0.f;
+
+    double m_PreviousFrameTime = 0.;
 
     uint32_t m_CurrentFrameIndex { 0 };
     uint32_t m_CurrentSemaphore { 0 };
