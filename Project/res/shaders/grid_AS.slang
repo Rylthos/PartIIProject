@@ -5,6 +5,10 @@
 #define STEP_LIMIT 100
 #endif
 
+#ifndef VOXEL_SIZE
+#define VOXEL_SIZE 1.0
+#endif
+
 #include "push_constants.slang"
 #include "ray.slang"
 
@@ -39,15 +43,16 @@ func traverse(in ray : Ray, in startingT : float) -> HitRecord {
   hit.intersection_checks = 0;
 #endif
 
-  float3 entry_pos = ray.calculate(startingT + 0.0001);
+  float3 entry_pos = ray.calculate(startingT + 0.0001) / VOXEL_SIZE;
 
   int3 voxel_pos = int3(floor(entry_pos));
   if (voxel_pos.x < 0 || voxel_pos.y < 0 || voxel_pos.z < 0 || voxel_pos.x >= GRID_LENGTH || voxel_pos.y >= GRID_LENGTH || voxel_pos.z >= GRID_LENGTH)
     return hit;
+
   voxel_pos = clamp(voxel_pos, int3(0), int3(GRID_LENGTH - 1));
 
   int3 step_dir = sign(ray.direction);
-  float3 next_dist = abs((voxel_pos + max(step_dir, int3(0)) - ray.origin) * ray.inverse_direction);
+  float3 next_dist = abs((voxel_pos + max(step_dir, int3(0)) - entry_pos) * ray.inverse_direction);
   float3 step_size = ray.inverse_direction * step_dir;
 
   // Needs to be initialized;
@@ -75,8 +80,8 @@ func traverse(in ray : Ray, in startingT : float) -> HitRecord {
 
     int3 step_axis = next_dist.xyz <= (min(next_dist.yzx, next_dist.zxy));
 
-    next_dist += float3(step_axis) * step_size;
-    voxel_pos += step_axis * step_dir;
+    next_dist +=  step_axis * step_size;
+    voxel_pos +=  step_axis * step_dir;
     normal     = -step_axis * step_dir;
 
     // Outside bounds
@@ -106,7 +111,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
                 push_constants.camera_up
   );
 
-  float startingT = ray.aabb(float3(0), float3(GRID_LENGTH));
+  float startingT = ray.aabb(float3(0), float3(GRID_LENGTH * VOXEL_SIZE));
   HitRecord hit = traverse(ray, startingT);
 
 #ifdef COUNT_INTERSECTIONS

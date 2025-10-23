@@ -77,6 +77,28 @@ void ASManager::UI(const Event& event)
             }
 
             {
+                ImGui::Text("Voxel size");
+                ImGui::PushItemWidth(-1.);
+
+                auto shaderValue = ShaderManager::getInstance()->getMacro("VOXEL_SIZE");
+                float voxelSize = std::atof(shaderValue.value_or("1.f").c_str());
+                if (!shaderValue) {
+                    updateShader = true;
+                    ShaderManager::getInstance()->setMacro(
+                        "VOXEL_SIZE", std::format("{}", voxelSize));
+                }
+
+                if (ImGui::SliderFloat("##VoxelSize", &voxelSize, 0.05f, 2.f)) {
+                    ShaderManager::getInstance()->setMacro(
+                        "VOXEL_SIZE", std::format("{}", voxelSize));
+                }
+                if (ImGui::IsItemDeactivatedAfterEdit()) {
+                    updateShader = true;
+                }
+                ImGui::PopItemWidth();
+            }
+
+            {
                 bool heatMapActive
                     = ShaderManager::getInstance()->getMacro("COUNT_INTERSECTIONS").has_value();
                 if (ImGui::Checkbox("Intersection heat map", &heatMapActive)) {
