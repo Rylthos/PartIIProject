@@ -11,6 +11,7 @@
 
 enum class ASType : uint8_t {
     GRID = 0,
+    OCTREE = 1,
     MAX_TYPE,
 };
 

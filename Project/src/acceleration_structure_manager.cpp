@@ -1,6 +1,7 @@
 #include "acceleration_structure_manager.hpp"
 #include "accelerationStructures/accelerationStructure.hpp"
 #include "accelerationStructures/grid.hpp"
+#include "accelerationStructures/octree.hpp"
 
 #include "events.hpp"
 #include "glm/common.hpp"
@@ -11,9 +12,11 @@
 
 #include <cassert>
 #include <format>
+#include <vulkan/vulkan_core.h>
 
 static std::map<ASType, const char*> typeToStringMap {
-    { ASType::GRID, "Grid" }
+    { ASType::GRID,   "Grid"   },
+    { ASType::OCTREE, "Octree" },
 };
 
 void ASManager::init(ASStructInfo initInfo)
@@ -34,17 +37,22 @@ void ASManager::render(
 
 void ASManager::setAS(ASType type)
 {
+    vkDeviceWaitIdle(m_InitInfo.device);
+
     if (m_CurrentAS)
         delete m_CurrentAS.release();
 
     switch (type) {
     case ASType::GRID:
         m_CurrentAS = std::make_unique<GridAS>();
-        m_CurrentAS->init(m_InitInfo);
+        break;
+    case ASType::OCTREE:
+        m_CurrentAS = std::make_unique<OctreeAS>();
         break;
     default:
         assert(false && "Invalid Type provided");
     }
+    m_CurrentAS->init(m_InitInfo);
 }
 
 void ASManager::updateShaders()
