@@ -12,6 +12,10 @@
 #include <cassert>
 #include <format>
 
+static std::map<ASType, const char*> typeToStringMap {
+    { ASType::GRID, "Grid" }
+};
+
 void ASManager::init(ASStructInfo initInfo)
 {
     m_InitInfo = initInfo;
@@ -30,6 +34,8 @@ void ASManager::render(
 
 void ASManager::setAS(ASType type)
 {
+    delete m_CurrentAS.release();
+
     switch (type) {
     case ASType::GRID:
         m_CurrentAS = std::make_unique<GridAS>();
@@ -52,6 +58,31 @@ void ASManager::UI(const Event& event)
 
     if (frameEvent.type() == FrameEventType::UI) {
         if (ImGui::Begin("AS Manager")) {
+            int currentlySelectedID = static_cast<uint8_t>(m_CurrentType);
+            const char* previewValue = typeToStringMap[m_CurrentType];
+
+            ImGui::Text("Current AS");
+            ImGui::PushItemWidth(-1.f);
+            if (ImGui::BeginCombo("##CurrentAS", previewValue)) {
+                for (uint8_t i = 0; i < static_cast<uint8_t>(ASType::MAX_TYPE); i++) {
+                    const bool isSelected = (currentlySelectedID == i);
+                    ASType currentType = static_cast<ASType>(i);
+                    if (ImGui::Selectable(typeToStringMap[currentType], isSelected)) {
+                        m_CurrentType = currentType;
+                        setAS(m_CurrentType);
+                    }
+
+                    if (isSelected)
+                        ImGui::SetItemDefaultFocus();
+                }
+
+                ImGui::EndCombo();
+            }
+            ImGui::PopItemWidth();
+        }
+        ImGui::End();
+
+        if (ImGui::Begin("AS Settings")) {
             bool updateShader = false;
 
             {

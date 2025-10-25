@@ -272,6 +272,4 @@ void ShaderManager::updateSessionDesc()
     }
     m_SessionDesc.preprocessorMacroCount = preprocessor.size();
     m_SessionDesc.preprocessorMacros = preprocessor.data();
-
-    LOG_INFO("Update macros");
 }

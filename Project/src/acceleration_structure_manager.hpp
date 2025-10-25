@@ -9,7 +9,10 @@
 
 #include <memory>
 
-enum class ASType { GRID };
+enum class ASType : uint8_t {
+    GRID = 0,
+    MAX_TYPE,
+};
 
 class ASManager {
   public:
