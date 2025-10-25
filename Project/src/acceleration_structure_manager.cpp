@@ -34,7 +34,8 @@ void ASManager::render(
 
 void ASManager::setAS(ASType type)
 {
-    delete m_CurrentAS.release();
+    if (m_CurrentAS)
+        delete m_CurrentAS.release();
 
     switch (type) {
     case ASType::GRID:
@@ -104,6 +105,7 @@ void ASManager::UI(const Event& event)
                 if (ImGui::IsItemDeactivatedAfterEdit()) {
                     updateShader = true;
                 }
+
                 ImGui::PopItemWidth();
             }
 
@@ -118,7 +120,6 @@ void ASManager::UI(const Event& event)
                     ShaderManager::getInstance()->setMacro(
                         "VOXEL_SIZE", std::format("{}", voxelSize));
                 }
-
                 if (ImGui::SliderFloat("##VoxelSize", &voxelSize, 0.05f, 2.f)) {
                     ShaderManager::getInstance()->setMacro(
                         "VOXEL_SIZE", std::format("{}", voxelSize));
@@ -126,6 +127,7 @@ void ASManager::UI(const Event& event)
                 if (ImGui::IsItemDeactivatedAfterEdit()) {
                     updateShader = true;
                 }
+
                 ImGui::PopItemWidth();
             }
 
@@ -157,6 +159,7 @@ void ASManager::UI(const Event& event)
                     ShaderManager::getInstance()->setMacro(
                         "INTERSECTION_MAX", std::format("{}", currentCount));
                 }
+
                 if (ImGui::SliderInt("##IntersectionMax", &currentCount, 10, 1000)) {
                     ShaderManager::getInstance()->setMacro(
                         "INTERSECTION_MAX", std::format("{}", currentCount));
@@ -164,6 +167,7 @@ void ASManager::UI(const Event& event)
                 if (ImGui::IsItemDeactivatedAfterEdit()) {
                     updateShader = true;
                 }
+
                 ImGui::PopItemWidth();
             }
 
