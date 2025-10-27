@@ -11,13 +11,13 @@ void Logger::init()
 {
     std::vector<spdlog::sink_ptr> sinks;
 
-    auto stdout_sink = std::make_shared<spdlog::sinks::stdout_sink_st>();
+    auto stdout_sink = std::make_shared<spdlog::sinks::stdout_sink_mt>();
     stdout_sink->set_level(spdlog::level::debug);
-    s_Ringbuffer = std::make_shared<spdlog::sinks::ringbuffer_sink_st>(256);
-    s_Ringbuffer->set_level(spdlog::level::info);
+    s_RingBuffer = std::make_shared<spdlog::sinks::ringbuffer_sink_mt>(256);
+    s_RingBuffer->set_level(spdlog::level::info);
 
     sinks.push_back(stdout_sink);
-    sinks.push_back(s_Ringbuffer);
+    sinks.push_back(s_RingBuffer);
 
     s_Logger = std::make_shared<spdlog::logger>("GeneralLogger", begin(sinks), end(sinks));
 
@@ -35,7 +35,7 @@ void Logger::UI(const Event& event)
         if (ImGui::Begin("Logger")) {
             if (ImGui::BeginChild("scrolling", ImVec2(0, 0), ImGuiChildFlags_None,
                     ImGuiWindowFlags_HorizontalScrollbar)) {
-                std::vector<std::string> log_messages = s_Ringbuffer->last_formatted();
+                std::vector<std::string> log_messages = s_RingBuffer->last_formatted();
 
                 ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
                 for (size_t i = 0; i < log_messages.size(); i++) {

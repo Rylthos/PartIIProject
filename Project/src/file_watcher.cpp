@@ -4,7 +4,7 @@
 
 #include "sys/inotify.h"
 #include "unistd.h"
-#include <algorithm>
+#include <cassert>
 #include <cstdio>
 
 FileWatcher* FileWatcher::getInstance()
@@ -21,7 +21,7 @@ void FileWatcher::stop()
     m_FileThread.join();
 
     for (auto& fileWatch : m_FileWatches) {
-        close(fileWatch.second.watchFD);
+        close(fileWatch.second.inotifyFD);
     }
     m_FileWatches.clear();
 }
@@ -49,10 +49,8 @@ void FileWatcher::removeWatcher(const std::string& filename)
 {
     assert(m_FileWatches.contains(filename) && "Unable to remove file watch that doesn't exist");
 
-    LOG_DEBUG("Remove watch: {}", filename);
-
     auto& fileWatch = m_FileWatches[filename];
-    close(fileWatch.watchFD);
+    close(fileWatch.inotifyFD);
 
     std::unique_lock<std::mutex> _lock(m_FileMutex);
     m_FileWatches.erase(filename);

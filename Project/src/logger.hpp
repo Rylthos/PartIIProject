@@ -24,7 +24,7 @@ class Logger {
 
   private:
     inline static std::shared_ptr<spdlog::logger> s_Logger;
-    inline static std::shared_ptr<spdlog::sinks::ringbuffer_sink_st> s_Ringbuffer;
+    inline static std::shared_ptr<spdlog::sinks::ringbuffer_sink_mt> s_RingBuffer;
 
     static void UI(const Event& event);
 
