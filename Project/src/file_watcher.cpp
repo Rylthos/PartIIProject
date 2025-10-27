@@ -4,6 +4,8 @@
 
 #include "sys/inotify.h"
 #include "unistd.h"
+#include <algorithm>
+#include <cstdio>
 
 FileWatcher* FileWatcher::getInstance()
 {
@@ -19,7 +21,7 @@ void FileWatcher::stop()
     m_FileThread.join();
 
     for (auto& fileWatch : m_FileWatches) {
-        close(std::get<1>(fileWatch.second));
+        close(fileWatch.second.watchFD);
     }
     m_FileWatches.clear();
 }
@@ -35,7 +37,25 @@ void FileWatcher::addWatcher(const std::string& filename, FunctionCallback callb
         LOG_DEBUG("Add watch {}", filename);
     }
 
-    m_FileWatches[filename] = std::make_tuple(id, watchFD, callback);
+    std::unique_lock<std::mutex> _lock(m_FileMutex);
+    m_FileWatches[filename] = {
+        .inotifyFD = id,
+        .watchFD = watchFD,
+        .callback = callback,
+    };
+}
+
+void FileWatcher::removeWatcher(const std::string& filename)
+{
+    assert(m_FileWatches.contains(filename) && "Unable to remove file watch that doesn't exist");
+
+    LOG_DEBUG("Remove watch: {}", filename);
+
+    auto& fileWatch = m_FileWatches[filename];
+    close(fileWatch.watchFD);
+
+    std::unique_lock<std::mutex> _lock(m_FileMutex);
+    m_FileWatches.erase(filename);
 }
 
 void FileWatcher::runThread()
@@ -52,9 +72,7 @@ void FileWatcher::runThread()
         m_FileMutex.unlock();
 
         for (const auto& fileWatch : fileCopy) {
-            std::tie(fd, watchFD, callback) = fileWatch.second;
-
-            ssize_t len = read(fd, event, bufSize);
+            ssize_t len = read(fileWatch.second.inotifyFD, event, bufSize);
             if (len > 0) {
                 if (event->mask & IN_MODIFY) {
                     LOG_DEBUG("Modified {}", fileWatch.first);
@@ -62,9 +80,10 @@ void FileWatcher::runThread()
                 }
                 if (event->mask & IN_DELETE_SELF) {
                     LOG_DEBUG("Modified {}", fileWatch.first);
-                    callback(fileWatch.first);
+                    fileWatch.second.callback(fileWatch.first);
                     close(fd);
-                    addWatcher(fileWatch.first, callback);
+                    removeWatcher(fileWatch.first);
+                    addWatcher(fileWatch.first, fileWatch.second.callback);
                 }
             }
         }

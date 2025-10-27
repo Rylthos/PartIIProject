@@ -8,12 +8,19 @@
 class FileWatcher {
     using FunctionCallback = std::function<void(const std::string&)>;
 
+    struct FileWatchInfo {
+        int inotifyFD;
+        int watchFD;
+        FunctionCallback callback;
+    };
+
   public:
     static FileWatcher* getInstance();
     void init();
     void stop();
 
     void addWatcher(const std::string& filename, FunctionCallback callback);
+    void removeWatcher(const std::string& filename);
 
   private:
     FileWatcher() { }
@@ -22,7 +29,7 @@ class FileWatcher {
     void reAddWatcher();
 
   private:
-    std::map<std::string, std::tuple<int, int, FunctionCallback>> m_FileWatches;
+    std::map<std::string, FileWatchInfo> m_FileWatches;
 
     bool m_RunThread = true;
     std::thread m_FileThread;

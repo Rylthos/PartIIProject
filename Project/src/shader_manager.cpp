@@ -340,6 +340,7 @@ void ShaderManager::removeFileHandler(ModuleHandler& module, const FileName& fil
     m_FileHandlers[file].refCount -= 1;
 
     if (m_FileHandlers[file].refCount == 0) {
+        FileWatcher::getInstance()->removeWatcher(file);
         m_FileHandlers.erase(file);
     }
 }
