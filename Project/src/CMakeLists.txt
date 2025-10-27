@@ -20,7 +20,7 @@ add_executable(${PROJECT_NAME} ${SOURCE_LIST})
 add_subdirectory(accelerationStructures)
 
 target_compile_options(${PROJECT_NAME}
-  PRIVATE -g -O0
+  PRIVATE -g -O
 )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE

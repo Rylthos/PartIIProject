@@ -11,6 +11,8 @@ OctreeAS::~OctreeAS()
 {
     destroyRenderPipeline();
     destroyRenderPipelineLayout();
+
+    ShaderManager::getInstance()->removeModule("octree_AS");
 }
 
 void OctreeAS::init(ASStructInfo info)

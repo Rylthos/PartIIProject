@@ -5,6 +5,7 @@
 #include "logger.hpp"
 #include "slang.h"
 #include <optional>
+#include <vulkan/vulkan_core.h>
 
 #define SLANG_DIAG(diagnostics)                                                                    \
     do {                                                                                           \
@@ -53,15 +54,21 @@ void ShaderManager::init(VkDevice device)
 
     FileWatcher::getInstance()->init();
 
-    LOG_DEBUG("Setup slang session");
+    LOG_DEBUG("Initialised Shader manager");
 }
 
 void ShaderManager::cleanup()
 {
-    for (const auto module : m_ShaderModules) {
-        vkDestroyShaderModule(m_VkDevice, module.second, nullptr);
+    LOG_DEBUG("Shader manager cleanup");
+    {
+        const auto moduleCopy = m_Modules;
+        for (const auto& module : moduleCopy) {
+            removeModule(module.first);
+        }
     }
-    m_ShaderModules.clear();
+    m_Modules.clear();
+
+    assert(m_FileHandlers.size() == 0 && "File handlers should be 0");
 
     FileWatcher::getInstance()->stop();
 }
@@ -74,52 +81,81 @@ void ShaderManager::addModule(const ModuleName& module, std::function<void()>&& 
         .destructor = destroyPipeline,
     };
 
-    m_FunctionMap[module].push_back(function);
+    LOG_DEBUG("Add module: {}", module);
 
-    generateShaderModule(module);
-    setDependencies(module);
+    if (m_Modules.contains(module)) {
+        m_Modules[module].pipelineFunctions.push_back(function);
+    } else {
+        ModuleHandler handler = {
+            .moduleName = module,
+            .pipelineFunctions = { function },
+        };
+
+        generateShaderModule(handler);
+        addDependencies(handler);
+
+        m_Modules.insert({ module, handler });
+    }
+}
+
+void ShaderManager::removeModule(const ModuleName& module)
+{
+    assert(m_Modules.contains(module) && "Cannot remove module that doesn't exist");
+    ModuleHandler& handler = m_Modules[module];
+
+    LOG_DEBUG("Remove module: {}", module);
+
+    auto fileDependencies = handler.fileDependencies;
+    for (const auto& dependent : fileDependencies) {
+        removeFileHandler(handler, dependent);
+    }
+
+    vkDestroyShaderModule(m_VkDevice, handler.shaderModule, nullptr);
+    m_Modules.erase(module);
 }
 
 VkShaderModule ShaderManager::getShaderModule(const ModuleName& module)
 {
-    return m_ShaderModules[module];
+    return m_Modules[module].shaderModule;
 }
 
-void ShaderManager::updated(const FileName& file)
+void ShaderManager::fileUpdated(const FileName& file)
 {
     std::lock_guard<std::mutex> _lock(m_UpdateMutex);
     m_Updates.insert(file);
 }
 
-void ShaderManager::regenerateModule(const ModuleName& module)
+void ShaderManager::moduleUpdated(const ModuleName& module)
 {
     std::lock_guard<std::mutex> _lock(m_UpdateMutex);
-    if (!m_InverseFileMapping[module].empty())
-        m_Updates.insert(*m_InverseFileMapping[module].begin());
+    if (!m_Modules[module].fileDependencies.empty())
+        m_Updates.insert(*m_Modules[module].fileDependencies.begin());
 }
 
-void ShaderManager::updateAll()
+void ShaderManager::updateShaders()
 {
     if (m_Updates.empty()) {
         return;
     }
 
-    updateSessionDesc();
+    updateSessionMacros();
 
     vkDeviceWaitIdle(m_VkDevice);
     std::lock_guard<std::mutex> _lock(m_UpdateMutex);
 
     for (FileName file : m_Updates) {
-        std::set<ModuleName> modules = m_FileMapping[file];
+        std::set<ModuleName> modules = m_FileHandlers[file].dependents;
 
         for (const ModuleName& module : modules) {
+            ModuleHandler& handler = m_Modules[module];
             LOG_DEBUG("Reloading {}", module);
-            if (!generateShaderModule(module)) {
+            if (!generateShaderModule(handler)) {
+                LOG_INFO("Failed to reload {}", module);
                 continue;
             }
-            setDependencies(module);
+            addDependencies(handler);
 
-            std::vector<PipelineFunction> functions = m_FunctionMap[module];
+            const std::vector<PipelineFunction>& functions = handler.pipelineFunctions;
             for (const auto& function : functions) {
                 function.destructor();
                 function.creator();
@@ -142,16 +178,17 @@ void ShaderManager::setMacro(std::string name, std::string value) { m_Macros[nam
 void ShaderManager::defineMacro(std::string name) { m_Macros.insert({ name.c_str(), "" }); }
 void ShaderManager::removeMacro(std::string name) { m_Macros.erase(name); }
 
-bool ShaderManager::generateShaderModule(const ModuleName& moduleName)
+bool ShaderManager::generateShaderModule(ModuleHandler& module)
 {
-    updateSessionDesc();
+    updateSessionMacros();
+
     Slang::ComPtr<slang::ISession> session;
     m_GlobalSession->createSession(m_SessionDesc, session.writeRef());
 
     Slang::ComPtr<slang::IModule> slangModule;
     {
         Slang::ComPtr<slang::IBlob> diagnostics;
-        slangModule = session->loadModule(moduleName.c_str(), diagnostics.writeRef());
+        slangModule = session->loadModule(module.moduleName.c_str(), diagnostics.writeRef());
         SLANG_DIAG(diagnostics);
         if (diagnostics != nullptr) {
             return false;
@@ -214,52 +251,46 @@ bool ShaderManager::generateShaderModule(const ModuleName& moduleName)
     moduleCI.codeSize = spirvCode->getBufferSize();
     moduleCI.pCode = (uint32_t*)spirvCode->getBufferPointer();
 
-    VkShaderModule module;
-    VK_CHECK(vkCreateShaderModule(m_VkDevice, &moduleCI, nullptr, &module),
+    VkShaderModule shaderModule;
+    VK_CHECK(vkCreateShaderModule(m_VkDevice, &moduleCI, nullptr, &shaderModule),
         "Failed to create shader module");
 
-    if (m_ShaderModules.find(moduleName) != m_ShaderModules.end()) {
-        vkDestroyShaderModule(m_VkDevice, m_ShaderModules[moduleName], nullptr);
+    if (module.shaderModule != VK_NULL_HANDLE) {
+        vkDestroyShaderModule(m_VkDevice, module.shaderModule, nullptr);
     }
-    m_ShaderModules[moduleName] = module;
+    module.shaderModule = shaderModule;
+    module.slangSession = session;
 
-    m_Sessions[moduleName] = session;
-
-    LOG_INFO("Compiled shader module: {}", moduleName);
+    LOG_INFO("Compiled shader module: {}", module.moduleName);
 
     return true;
 }
 
-void ShaderManager::setDependencies(const ModuleName& module)
+void ShaderManager::addDependencies(ModuleHandler& module)
 {
     Slang::ComPtr<slang::IModule> slangModule;
     {
         Slang::ComPtr<slang::IBlob> diagnostics;
-        slangModule = m_Sessions[module]->loadModule(module.c_str(), diagnostics.writeRef());
+        slangModule
+            = module.slangSession->loadModule(module.moduleName.c_str(), diagnostics.writeRef());
         SLANG_DIAG(diagnostics);
     }
 
-    // Readds watch multiple times
-    for (auto file : m_InverseFileMapping[module]) {
-        m_FileMapping[file].erase(module);
+    LOG_DEBUG("Removing dependencies");
+    const std::set<FileName> fileDependencies = module.fileDependencies;
+    for (const auto& file : fileDependencies) {
+        removeFileHandler(module, file);
     }
-    m_InverseFileMapping[module].clear();
 
     uint32_t count = slangModule->getDependencyFileCount();
     for (uint32_t i = 0; i < count; i++) {
         const char* path = slangModule->getDependencyFilePath(i);
 
-        m_FileMapping[path].insert(module);
-        m_InverseFileMapping[module].insert(path);
-
-        FileWatcher::getInstance()->addWatcher(
-            path, std::bind(&ShaderManager::updated, this, std::placeholders::_1));
+        addFileHandler(module, path);
     }
-    m_FileMapping[module].insert(module);
-    m_InverseFileMapping[module].insert(module);
 }
 
-void ShaderManager::updateSessionDesc()
+void ShaderManager::updateSessionMacros()
 {
     static std::vector<slang::PreprocessorMacroDesc> preprocessor;
     preprocessor.resize(m_Macros.size());
@@ -272,4 +303,43 @@ void ShaderManager::updateSessionDesc()
     }
     m_SessionDesc.preprocessorMacroCount = preprocessor.size();
     m_SessionDesc.preprocessorMacros = preprocessor.data();
+}
+
+void ShaderManager::addFileHandler(ModuleHandler& module, const FileName& file)
+{
+    if (module.fileDependencies.contains(file)) {
+        return;
+    }
+
+    if (m_FileHandlers.contains(file)) {
+        module.fileDependencies.insert(file);
+        m_FileHandlers[file].refCount += 1;
+    } else {
+        FileHandler handler = {
+            .filePath = file,
+            .refCount = 1,
+            .dependents = {
+                module.moduleName,
+            },
+        };
+        m_FileHandlers[file] = handler;
+        module.fileDependencies.insert(file);
+
+        FileWatcher::getInstance()->addWatcher(
+            file, std::bind(&ShaderManager::fileUpdated, this, std::placeholders::_1));
+    }
+}
+
+void ShaderManager::removeFileHandler(ModuleHandler& module, const FileName& file)
+{
+    assert(module.fileDependencies.contains(file)
+        && "Cannot remove file dependency that doesn't exist");
+    LOG_DEBUG("Remove file handler: {} - {}", module.moduleName, file);
+
+    module.fileDependencies.erase(file);
+    m_FileHandlers[file].refCount -= 1;
+
+    if (m_FileHandlers[file].refCount == 0) {
+        m_FileHandlers.erase(file);
+    }
 }

@@ -31,6 +31,8 @@ GridAS::~GridAS()
 
     destroyRenderPipeline();
     destroyRenderPipelineLayout();
+
+    ShaderManager::getInstance()->removeModule("grid_AS");
 }
 
 void GridAS::init(ASStructInfo info)
@@ -90,7 +92,7 @@ void GridAS::render(
     endCmdDebugLabel(cmd);
 }
 
-void GridAS::updateShaders() { ShaderManager::getInstance()->regenerateModule("grid_AS"); }
+void GridAS::updateShaders() { ShaderManager::getInstance()->moduleUpdated("grid_AS"); }
 
 void GridAS::createDescriptorLayouts()
 {

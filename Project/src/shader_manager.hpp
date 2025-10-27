@@ -17,6 +17,25 @@ class ShaderManager {
     using ModuleName = std::string;
     using FileName = std::string;
 
+    struct PipelineFunction {
+        std::function<void()> creator;
+        std::function<void()> destructor;
+    };
+
+    struct FileHandler {
+        std::string filePath;
+        size_t refCount;
+        std::set<ModuleName> dependents;
+    };
+
+    struct ModuleHandler {
+        std::string moduleName;
+        Slang::ComPtr<slang::ISession> slangSession;
+        VkShaderModule shaderModule;
+        std::set<FileName> fileDependencies;
+        std::vector<PipelineFunction> pipelineFunctions;
+    };
+
   public:
     static ShaderManager* getInstance();
     void init(VkDevice device);
@@ -24,12 +43,13 @@ class ShaderManager {
 
     void addModule(const ModuleName& module, std::function<void()>&& createPipeline,
         std::function<void()>&& destroyPipeline);
+    void removeModule(const ModuleName& module);
 
     VkShaderModule getShaderModule(const ModuleName& moduleName);
 
-    void updated(const FileName& file);
-    void regenerateModule(const ModuleName& module);
-    void updateAll();
+    void fileUpdated(const FileName& file);
+    void moduleUpdated(const ModuleName& module);
+    void updateShaders();
 
     std::optional<std::string> getMacro(std::string name);
     void setMacro(std::string name, std::string value);
@@ -39,30 +59,30 @@ class ShaderManager {
   private:
     ShaderManager() { }
 
-    bool generateShaderModule(const ModuleName& moduleName);
-    void setDependencies(const ModuleName& moduleName);
+    bool generateShaderModule(ModuleHandler& module);
+    void addDependencies(ModuleHandler& module);
 
-    void updateSessionDesc();
+    void updateSessionMacros();
+
+    void addFileHandler(ModuleHandler& module, const FileName& file);
+    void removeFileHandler(ModuleHandler& module, const FileName& file);
+
+    // bool generateShaderModule(const ModuleName& moduleName);
+    // void setDependencies(const ModuleName& moduleName);
+    //
+    // void updateSessionDesc();
 
   private:
-    struct PipelineFunction {
-        std::function<void()> creator;
-        std::function<void()> destructor;
-    };
-
     VkDevice m_VkDevice;
-
-    std::map<std::string, std::string> m_Macros;
 
     Slang::ComPtr<slang::IGlobalSession> m_GlobalSession;
     slang::SessionDesc m_SessionDesc;
 
-    std::map<FileName, std::set<ModuleName>> m_FileMapping;
-    std::map<ModuleName, std::set<FileName>> m_InverseFileMapping;
-    std::map<ModuleName, std::vector<PipelineFunction>> m_FunctionMap;
+    std::map<std::string, std::string> m_Macros;
 
-    std::map<ModuleName, VkShaderModule> m_ShaderModules;
-    std::map<ModuleName, Slang::ComPtr<slang::ISession>> m_Sessions;
+    std::map<ModuleName, ModuleHandler> m_Modules;
+
+    std::map<FileName, FileHandler> m_FileHandlers;
 
     std::set<FileName> m_Updates;
     std::mutex m_UpdateMutex;

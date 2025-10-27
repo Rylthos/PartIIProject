@@ -901,7 +901,7 @@ void Application::update(float delta)
 
     m_PreviousFrameTime = delta;
 
-    ShaderManager::getInstance()->updateAll();
+    ShaderManager::getInstance()->updateShaders();
 
     UpdateEvent event;
     event.delta = delta;
