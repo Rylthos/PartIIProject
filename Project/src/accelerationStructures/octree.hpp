@@ -4,6 +4,35 @@
 
 #include "../buffer.hpp"
 
+#include <variant>
+
+class OctreeNode {
+  public:
+    OctreeNode(uint8_t childMask, uint16_t offset);
+    OctreeNode(uint8_t r, uint8_t g, uint8_t b);
+
+    uint32_t getData();
+
+  private:
+    enum OctreeFlags : uint8_t {
+        OCTREE_FLAG_EMPTY = 0x00,
+        OCTREE_FLAG_LEAF = 0x01,
+    };
+
+    struct NodeType {
+        OctreeFlags flags;
+        uint32_t childMask : 8;
+        uint32_t offset    : 16;
+    };
+    struct LeafType {
+        OctreeFlags flags;
+        uint32_t r : 8;
+        uint32_t g : 8;
+        uint32_t b : 8;
+    };
+    std::variant<NodeType, LeafType> m_CurrentType;
+};
+
 class OctreeAS : public IAccelerationStructure {
   public:
     OctreeAS();
@@ -16,6 +45,14 @@ class OctreeAS : public IAccelerationStructure {
     void updateShaders() override;
 
   private:
+    void createDescriptorLayout();
+    void destroyDescriptorLayout();
+
+    void createBuffers();
+
+    void createDescriptorSet();
+    void freeDescriptorSet();
+
     void createRenderPipelineLayout();
     void destroyRenderPipelineLayout();
 
@@ -25,6 +62,14 @@ class OctreeAS : public IAccelerationStructure {
   private:
     ASStructInfo m_Info;
 
+    VkDescriptorSetLayout m_BufferSetLayout;
+    VkDescriptorSet m_BufferSet;
+
     VkPipelineLayout m_RenderPipelineLayout;
     VkPipeline m_RenderPipeline;
+
+    std::vector<OctreeNode> m_Nodes;
+
+    Buffer m_StagingBuffer;
+    Buffer m_OctreeBuffer;
 };
