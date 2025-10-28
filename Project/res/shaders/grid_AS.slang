@@ -1,16 +1,6 @@
-// Set by application
-// #define COUNT_INTERSECTIONS
-// #define INTERSECTION_MAX 10
-#ifndef STEP_LIMIT
-#define STEP_LIMIT 100
-#endif
-
-#ifndef VOXEL_SIZE
-#define VOXEL_SIZE 1.0
-#endif
-
 #include "push_constants.slang"
 #include "ray.slang"
+#include "default_defines.slang"
 
 [[vk_push_constant]]
 PushConstants push_constants;

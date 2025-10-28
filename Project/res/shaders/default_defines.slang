@@ -1,0 +1,13 @@
+#ifndef STEP_LIMIT
+#define STEP_LIMIT 100
+#endif // STEP_LIMIT
+
+#ifndef VOXEL_SIZE
+#define VOXEL_SIZE 1.0
+#endif // VOXEL_SIZE
+
+#ifdef COUNT_INTERSECTIONS
+#ifndef INTERSECTION_MAX
+#define INTERSECTION_MAX 10
+#endif // INTERSECTION_MAX
+#endif // COUNT_INTERSECTIONS
