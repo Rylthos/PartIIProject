@@ -20,7 +20,7 @@ struct OctreeNode {
 
   // Node properties
   property uint32_t childMask { // Only lower 8 bits used
-    get { return (data & 0x00FF0000) >> 8; }
+    get { return (data & 0x00FF0000) >> 16; }
   }
   property uint32_t offset {
     get { return (data & 0x0000FFFF); }
@@ -51,38 +51,121 @@ RWTexture2D<float4> o_Image;
 [[vk::binding(0, 1)]]
 StructuredBuffer<OctreeNode> i_Octree;
 
-func traverse(in ray : Ray, in startingT : float, min_bound : float3, max_bound : float3) -> HitRecord {
+struct StackMember {
+  uint parent;
+  float3 minBound;
+  float tMax;
+}
+
+func traverse(in ray : Ray) -> HitRecord {
+  float3 minBound = float3(0);
+  float3 maxBound = float3(1);
+
+  const float3 dimensions = maxBound - minBound;
+
   HitRecord hit;
-  if (startingT < 0.) {
+  float tMin, tMax;
+  if (!ray.aabb(minBound, maxBound, tMin, tMax, 0.0000001, 100000.0)) {
     return hit;
   }
 
-  float3 entry_pos = ray.calculate(startingT + 0.00001);
+  float3 position = ray.calculate(tMin + 0.00001);
 
-  uint current_index = 0;
-  uint stack[MAX_DEPTH];
-  stack[0] = 0;
+  int current_index = -1;
+  StackMember stack[MAX_DEPTH];
 
-  int current_depth = 1;
-  float default_scale = 1.0f;
+  float current_scale = 0.5;
+  uint parent = 0;
+
+  OctreeNode node;
+  float t = tMin;
 
   for (int i = 0; i < STEP_LIMIT; i++) {
-    float current_scale = default_scale / (1 << current_depth);
-
-    OctreeNode node = new OctreeNode(i_Octree[stack[current_index]]);
+    node = new OctreeNode(i_Octree[parent]);
 
     if (node.isSolid) {
       hit.hit = true;
       hit.colour = node.colour;
+
       return hit;
     }
 
-    uint32_t childMask = node.childMask;
-    uint32_t offset = node.offset;
+    if (t >= tMax) {
+      // Ascend
+      if (current_index == -1) break;
 
-    // Calculate hit voxel
-    // Update ray position if required
-    // Descend of ascend based on voxel position
+      StackMember member = stack[current_index];
+      current_index--;
+
+      tMax = member.tMax;
+      parent = member.parent;
+      minBound = member.minBound;
+
+      node = new OctreeNode(i_Octree[parent]);
+      current_scale *= 2;
+
+      continue;
+    }
+
+    float3 center = minBound + current_scale * dimensions;
+    float3 boundOffset = float3(0);
+    int octantMask = 0;
+
+    if (position.x > center.x || (position.x == center.x && ray.direction.x > 0)) {
+      octantMask ^= 1;
+      boundOffset.x = dimensions.x;
+    }
+
+    if (position.z > center.z || (position.z == center.z && ray.direction.z > 0)) {
+      octantMask ^= 2;
+      boundOffset.z = dimensions.z;
+    }
+
+    if (position.y > center.y || (position.y == center.y && ray.direction.y > 0)) {
+      octantMask ^= 4;
+      boundOffset.y = dimensions.y;
+    }
+
+    bool childMask = ((node.childMask >> octantMask) & 1) == 1;
+
+    if (childMask) { // Child exists and has content
+      // Descend into child
+      if (node.offset == 0) break;
+
+      StackMember stackMember;
+      stackMember.parent = parent;
+      stackMember.tMax = tMax;
+      stackMember.minBound = minBound;
+
+      stack[current_index + 1] = stackMember;
+      current_index++;
+
+      uint offset = countbits(node.childMask >> (octantMask + 1));
+      parent = parent + node.offset + offset;
+
+      minBound += boundOffset * current_scale;
+      maxBound = minBound + current_scale * dimensions;
+
+      if (!ray.aabb(minBound, maxBound, tMin, tMax, tMin, tMax))
+        break;
+
+      current_scale *= 0.5;
+
+      continue;
+    } else { // Child is empty
+      // Traverse through air
+      float3 octantMinBound = minBound + boundOffset * current_scale;
+      float3 octantMaxBound = octantMinBound + current_scale * dimensions;
+
+      float t0;
+      if (!ray.aabb(octantMinBound, octantMaxBound, t0, t, tMin, tMax))
+        break;
+
+      t += 0.0000001;
+      position = ray.calculate(t);
+
+      continue;
+    }
   }
 
   return hit;
@@ -107,11 +190,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
                 push_constants.camera_up
   );
 
-  const float3 min_bound = float3(0);
-  const float3 max_bound = float3(1);
-
-  float startingT = ray.aabb(min_bound, max_bound);
-  HitRecord hit = traverse(ray, startingT, min_bound, max_bound);
+  HitRecord hit = traverse(ray);
 
   if (hit.hit) {
     o_Image[pixelCoord] = float4(hit.colour, 1.);

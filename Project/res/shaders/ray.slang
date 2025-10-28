@@ -29,6 +29,24 @@ struct Ray {
     return origin + direction * t;
   }
 
+  bool aabb(float3 minBound, float3 maxBound, out float tMin, out float tMax, in float minT, in float maxT) {
+    float3 t_bot = this.inverse_direction * (minBound - this.origin);
+    float3 t_top = this.inverse_direction * (maxBound - this.origin);
+
+    float3 t_min = min(t_top, t_bot);
+    float3 t_max = max(t_top, t_bot);
+
+    float2 t = max(t_min.xx, t_min.yz);
+    float t0 = max(t.x, t.y);
+    t = min(t_max.xx, t_max.yz);
+    float t1 = min(t.x, t.y);
+
+    tMin = t0;
+    tMax = t1;
+
+    return t1 > max(t0, 0.) && tMax > minT && tMin < maxT;
+  }
+
   float aabb(float3 c1, float3 c2) {
     float3 minB = min(c1, c2);
     float3 maxB = max(c1, c2);

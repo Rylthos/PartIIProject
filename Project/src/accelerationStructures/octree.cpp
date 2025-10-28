@@ -74,17 +74,76 @@ void OctreeAS::init(ASStructInfo info)
     m_Info = info;
 
     // Single Node
-    m_Nodes = {
-        OctreeNode(0, 255, 255),
-    };
+    // m_Nodes = {
+    //     OctreeNode(0, 255, 255),
+    // };
 
     // Alternative corners
     // m_Nodes = {
-    //     OctreeNode(0xA5, 0x1),
-    //     OctreeNode(255, 0, 0),
+    //     OctreeNode(0xFF, 0x1),
+    //
+    //     OctreeNode(255, 255, 255),
+    //     OctreeNode(255, 0, 255),
+    //     OctreeNode(255, 255, 0),
+    //     OctreeNode(0, 255, 255),
+    //     OctreeNode(0, 0, 255),
     //     OctreeNode(0, 255, 0),
+    //     OctreeNode(255, 0, 0),
+    //     OctreeNode(0xFF, 0x1),
+    //
+    //     OctreeNode(255, 255, 255),
+    //     OctreeNode(255, 0, 255),
+    //     OctreeNode(255, 255, 0),
+    //     OctreeNode(0, 255, 255),
     //     OctreeNode(0, 0, 255),
+    //     OctreeNode(0, 255, 0),
+    //     OctreeNode(255, 0, 0),
+    //     OctreeNode(0xFF, 0x1),
+    //
+    //     OctreeNode(255, 255, 255),
+    //     OctreeNode(255, 0, 255),
+    //     OctreeNode(255, 255, 0),
+    //     OctreeNode(0, 255, 255),
     //     OctreeNode(0, 0, 255),
+    //     OctreeNode(0, 255, 0),
+    //     OctreeNode(255, 0, 0),
+    //     OctreeNode(0xFF, 0x1),
+    //
+    //     OctreeNode(255, 255, 255),
+    //     OctreeNode(255, 0, 255),
+    //     OctreeNode(255, 255, 0),
+    //     OctreeNode(0, 255, 255),
+    //     OctreeNode(0, 0, 255),
+    //     OctreeNode(0, 255, 0),
+    //     OctreeNode(255, 0, 0),
+    //     OctreeNode(0xFF, 0x1),
+    //
+    //     OctreeNode(255, 255, 255),
+    //     OctreeNode(255, 0, 255),
+    //     OctreeNode(255, 255, 0),
+    //     OctreeNode(0, 255, 255),
+    //     OctreeNode(0, 0, 255),
+    //     OctreeNode(0, 255, 0),
+    //     OctreeNode(255, 0, 0),
+    //     OctreeNode(0xFF, 0x1),
+    //
+    //     OctreeNode(255, 255, 255),
+    //     OctreeNode(255, 0, 255),
+    //     OctreeNode(255, 255, 0),
+    //     OctreeNode(0, 255, 255),
+    //     OctreeNode(0, 0, 255),
+    //     OctreeNode(0, 255, 0),
+    //     OctreeNode(255, 0, 0),
+    //     OctreeNode(0xFF, 0x1),
+    //
+    //     OctreeNode(255, 255, 255),
+    //     OctreeNode(255, 0, 255),
+    //     OctreeNode(255, 255, 0),
+    //     OctreeNode(0, 255, 255),
+    //     OctreeNode(0, 0, 255),
+    //     OctreeNode(0, 255, 0),
+    //     OctreeNode(255, 0, 0),
+    //     OctreeNode(0, 0, 0),
     // };
 
     for (const auto& node : m_Nodes) {
