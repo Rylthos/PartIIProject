@@ -16,7 +16,7 @@ class OctreeNode {
   private:
     enum OctreeFlags : uint8_t {
         OCTREE_FLAG_EMPTY = 0x00,
-        OCTREE_FLAG_LEAF = 0x01,
+        OCTREE_FLAG_SOLID = 0x01,
     };
 
     struct NodeType {

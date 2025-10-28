@@ -9,6 +9,13 @@
 #include "../shader_manager.hpp"
 #include "accelerationStructure.hpp"
 
+struct PushConstants {
+    alignas(16) glm::vec3 cameraPosition;
+    alignas(16) glm::vec3 cameraForward;
+    alignas(16) glm::vec3 cameraRight;
+    alignas(16) glm::vec3 cameraUp;
+};
+
 OctreeNode::OctreeNode(uint8_t childMask, uint16_t offset)
 {
     m_CurrentType = NodeType {
@@ -21,7 +28,7 @@ OctreeNode::OctreeNode(uint8_t childMask, uint16_t offset)
 OctreeNode::OctreeNode(uint8_t r, uint8_t g, uint8_t b)
 {
     m_CurrentType = LeafType {
-        .flags = OCTREE_FLAG_LEAF,
+        .flags = OCTREE_FLAG_SOLID,
         .r = r,
         .g = g,
         .b = b,
@@ -66,10 +73,19 @@ void OctreeAS::init(ASStructInfo info)
 {
     m_Info = info;
 
+    // Single Node
     m_Nodes = {
-        OctreeNode(0, 0),
-        OctreeNode(40, 80, 255),
+        OctreeNode(0, 255, 255),
     };
+
+    // Alternative corners
+    // m_Nodes = {
+    //     OctreeNode(0xA5, 0x1),
+    //     OctreeNode(255, 0, 0),
+    //     OctreeNode(0, 255, 0),
+    //     OctreeNode(0, 0, 255),
+    //     OctreeNode(0, 0, 255),
+    // };
 
     for (const auto& node : m_Nodes) {
         LOG_INFO("Data: {}", *reinterpret_cast<const uint32_t*>(&node));
@@ -91,6 +107,13 @@ void OctreeAS::render(
 {
     beginCmdDebugLabel(cmd, "Octree AS render", { 0.0f, 0.0f, 1.0f, 1.0f });
 
+    PushConstants pushConstant = {
+        .cameraPosition = camera.getPosition(),
+        .cameraForward = camera.getForwardVector(),
+        .cameraRight = camera.getRightVector(),
+        .cameraUp = camera.getUpVector(),
+    };
+
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_RenderPipeline);
     std::vector<VkDescriptorSet> descriptorSets = {
         drawImageSet,
@@ -98,8 +121,8 @@ void OctreeAS::render(
     };
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_RenderPipelineLayout, 0,
         descriptorSets.size(), descriptorSets.data(), 0, nullptr);
-    // vkCmdPushConstants(cmd, m_RenderPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
-    //     sizeof(PushConstants), &pushConstant);
+    vkCmdPushConstants(cmd, m_RenderPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
+        sizeof(PushConstants), &pushConstant);
 
     vkCmdDispatch(cmd, std::ceil(imageSize.width / 8.f), std::ceil(imageSize.height / 8.f), 1);
 
@@ -236,14 +259,22 @@ void OctreeAS::createRenderPipelineLayout()
     std::vector<VkDescriptorSetLayout> descriptorSetLayouts
         = { m_Info.drawImageDescriptorLayout, m_BufferSetLayout };
 
+    std::vector<VkPushConstantRange> pushConstantRanges = {
+        {
+         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+         .offset = 0,
+         .size = sizeof(PushConstants),
+         },
+    };
+
     VkPipelineLayoutCreateInfo layoutCI {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .pNext = nullptr,
         .flags = 0,
         .setLayoutCount = static_cast<uint32_t>(descriptorSetLayouts.size()),
         .pSetLayouts = descriptorSetLayouts.data(),
-        .pushConstantRangeCount = 0,
-        .pPushConstantRanges = nullptr,
+        .pushConstantRangeCount = static_cast<uint32_t>(pushConstantRanges.size()),
+        .pPushConstantRanges = pushConstantRanges.data(),
     };
 
     VK_CHECK(vkCreatePipelineLayout(m_Info.device, &layoutCI, nullptr, &m_RenderPipelineLayout),
