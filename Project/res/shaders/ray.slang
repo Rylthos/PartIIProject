@@ -1,5 +1,7 @@
 #include "hit_record.slang"
 
+#include "default_defines.slang"
+
 struct Ray {
   float3 origin;
   float3 direction;
@@ -41,36 +43,33 @@ struct Ray {
     t = min(t_max.xx, t_max.yz);
     float t1 = min(t.x, t.y);
 
-    tMin = t0;
-    tMax = t1;
+    tMin = max(t0, minT);
+    tMax = min(t1, maxT);
 
     return t1 > max(t0, 0.) && tMax > minT && tMin < maxT;
   }
 
-  float aabb(float3 c1, float3 c2) {
-    float3 minB = min(c1, c2);
-    float3 maxB = max(c1, c2);
+  float aabb(float3 minBound, float3 maxBound) {
+    float3 t_all_min = (minBound - this.origin) * inverse_direction;
+    float3 t_all_max = (maxBound - this.origin) * inverse_direction;
 
-    float tx1 = (minB.x - origin.x) * inverse_direction.x;
-    float tx2 = (maxB.x - origin.x) * inverse_direction.x;
+    float3 t_min = min(t_all_min, t_all_max);
+    float3 t_max = max(t_all_min, t_all_max);
 
-    float tmin = min(tx1, tx2);
-    float tmax = max(tx1, tx2);
+    float2 t = max(t_min.xx, t_min.yz);
+    float t0 = max(t.x, t.y);
 
-    float ty1 = (minB.y - origin.y) * inverse_direction.y;
-    float ty2 = (maxB.y - origin.y) * inverse_direction.y;
+    t = min(t_max.xx, t_max.yz);
+    float t1 = min(t.x, t.y);
 
-    tmin = max(tmin, min(ty1, ty2));
-    tmax = min(tmax, max(ty1, ty2));
+    float tMin = max(t0, 0);
+    float tMax = min(t1, MAX_FLOAT);
 
-    float tz1 = (minB.z - origin.z) * inverse_direction.z;
-    float tz2 = (maxB.z - origin.z) * inverse_direction.z;
+    if (t1 > t0) {
+      return t0;
+    }
 
-    tmin = max(tmin, min(tz1, tz2));
-    tmax = min(tmax, max(tz1, tz2));
-
-    if (tmax >= tmin) return max(tmin, 0.);
-    return -1.f;
+    return -1;
   }
 };
 

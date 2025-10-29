@@ -16,9 +16,14 @@ StructuredBuffer<float> i_Colour;
 
 #define GRID_LENGTH 32
 
-func traverse(in ray : Ray, in startingT : float) -> HitRecord {
+func traverse(in ray : Ray) -> HitRecord {
+  const float3 minBound = float3(0);
+  const float3 maxBound = float3(GRID_LENGTH * VOXEL_SIZE);
+
   HitRecord hit;
   hit.hit = false;
+
+  float startingT = ray.aabb(minBound, maxBound);
 
   if (startingT < 0.) {
     return hit;
@@ -98,8 +103,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
                 push_constants.camera_up
   );
 
-  float startingT = ray.aabb(float3(0), float3(GRID_LENGTH * VOXEL_SIZE));
-  HitRecord hit = traverse(ray, startingT);
+  HitRecord hit = traverse(ray);
 
 #ifdef COUNT_INTERSECTIONS
     if (hit.intersection_checks != 0) {

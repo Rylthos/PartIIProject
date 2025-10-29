@@ -15,7 +15,7 @@
 #endif // COUNT_INTERSECTIONS
 
 #ifndef EPS
-#define EPS 1e-6
+#define EPS 1e-5
 #endif
 
 #ifndef MAX_FLOAT
