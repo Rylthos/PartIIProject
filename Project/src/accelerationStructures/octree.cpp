@@ -16,7 +16,7 @@ struct PushConstants {
     alignas(16) glm::vec3 cameraUp;
 };
 
-OctreeNode::OctreeNode(uint8_t childMask, uint16_t offset)
+OctreeNode::OctreeNode(uint8_t childMask, uint32_t offset)
 {
     m_CurrentType = NodeType {
         .flags = OCTREE_FLAG_EMPTY,
@@ -38,12 +38,12 @@ OctreeNode::OctreeNode(uint8_t r, uint8_t g, uint8_t b)
 uint32_t OctreeNode::getData()
 {
     if (const NodeType* node = std::get_if<NodeType>(&m_CurrentType)) {
-        uint32_t flags = ((uint32_t)node->flags) << 24;
-        uint32_t childMask = ((uint32_t)node->childMask) << 16;
-        uint32_t offset = ((uint32_t)node->offset) << 0;
+        uint32_t flags = (((uint32_t)node->flags & 0x3) << 30);
+        uint32_t childMask = ((uint32_t)node->childMask & 0xFF) << 22;
+        uint32_t offset = ((uint32_t)node->offset & 0x3FFFFF) << 0;
         return flags | childMask | offset;
     } else if (const LeafType* leaf = std::get_if<LeafType>(&m_CurrentType)) {
-        uint32_t flags = ((uint32_t)leaf->flags) << 24;
+        uint32_t flags = ((uint32_t)leaf->flags & 0x3) << 30;
         uint32_t r = ((uint32_t)leaf->r) << 16;
         uint32_t g = ((uint32_t)leaf->g) << 8;
         uint32_t b = ((uint32_t)leaf->b) << 0;
@@ -136,7 +136,7 @@ void OctreeAS::init(ASStructInfo info)
         OctreeNode(0x69, 1),
     };
 
-    const uint32_t depth = 8;
+    const uint32_t depth = 11;
     uint32_t base_offset = 4;
 
     for (uint32_t i = 1; i < depth; i++) {
@@ -145,6 +145,7 @@ void OctreeAS::init(ASStructInfo info)
             base_offset += 3;
         }
     }
+    LOG_INFO("Final offset: {}", base_offset);
 
     for (size_t i = 0; i < pow(4, depth); i++) {
         m_Nodes.emplace_back(255, 255, 255);
@@ -152,7 +153,9 @@ void OctreeAS::init(ASStructInfo info)
         m_Nodes.emplace_back(0, 255, 0);
         m_Nodes.emplace_back(255, 0, 0);
     }
+
     LOG_INFO("Total Voxels: {}", pow(4, depth) * 4);
+    LOG_INFO("Entries: {}", m_Nodes.size());
     LOG_INFO("Bytes: {}", sizeof(uint32_t) * m_Nodes.size());
 
     createDescriptorLayout();

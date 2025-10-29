@@ -8,13 +8,13 @@
 
 class OctreeNode {
   public:
-    OctreeNode(uint8_t childMask, uint16_t offset);
+    OctreeNode(uint8_t childMask, uint32_t offset);
     OctreeNode(uint8_t r, uint8_t g, uint8_t b);
 
     uint32_t getData();
 
   private:
-    enum OctreeFlags : uint8_t {
+    enum OctreeFlags : uint8_t { // 2 bits
         OCTREE_FLAG_EMPTY = 0x00,
         OCTREE_FLAG_SOLID = 0x01,
     };
@@ -22,7 +22,7 @@ class OctreeNode {
     struct NodeType {
         OctreeFlags flags;
         uint32_t childMask : 8;
-        uint32_t offset    : 16;
+        uint32_t offset    : 22;
     };
     struct LeafType {
         OctreeFlags flags;

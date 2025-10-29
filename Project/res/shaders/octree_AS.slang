@@ -11,15 +11,15 @@ struct OctreeNode {
 
   // Flags
   property bool isSolid {
-    get { return (data & 0x01000000) != 0; }
+    get { return ((data >> 30) & 0x1) != 0; }
   }
 
   // Node properties
   property uint32_t childMask { // Only lower 8 bits used
-    get { return (data & 0x00FF0000) >> 16; }
+    get { return (data >> 22) & 0xFF; }
   }
   property uint32_t offset {
-    get { return (data & 0x0000FFFF); }
+    get { return (data & 0x003FFFFF); }
   }
 
   // Lead properties
@@ -55,7 +55,7 @@ struct StackMember {
 
 func traverse(in ray : Ray) -> HitRecord {
   float3 minBound = float3(0);
-  float3 maxBound = float3(5);
+  float3 maxBound = float3(150);
 
   const float3 dimensions = maxBound - minBound;
 
