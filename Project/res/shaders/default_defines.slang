@@ -1,3 +1,5 @@
+#pragma once
+
 #ifndef STEP_LIMIT
 #define STEP_LIMIT 100
 #endif // STEP_LIMIT

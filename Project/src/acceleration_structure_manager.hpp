@@ -46,6 +46,6 @@ class ASManager {
   private:
     ASStructInfo m_InitInfo;
 
-    ASType m_CurrentType = ASType::GRID;
+    ASType m_CurrentType = ASType::OCTREE;
     std::unique_ptr<IAccelerationStructure> m_CurrentAS;
 };

@@ -104,6 +104,7 @@ void OctreeAS::init(ASStructInfo info)
     // Alternative corners 2 deep
     // m_Nodes = {
     //     OctreeNode(0x69, 0x1),
+    //
     //     OctreeNode(0x69, 0x4),
     //     OctreeNode(0x69, 0x7),
     //     OctreeNode(0x69, 0xA),
@@ -133,37 +134,26 @@ void OctreeAS::init(ASStructInfo info)
     // Alternative corners 3 deep
     m_Nodes = {
         OctreeNode(0x69, 1),
-        OctreeNode(0x69, 4),
-        OctreeNode(0x69, 7),
-        OctreeNode(0x69, 10),
-        OctreeNode(0x69, 13),
-
-        OctreeNode(0x69, 16),
-        OctreeNode(0x69, 19),
-        OctreeNode(0x69, 22),
-        OctreeNode(0x69, 25),
-
-        OctreeNode(0x69, 28),
-        OctreeNode(0x69, 31),
-        OctreeNode(0x69, 34),
-        OctreeNode(0x69, 37),
-
-        OctreeNode(0x69, 40),
-        OctreeNode(0x69, 43),
-        OctreeNode(0x69, 46),
-        OctreeNode(0x69, 49),
-
-        OctreeNode(0x69, 52),
-        OctreeNode(0x69, 55),
-        OctreeNode(0x69, 58),
-        OctreeNode(0x69, 61),
     };
-    for (size_t i = 0; i < 16; i++) {
+
+    const uint32_t depth = 8;
+    uint32_t base_offset = 4;
+
+    for (uint32_t i = 1; i < depth; i++) {
+        for (uint32_t j = 0; j < pow(4, i); j++) {
+            m_Nodes.emplace_back(0x69, base_offset);
+            base_offset += 3;
+        }
+    }
+
+    for (size_t i = 0; i < pow(4, depth); i++) {
         m_Nodes.emplace_back(255, 255, 255);
         m_Nodes.emplace_back(0, 0, 255);
         m_Nodes.emplace_back(0, 255, 0);
         m_Nodes.emplace_back(255, 0, 0);
     }
+    LOG_INFO("Total Voxels: {}", pow(4, depth) * 4);
+    LOG_INFO("Bytes: {}", sizeof(uint32_t) * m_Nodes.size());
 
     createDescriptorLayout();
     createBuffers();
