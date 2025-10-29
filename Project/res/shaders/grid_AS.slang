@@ -16,11 +16,6 @@ StructuredBuffer<float> i_Colour;
 
 #define GRID_LENGTH 32
 
-#ifdef COUNT_INTERSECTIONS
-static const float3 min_colour = float3(0.2, 0.2, 0.8);
-static const float3 max_colour = float3(0.9, 0.4, 0.05);
-#endif
-
 func traverse(in ray : Ray, in startingT : float) -> HitRecord {
   HitRecord hit;
   hit.hit = false;
@@ -33,10 +28,11 @@ func traverse(in ray : Ray, in startingT : float) -> HitRecord {
   hit.intersection_checks = 0;
 #endif
 
-  float3 entry_pos = ray.calculate(startingT + 0.0001) / VOXEL_SIZE;
+  float3 entry_pos = ray.calculate(startingT + EPS) / VOXEL_SIZE;
 
   int3 voxel_pos = int3(floor(entry_pos));
-  if (voxel_pos.x < 0 || voxel_pos.y < 0 || voxel_pos.z < 0 || voxel_pos.x >= GRID_LENGTH || voxel_pos.y >= GRID_LENGTH || voxel_pos.z >= GRID_LENGTH)
+  if (voxel_pos.x < 0 || voxel_pos.y < 0 || voxel_pos.z < 0 ||
+      voxel_pos.x >= GRID_LENGTH || voxel_pos.y >= GRID_LENGTH || voxel_pos.z >= GRID_LENGTH)
     return hit;
 
   voxel_pos = clamp(voxel_pos, int3(0), int3(GRID_LENGTH - 1));
@@ -75,7 +71,8 @@ func traverse(in ray : Ray, in startingT : float) -> HitRecord {
     normal     = -step_axis * step_dir;
 
     // Outside bounds
-    if (voxel_pos.x < 0 || voxel_pos.y < 0 || voxel_pos.z < 0 || voxel_pos.x >= GRID_LENGTH || voxel_pos.y >= GRID_LENGTH || voxel_pos.z >= GRID_LENGTH)
+    if (voxel_pos.x < 0 || voxel_pos.y < 0 || voxel_pos.z < 0 ||
+        voxel_pos.x >= GRID_LENGTH || voxel_pos.y >= GRID_LENGTH || voxel_pos.z >= GRID_LENGTH)
       return hit;
   }
 
@@ -106,7 +103,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
 
 #ifdef COUNT_INTERSECTIONS
     if (hit.intersection_checks != 0) {
-      float3 mix = lerp(min_colour, max_colour, float3(hit.intersection_checks / float(INTERSECTION_MAX)));
+      float3 mix = lerp(MIN_INTERSECTION_COLOUR, MAX_INTERSECTION_COLOUR, float3(hit.intersection_checks / float(INTERSECTION_MAX)));
       o_Image[pixelCoord] = float4(mix, 1.);
     } else {
       o_Image[pixelCoord] = float4(0);
