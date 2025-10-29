@@ -78,76 +78,91 @@ void OctreeAS::init(ASStructInfo info)
     //     OctreeNode(0, 255, 255),
     // };
 
-    // Alternative corners
+    // Descending corner
+    // for (size_t i = 0; i < 10; i++) {
+    //     m_Nodes.emplace_back(0xFF, 0x1);
+    //     m_Nodes.emplace_back(255, 255, 255);
+    //     m_Nodes.emplace_back(255, 0, 255);
+    //     m_Nodes.emplace_back(255, 255, 0);
+    //     m_Nodes.emplace_back(0, 255, 255);
+    //     m_Nodes.emplace_back(0, 0, 255);
+    //     m_Nodes.emplace_back(0, 255, 0);
+    //     m_Nodes.emplace_back(255, 0, 0);
+    // }
+    //
+    // m_Nodes.emplace_back(0, 0, 0);
+
+    // Alternative Corners
     // m_Nodes = {
-    //     OctreeNode(0xFF, 0x1),
-    //
+    //     OctreeNode(0x69, 0x1),
     //     OctreeNode(255, 255, 255),
-    //     OctreeNode(255, 0, 255),
-    //     OctreeNode(255, 255, 0),
-    //     OctreeNode(0, 255, 255),
     //     OctreeNode(0, 0, 255),
     //     OctreeNode(0, 255, 0),
     //     OctreeNode(255, 0, 0),
-    //     OctreeNode(0xFF, 0x1),
-    //
-    //     OctreeNode(255, 255, 255),
-    //     OctreeNode(255, 0, 255),
-    //     OctreeNode(255, 255, 0),
-    //     OctreeNode(0, 255, 255),
-    //     OctreeNode(0, 0, 255),
-    //     OctreeNode(0, 255, 0),
-    //     OctreeNode(255, 0, 0),
-    //     OctreeNode(0xFF, 0x1),
-    //
-    //     OctreeNode(255, 255, 255),
-    //     OctreeNode(255, 0, 255),
-    //     OctreeNode(255, 255, 0),
-    //     OctreeNode(0, 255, 255),
-    //     OctreeNode(0, 0, 255),
-    //     OctreeNode(0, 255, 0),
-    //     OctreeNode(255, 0, 0),
-    //     OctreeNode(0xFF, 0x1),
-    //
-    //     OctreeNode(255, 255, 255),
-    //     OctreeNode(255, 0, 255),
-    //     OctreeNode(255, 255, 0),
-    //     OctreeNode(0, 255, 255),
-    //     OctreeNode(0, 0, 255),
-    //     OctreeNode(0, 255, 0),
-    //     OctreeNode(255, 0, 0),
-    //     OctreeNode(0xFF, 0x1),
-    //
-    //     OctreeNode(255, 255, 255),
-    //     OctreeNode(255, 0, 255),
-    //     OctreeNode(255, 255, 0),
-    //     OctreeNode(0, 255, 255),
-    //     OctreeNode(0, 0, 255),
-    //     OctreeNode(0, 255, 0),
-    //     OctreeNode(255, 0, 0),
-    //     OctreeNode(0xFF, 0x1),
-    //
-    //     OctreeNode(255, 255, 255),
-    //     OctreeNode(255, 0, 255),
-    //     OctreeNode(255, 255, 0),
-    //     OctreeNode(0, 255, 255),
-    //     OctreeNode(0, 0, 255),
-    //     OctreeNode(0, 255, 0),
-    //     OctreeNode(255, 0, 0),
-    //     OctreeNode(0xFF, 0x1),
-    //
-    //     OctreeNode(255, 255, 255),
-    //     OctreeNode(255, 0, 255),
-    //     OctreeNode(255, 255, 0),
-    //     OctreeNode(0, 255, 255),
-    //     OctreeNode(0, 0, 255),
-    //     OctreeNode(0, 255, 0),
-    //     OctreeNode(255, 0, 0),
-    //     OctreeNode(0, 0, 0),
     // };
 
-    for (const auto& node : m_Nodes) {
-        LOG_INFO("Data: {}", *reinterpret_cast<const uint32_t*>(&node));
+    // Alternative corners 2 deep
+    // m_Nodes = {
+    //     OctreeNode(0x69, 0x1),
+    //     OctreeNode(0x69, 0x4),
+    //     OctreeNode(0x69, 0x7),
+    //     OctreeNode(0x69, 0xA),
+    //     OctreeNode(0x69, 0xD),
+    //
+    //     OctreeNode(255, 255, 255),
+    //     OctreeNode(0, 0, 255),
+    //     OctreeNode(0, 255, 0),
+    //     OctreeNode(255, 0, 0),
+    //
+    //     OctreeNode(255, 255, 255),
+    //     OctreeNode(0, 0, 255),
+    //     OctreeNode(0, 255, 0),
+    //     OctreeNode(255, 0, 0),
+    //
+    //     OctreeNode(255, 255, 255),
+    //     OctreeNode(0, 0, 255),
+    //     OctreeNode(0, 255, 0),
+    //     OctreeNode(255, 0, 0),
+    //
+    //     OctreeNode(255, 255, 255),
+    //     OctreeNode(0, 0, 255),
+    //     OctreeNode(0, 255, 0),
+    //     OctreeNode(255, 0, 0),
+    // };
+
+    // Alternative corners 3 deep
+    m_Nodes = {
+        OctreeNode(0x69, 1),
+        OctreeNode(0x69, 4),
+        OctreeNode(0x69, 7),
+        OctreeNode(0x69, 10),
+        OctreeNode(0x69, 13),
+
+        OctreeNode(0x69, 16),
+        OctreeNode(0x69, 19),
+        OctreeNode(0x69, 22),
+        OctreeNode(0x69, 25),
+
+        OctreeNode(0x69, 28),
+        OctreeNode(0x69, 31),
+        OctreeNode(0x69, 34),
+        OctreeNode(0x69, 37),
+
+        OctreeNode(0x69, 40),
+        OctreeNode(0x69, 43),
+        OctreeNode(0x69, 46),
+        OctreeNode(0x69, 49),
+
+        OctreeNode(0x69, 52),
+        OctreeNode(0x69, 55),
+        OctreeNode(0x69, 58),
+        OctreeNode(0x69, 61),
+    };
+    for (size_t i = 0; i < 16; i++) {
+        m_Nodes.emplace_back(255, 255, 255);
+        m_Nodes.emplace_back(0, 0, 255);
+        m_Nodes.emplace_back(0, 255, 0);
+        m_Nodes.emplace_back(255, 0, 0);
     }
 
     createDescriptorLayout();

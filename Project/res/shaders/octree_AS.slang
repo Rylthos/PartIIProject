@@ -64,12 +64,12 @@ func traverse(in ray : Ray) -> HitRecord {
   const float3 dimensions = maxBound - minBound;
 
   HitRecord hit;
-  float tMin, tMax;
-  if (!ray.aabb(minBound, maxBound, tMin, tMax, 0.0000001, 100000.0)) {
+  float boundingTMin, boundingTMax;
+  if (!ray.aabb(minBound, maxBound, boundingTMin, boundingTMax, EPS, MAX_FLOAT)) {
     return hit;
   }
 
-  float3 position = ray.calculate(tMin + 0.00001);
+  float3 position = ray.calculate(boundingTMin + EPS);
 
   int current_index = -1;
   StackMember stack[MAX_DEPTH];
@@ -78,10 +78,17 @@ func traverse(in ray : Ray) -> HitRecord {
   uint parent = 0;
 
   OctreeNode node;
-  float t = tMin;
+  float t = boundingTMin;
+  
+  float currentTMin = boundingTMin;
+  float currentTMax = boundingTMax;
 
   for (int i = 0; i < STEP_LIMIT; i++) {
     node = new OctreeNode(i_Octree[parent]);
+
+#ifdef COUNT_INTERSECTIONS
+hit.intersection_checks += 1;
+#endif
 
     if (node.isSolid) {
       hit.hit = true;
@@ -90,18 +97,15 @@ func traverse(in ray : Ray) -> HitRecord {
       return hit;
     }
 
-    if (t >= tMax) {
+    if (t >= currentTMax) {
       // Ascend
       if (current_index == -1) break;
 
-      StackMember member = stack[current_index];
+      currentTMax = stack[current_index].tMax;
+      parent = stack[current_index].parent;
+      minBound = stack[current_index].minBound;
       current_index--;
 
-      tMax = member.tMax;
-      parent = member.parent;
-      minBound = member.minBound;
-
-      node = new OctreeNode(i_Octree[parent]);
       current_scale *= 2;
 
       continue;
@@ -132,39 +136,36 @@ func traverse(in ray : Ray) -> HitRecord {
       // Descend into child
       if (node.offset == 0) break;
 
-      StackMember stackMember;
-      stackMember.parent = parent;
-      stackMember.tMax = tMax;
-      stackMember.minBound = minBound;
-
-      stack[current_index + 1] = stackMember;
       current_index++;
+      stack[current_index].parent = parent;
+      stack[current_index].tMax = currentTMax;
+      stack[current_index].minBound = minBound;
 
-      uint offset = countbits(node.childMask >> (octantMask + 1));
-      parent = parent + node.offset + offset;
+      uint child_offset = countbits(node.childMask >> (octantMask + 1));
+      parent = parent + node.offset + child_offset;
 
-      minBound += boundOffset * current_scale;
-      maxBound = minBound + current_scale * dimensions;
+      minBound = minBound + boundOffset * current_scale;
+      maxBound = minBound + dimensions * current_scale;
 
-      if (!ray.aabb(minBound, maxBound, tMin, tMax, tMin, tMax))
+      const float minT = currentTMin;
+      const float maxT = currentTMax;
+      if (!ray.aabb(minBound, maxBound, currentTMin, currentTMax, minT, maxT))
         break;
 
       current_scale *= 0.5;
-
-      continue;
     } else { // Child is empty
       // Traverse through air
+
       float3 octantMinBound = minBound + boundOffset * current_scale;
       float3 octantMaxBound = octantMinBound + current_scale * dimensions;
 
       float t0;
-      if (!ray.aabb(octantMinBound, octantMaxBound, t0, t, tMin, tMax))
+      if (!ray.aabb(octantMinBound, octantMaxBound, t0, t, currentTMin, currentTMax))
         break;
 
-      t += 0.0000001;
+      t += EPS;
       position = ray.calculate(t);
-
-      continue;
+      // position = round(ray.calculate(t) / current_scale) * current_scale;
     }
   }
 
@@ -192,9 +193,18 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
 
   HitRecord hit = traverse(ray);
 
+#ifdef COUNT_INTERSECTIONS
+  if (hit.intersection_checks != 0) {
+      float3 mix = lerp(MIN_INTERSECTION_COLOUR, MAX_INTERSECTION_COLOUR, float3(hit.intersection_checks / float(INTERSECTION_MAX)));
+    o_Image[pixelCoord] = float4(mix, 1.);
+  } else {
+    o_Image[pixelCoord] = float4(0);
+  }
+#else
   if (hit.hit) {
     o_Image[pixelCoord] = float4(hit.colour, 1.);
   } else {
     o_Image[pixelCoord] = float4(float3(0.2), 1);
   }
+#endif
 }
