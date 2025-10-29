@@ -2,10 +2,6 @@
 #include "push_constants.slang"
 #include "default_defines.slang"
 
-#ifndef MAX_DEPTH
-#define MAX_DEPTH 10
-#endif
-
 struct OctreeNode {
   uint32_t data;
 
@@ -59,7 +55,7 @@ struct StackMember {
 
 func traverse(in ray : Ray) -> HitRecord {
   float3 minBound = float3(0);
-  float3 maxBound = float3(1);
+  float3 maxBound = float3(5);
 
   const float3 dimensions = maxBound - minBound;
 
@@ -79,7 +75,7 @@ func traverse(in ray : Ray) -> HitRecord {
 
   OctreeNode node;
   float t = boundingTMin;
-  
+
   float currentTMin = boundingTMin;
   float currentTMax = boundingTMax;
 
