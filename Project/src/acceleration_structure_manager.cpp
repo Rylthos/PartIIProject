@@ -262,5 +262,22 @@ void ASManager::UI(const Event& event)
             }
         }
         ImGui::End();
+
+        if (ImGui::Begin("AS Stats")) {
+            uint64_t bytes = m_CurrentAS->getMemoryUsage();
+            ImGui::Text("Total Memory");
+            ImGui::Text(" %lu bytes", bytes);
+            ImGui::Text(" %lu KiB", bytes / 1024);
+            ImGui::Text(" %lu MiB", bytes / (1024 * 1024));
+            ImGui::Text(" %lu GiB", bytes / (1024 * 1024 * 1024));
+
+            uint64_t voxels = m_CurrentAS->getVoxels();
+            ImGui::Text("Voxels");
+            ImGui::Text(" %lu", voxels);
+
+            ImGui::Text("Bytes / Voxel");
+            ImGui::Text(" %5.2f", (float)bytes / (float)voxels);
+        }
+        ImGui::End();
     }
 }

@@ -94,6 +94,9 @@ void GridAS::render(
 
 void GridAS::updateShaders() { ShaderManager::getInstance()->moduleUpdated("grid_AS"); }
 
+uint64_t GridAS::getMemoryUsage() { return m_OccupancyBuffer.getSize() + m_ColourBuffer.getSize(); }
+uint64_t GridAS::getVoxels() { return m_Voxels.size(); }
+
 void GridAS::createDescriptorLayouts()
 {
     std::vector<VkDescriptorSetLayoutBinding> bindings = {

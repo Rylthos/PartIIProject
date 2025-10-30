@@ -153,6 +153,7 @@ void OctreeAS::init(ASStructInfo info)
         m_Nodes.emplace_back(0, 255, 0);
         m_Nodes.emplace_back(255, 0, 0);
     }
+    m_VoxelCount = pow(4, depth);
 
     LOG_INFO("Total Voxels: {}", pow(4, depth) * 4);
     LOG_INFO("Entries: {}", m_Nodes.size());
@@ -197,6 +198,9 @@ void OctreeAS::render(
 }
 
 void OctreeAS::updateShaders() { ShaderManager::getInstance()->moduleUpdated("octree_AS"); }
+
+uint64_t OctreeAS::getMemoryUsage() { return m_OctreeBuffer.getSize(); }
+uint64_t OctreeAS::getVoxels() { return m_VoxelCount; }
 
 void OctreeAS::createDescriptorLayout()
 {

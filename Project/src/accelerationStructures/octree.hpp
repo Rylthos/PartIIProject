@@ -44,6 +44,9 @@ class OctreeAS : public IAccelerationStructure {
 
     void updateShaders() override;
 
+    uint64_t getMemoryUsage() override;
+    uint64_t getVoxels() override;
+
   private:
     void createDescriptorLayout();
     void destroyDescriptorLayout();
@@ -72,4 +75,6 @@ class OctreeAS : public IAccelerationStructure {
 
     Buffer m_StagingBuffer;
     Buffer m_OctreeBuffer;
+
+    uint64_t m_VoxelCount = 0;
 };

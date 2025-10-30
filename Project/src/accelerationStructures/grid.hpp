@@ -27,6 +27,9 @@ class GridAS : public IAccelerationStructure {
 
     void updateShaders() override;
 
+    uint64_t getMemoryUsage() override;
+    uint64_t getVoxels() override;
+
   private:
     void createDescriptorLayouts();
     void destroyDescriptorLayouts();

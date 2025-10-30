@@ -22,13 +22,15 @@ class IAccelerationStructure {
     IAccelerationStructure() { }
     virtual ~IAccelerationStructure() { }
 
-    virtual void init(ASStructInfo info) { }
+    virtual void init(ASStructInfo info) = 0;
     virtual void render(
         VkCommandBuffer cmd, Camera camera, VkDescriptorSet drawImageSet, VkExtent2D imageSize)
-    {
-    }
+        = 0;
 
     virtual void updateShaders() { }
+
+    virtual uint64_t getMemoryUsage() = 0;
+    virtual uint64_t getVoxels() = 0;
 
   protected:
   private:
