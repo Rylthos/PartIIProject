@@ -43,6 +43,9 @@ void ShaderManager::init(VkDevice device)
          { slang::CompilerOptionValueKind::Int,
                 m_GlobalSession->findCapability("SPV_KHR_non_semantic_info"), 0, nullptr,
                 nullptr }                                                                   },
+        { slang::CompilerOptionName::Capability,
+         { slang::CompilerOptionValueKind::Int,
+                m_GlobalSession->findCapability("spvShaderClockKHR"), 0, nullptr, nullptr } },
     };
 
     m_SessionDesc.compilerOptionEntries = options.data();

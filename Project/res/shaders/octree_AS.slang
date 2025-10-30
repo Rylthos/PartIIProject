@@ -170,6 +170,9 @@ hit.intersection_checks += 1;
 [shader("compute")]
 [numthreads(8, 8, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
+#ifdef CYCLES
+  uint64_t start_cycles = clockARB();
+#endif
   int2 pixelCoord = int2(dispatchThreadID.xy);
 
   int width, height;
@@ -188,6 +191,10 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
 
   HitRecord hit = traverse(ray);
 
+#ifdef CYCLES
+uint64_t end_cycles = clockARB();
+#endif
+
 #ifdef HEATMAP
   if (hit.intersection_checks != 0) {
       float3 mix = lerp(MIN_INTERSECTION_COLOUR, MAX_INTERSECTION_COLOUR, float3(hit.intersection_checks / float(INTERSECTION_MAX)));
@@ -195,6 +202,9 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
   } else {
     o_Image[pixelCoord] = float4(0);
   }
+#elif defined(CYCLES)
+  float3 mix = lerp(MIN_CYCLE_COLOUR, MAX_CYCLE_COLOUR, float3((end_cycles - start_cycles) / float(CYCLE_MAX)));
+  o_Image[pixelCoord] = float4(mix, 1.);
 #else
   if (hit.hit) {
     o_Image[pixelCoord] = float4(hit.colour, 1.);

@@ -223,6 +223,7 @@ void Application::initVulkan()
 
     VkPhysicalDeviceVulkan11Features features11 {};
     VkPhysicalDeviceFeatures features {};
+    features.shaderInt64 = true;
 
     vkb::PhysicalDeviceSelector selector { vkbInst };
     auto vkbDeviceSelector = selector.set_minimum_version(1, 4)
@@ -232,6 +233,7 @@ void Application::initVulkan()
                                  .set_required_features_11(features11)
                                  .set_required_features(features)
                                  .set_surface(m_VkSurface)
+                                 .add_required_extension("VK_KHR_shader_clock")
                                  .select();
 
     if (!vkbDeviceSelector.has_value()) {
@@ -240,9 +242,13 @@ void Application::initVulkan()
         exit(-1);
     }
 
+    VkPhysicalDeviceShaderClockFeaturesKHR clockFeatures {};
+    clockFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_CLOCK_FEATURES_KHR;
+    clockFeatures.shaderSubgroupClock = true;
+
     vkb::PhysicalDevice vkbPhysicalDevice = vkbDeviceSelector.value();
     vkb::DeviceBuilder deviceBuilder { vkbPhysicalDevice };
-    vkb::Device vkbDevice = deviceBuilder.build().value();
+    vkb::Device vkbDevice = deviceBuilder.add_pNext(&clockFeatures).build().value();
 
     m_VkPhysicalDevice = vkbPhysicalDevice.physical_device;
     m_VkDevice = vkbDevice.device;

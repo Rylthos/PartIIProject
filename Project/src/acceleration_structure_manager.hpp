@@ -18,6 +18,7 @@ enum class ASType : uint8_t {
 enum class RenderStyle : uint8_t {
     NORMAL = 0,
     HEAT = 1,
+    CYCLES = 2,
     MAX_STYLE,
 };
 

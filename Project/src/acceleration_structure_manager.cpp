@@ -22,6 +22,7 @@ static std::map<ASType, const char*> typeToStringMap {
 static std::map<RenderStyle, const char*> styleToStringMap {
     { RenderStyle::NORMAL, "Normal"  },
     { RenderStyle::HEAT,   "Heatmap" },
+    { RenderStyle::CYCLES, "Cycles"  },
 };
 
 void ASManager::init(ASStructInfo initInfo)
@@ -174,6 +175,9 @@ void ASManager::UI(const Event& event)
                     case RenderStyle::HEAT:
                         ShaderManager::getInstance()->removeMacro("HEATMAP");
                         break;
+                    case RenderStyle::CYCLES:
+                        ShaderManager::getInstance()->removeMacro("CYCLES");
+                        break;
                     default:
                         assert(false && "Cases not handled");
                     }
@@ -184,13 +188,13 @@ void ASManager::UI(const Event& event)
                     case RenderStyle::HEAT:
                         ShaderManager::getInstance()->defineMacro("HEATMAP");
                         break;
+                    case RenderStyle::CYCLES:
+                        ShaderManager::getInstance()->defineMacro("CYCLES");
+                        break;
                     default:
                         assert(false && "Cases not handled");
                     }
                 }
-            }
-
-            {
             }
 
             {
@@ -215,6 +219,30 @@ void ASManager::UI(const Event& event)
                         if (ImGui::SliderInt("##IntersectionMax", &currentCount, 10, 1000)) {
                             ShaderManager::getInstance()->setMacro(
                                 "INTERSECTION_MAX", std::format("{}", currentCount));
+                        }
+                        if (ImGui::IsItemDeactivatedAfterEdit()) {
+                            updateShader = true;
+                        }
+                    }
+                    break;
+                }
+                case RenderStyle::CYCLES: {
+                    {
+                        ImGui::Text("Cycles max");
+
+                        auto currentCycleValue
+                            = ShaderManager::getInstance()->getMacro("CYCLE_MAX");
+                        int currentCount = std::atoi(currentCycleValue.value_or("10").c_str());
+
+                        if (!currentCycleValue) {
+                            updateShader = true;
+                            ShaderManager::getInstance()->setMacro(
+                                "CYCLE_MAX", std::format("{}", currentCount));
+                        }
+
+                        if (ImGui::SliderInt("##CycleMax", &currentCount, 10, 1000)) {
+                            ShaderManager::getInstance()->setMacro(
+                                "CYCLE_MAX", std::format("{}", currentCount));
                         }
                         if (ImGui::IsItemDeactivatedAfterEdit()) {
                             updateShader = true;
