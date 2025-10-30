@@ -54,18 +54,26 @@ struct StackMember {
 }
 
 func traverse(in ray : Ray) -> HitRecord {
-  float3 minBound = float3(0);
-  float3 maxBound = float3(1);
+  const float3 world_offset = float3(0);
+  // const float3 world_dimensions = float3(2); // Not currently working
 
-  const float3 dimensions = maxBound - minBound;
+  float3 min_bound = float3(1);
+  float3 max_bound = float3(3);
+
+  const float3 dimensions = max_bound - min_bound;
+
+  Ray transformed = Ray(
+    (ray.origin + (min_bound - world_offset)),
+    ray.direction
+  );
 
   HitRecord hit;
   float boundingTMin, boundingTMax;
-  if (!ray.aabb(minBound, maxBound, boundingTMin, boundingTMax, EPS, MAX_FLOAT)) {
+  if (!transformed.aabb(min_bound, max_bound, boundingTMin, boundingTMax, EPS, MAX_FLOAT)) {
     return hit;
   }
 
-  float3 position = ray.calculate(boundingTMin + EPS);
+  float3 position = transformed.calculate(boundingTMin + EPS);
 
   int current_index = -1;
   StackMember stack[MAX_DEPTH];
@@ -99,7 +107,7 @@ hit.intersection_checks += 1;
 
       currentTMax = stack[current_index].tMax;
       parent = stack[current_index].parent;
-      minBound = stack[current_index].minBound;
+      min_bound = stack[current_index].minBound;
       current_index--;
 
       current_scale *= 2;
@@ -107,21 +115,21 @@ hit.intersection_checks += 1;
       continue;
     }
 
-    float3 center = minBound + current_scale * dimensions;
+    float3 center = min_bound + current_scale * dimensions;
     float3 boundOffset = float3(0);
     int octantMask = 0;
 
-    if (position.x > center.x || (position.x == center.x && ray.direction.x > 0)) {
+    if (position.x > center.x || (position.x == center.x && transformed.direction.x > 0)) {
       octantMask ^= 1;
       boundOffset.x = dimensions.x;
     }
 
-    if (position.z > center.z || (position.z == center.z && ray.direction.z > 0)) {
+    if (position.z > center.z || (position.z == center.z && transformed.direction.z > 0)) {
       octantMask ^= 2;
       boundOffset.z = dimensions.z;
     }
 
-    if (position.y > center.y || (position.y == center.y && ray.direction.y > 0)) {
+    if (position.y > center.y || (position.y == center.y && transformed.direction.y > 0)) {
       octantMask ^= 4;
       boundOffset.y = dimensions.y;
     }
@@ -135,32 +143,32 @@ hit.intersection_checks += 1;
       current_index++;
       stack[current_index].parent = parent;
       stack[current_index].tMax = currentTMax;
-      stack[current_index].minBound = minBound;
+      stack[current_index].minBound = min_bound;
 
       uint child_offset = countbits(node.childMask >> (octantMask + 1));
       parent = parent + node.offset + child_offset;
 
-      minBound = minBound + boundOffset * current_scale;
-      maxBound = minBound + dimensions * current_scale;
+      min_bound = min_bound + boundOffset * current_scale;
+      max_bound = min_bound + dimensions * current_scale;
 
       const float minT = currentTMin;
       const float maxT = currentTMax;
-      if (!ray.aabb(minBound, maxBound, currentTMin, currentTMax, minT, maxT))
+      if (!transformed.aabb(min_bound, max_bound, currentTMin, currentTMax, minT, maxT))
         break;
 
       current_scale *= 0.5;
     } else { // Child is empty
       // Traverse through air
 
-      float3 octantMinBound = minBound + boundOffset * current_scale;
+      float3 octantMinBound = min_bound + boundOffset * current_scale;
       float3 octantMaxBound = octantMinBound + current_scale * dimensions;
 
       float t0;
-      if (!ray.aabb(octantMinBound, octantMaxBound, t0, t, currentTMin, currentTMax))
+      if (!transformed.aabb(octantMinBound, octantMaxBound, t0, t, currentTMin, currentTMax))
         break;
 
       t += EPS;
-      position = ray.calculate(t);
+      position = transformed.calculate(t);
     }
   }
 
