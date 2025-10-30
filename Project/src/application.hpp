@@ -86,6 +86,7 @@ class Application : public EventDispatcher {
     VkQueryPool m_VkQueryPool;
     double m_PreviousGPUTime = 0.;
     float m_TimestampInterval = 0.f;
+    uint64_t m_PreviousGPUCount = 0;
 
     double m_PreviousFrameTime = 0.;
 

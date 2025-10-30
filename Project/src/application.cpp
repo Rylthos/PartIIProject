@@ -658,7 +658,7 @@ void Application::createQueryPool()
     queryPoolCI.pNext = nullptr;
     queryPoolCI.flags = 0;
     queryPoolCI.queryType = VK_QUERY_TYPE_TIMESTAMP;
-    queryPoolCI.queryCount = FRAMES_IN_FLIGHT * 2;
+    queryPoolCI.queryCount = FRAMES_IN_FLIGHT * 4;
     queryPoolCI.pipelineStatistics = 0;
 
     VK_CHECK(vkCreateQueryPool(m_VkDevice, &queryPoolCI, nullptr, &m_VkQueryPool),
@@ -706,6 +706,7 @@ void Application::UI(const Event& event)
         ImGui::Spacing();
         ImGui::Text("GPU FPS            : %3f", 1.0f / (m_PreviousGPUTime / 1000.0f));
         ImGui::Text("Previous GPU time  : %6.2f ms", m_PreviousGPUTime);
+        ImGui::Text("Previous GPU Count : %lu cyles", m_PreviousGPUCount);
         ImGui::Spacing();
         ImGui::Text("Frame times");
         ImGui::PlotLines("##Timing", previousFrames.getData().data(), previousFrames.getSize(), 0,
@@ -745,10 +746,10 @@ void Application::render()
         {
             beginCmdDebugLabel(commandBuffer, "Setup", { 0.f, 1.f, 0.f, 1.f });
 
-            vkCmdResetQueryPool(commandBuffer, m_VkQueryPool, m_CurrentFrameIndex * 2, 2);
+            vkCmdResetQueryPool(commandBuffer, m_VkQueryPool, m_CurrentFrameIndex * 4, 4);
 
             vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, m_VkQueryPool,
-                m_CurrentFrameIndex * 2);
+                m_CurrentFrameIndex * 4);
 
             transitionImage(commandBuffer, m_VkSwapchainImages[swapchainImageIndex],
                 VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
@@ -758,12 +759,16 @@ void Application::render()
             endCmdDebugLabel(commandBuffer);
         }
 
+        vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_VkQueryPool,
+            m_CurrentFrameIndex * 4 + 2);
         ASManager::getManager()->render(commandBuffer, m_Camera,
             currentFrame.drawImageDescriptorSet,
             {
                 .width = currentFrame.drawImage.extent.width,
                 .height = currentFrame.drawImage.extent.height,
             });
+        vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_VkQueryPool,
+            m_CurrentFrameIndex * 4 + 3);
 
         transitionImage(commandBuffer, currentFrame.drawImage.image, VK_IMAGE_LAYOUT_GENERAL,
             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
@@ -782,11 +787,11 @@ void Application::render()
             transitionImage(commandBuffer, m_VkSwapchainImages[swapchainImageIndex],
                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
-            vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_VkQueryPool,
-                m_CurrentFrameIndex * 2 + 1);
-
             endCmdDebugLabel(commandBuffer);
         }
+
+        vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_VkQueryPool,
+            m_CurrentFrameIndex * 4 + 1);
 
         VK_CHECK(vkEndCommandBuffer(commandBuffer), "End command buffer");
     }
@@ -841,13 +846,14 @@ void Application::render()
     }
 
     {
-        static uint64_t timeQueryBuffer[2];
-        VkResult result = vkGetQueryPoolResults(m_VkDevice, m_VkQueryPool, m_CurrentFrameIndex * 2,
-            2, sizeof(uint64_t) * 2, &timeQueryBuffer, sizeof(uint64_t), VK_QUERY_RESULT_64_BIT);
+        static uint64_t timeQueryBuffer[4];
+        VkResult result = vkGetQueryPoolResults(m_VkDevice, m_VkQueryPool, m_CurrentFrameIndex * 4,
+            4, sizeof(uint64_t) * 4, &timeQueryBuffer, sizeof(uint64_t), VK_QUERY_RESULT_64_BIT);
 
         if (result == VK_SUCCESS) {
             m_PreviousGPUTime
                 = ((timeQueryBuffer[1] - timeQueryBuffer[0]) * m_TimestampInterval) / 1e6;
+            m_PreviousGPUCount = timeQueryBuffer[3] - timeQueryBuffer[2];
         }
     }
 
