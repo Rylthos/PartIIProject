@@ -55,7 +55,7 @@ struct StackMember {
 
 func traverse(in ray : Ray) -> HitRecord {
   float3 minBound = float3(0);
-  float3 maxBound = float3(150);
+  float3 maxBound = float3(1);
 
   const float3 dimensions = maxBound - minBound;
 
@@ -82,7 +82,7 @@ func traverse(in ray : Ray) -> HitRecord {
   for (int i = 0; i < STEP_LIMIT; i++) {
     node = new OctreeNode(i_Octree[parent]);
 
-#ifdef COUNT_INTERSECTIONS
+#ifdef HEATMAP
 hit.intersection_checks += 1;
 #endif
 
@@ -161,7 +161,6 @@ hit.intersection_checks += 1;
 
       t += EPS;
       position = ray.calculate(t);
-      // position = round(ray.calculate(t) / current_scale) * current_scale;
     }
   }
 
@@ -189,7 +188,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
 
   HitRecord hit = traverse(ray);
 
-#ifdef COUNT_INTERSECTIONS
+#ifdef HEATMAP
   if (hit.intersection_checks != 0) {
       float3 mix = lerp(MIN_INTERSECTION_COLOUR, MAX_INTERSECTION_COLOUR, float3(hit.intersection_checks / float(INTERSECTION_MAX)));
     o_Image[pixelCoord] = float4(mix, 1.);

@@ -15,6 +15,12 @@ enum class ASType : uint8_t {
     MAX_TYPE,
 };
 
+enum class RenderStyle : uint8_t {
+    NORMAL = 0,
+    HEAT = 1,
+    MAX_STYLE,
+};
+
 class ASManager {
   public:
     static ASManager* getManager()
@@ -45,6 +51,8 @@ class ASManager {
 
   private:
     ASStructInfo m_InitInfo;
+
+    RenderStyle m_CurrentRenderStyle = RenderStyle::NORMAL;
 
     ASType m_CurrentType = ASType::OCTREE;
     std::unique_ptr<IAccelerationStructure> m_CurrentAS;

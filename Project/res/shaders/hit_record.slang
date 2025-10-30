@@ -4,7 +4,7 @@ struct HitRecord {
   float3 hit_position;
   float3 normal;
   float t;
-#ifdef COUNT_INTERSECTIONS
+#ifdef HEATMAP
   int intersection_checks;
 #endif
 
@@ -14,7 +14,7 @@ struct HitRecord {
     hit_position = float3(0);
     normal = float3(0);
     t = 1.0 / 0.;
-#ifdef COUNT_INTERSECTIONS
+#ifdef HEATMAP
     intersection_checks = 0;
 #endif
   }

@@ -29,7 +29,7 @@ func traverse(in ray : Ray) -> HitRecord {
     return hit;
   }
 
-#ifdef COUNT_INTERSECTIONS
+#ifdef HEATMAP
   hit.intersection_checks = 0;
 #endif
 
@@ -50,7 +50,7 @@ func traverse(in ray : Ray) -> HitRecord {
   float3 normal;
 
   for (int i = 0; i < STEP_LIMIT; i++) {
-#ifdef COUNT_INTERSECTIONS
+#ifdef HEATMAP
   hit.intersection_checks += 1;
 #endif
 
@@ -105,7 +105,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
 
   HitRecord hit = traverse(ray);
 
-#ifdef COUNT_INTERSECTIONS
+#ifdef HEATMAP
     if (hit.intersection_checks != 0) {
       float3 mix = lerp(MIN_INTERSECTION_COLOUR, MAX_INTERSECTION_COLOUR, float3(hit.intersection_checks / float(INTERSECTION_MAX)));
       o_Image[pixelCoord] = float4(mix, 1.);

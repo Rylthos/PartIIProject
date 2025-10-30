@@ -8,13 +8,13 @@
 #define VOXEL_SIZE 1.0
 #endif // VOXEL_SIZE
 
-#ifdef COUNT_INTERSECTIONS
+#ifdef HEATMAP
 #ifndef INTERSECTION_MAX
 #define INTERSECTION_MAX 10
 #endif // INTERSECTION_MAX
 #define MIN_INTERSECTION_COLOUR float3(0.2, 0.2, 0.8)
 #define MAX_INTERSECTION_COLOUR float3(0.9, 0.4, 0.05)
-#endif // COUNT_INTERSECTIONS
+#endif // HEATMAP
 
 #ifndef EPS
 #define EPS 1e-5
