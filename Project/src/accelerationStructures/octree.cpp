@@ -153,7 +153,7 @@ void OctreeAS::init(ASStructInfo info)
         m_Nodes.emplace_back(0, 255, 0);
         m_Nodes.emplace_back(255, 0, 0);
     }
-    m_VoxelCount = pow(4, depth);
+    m_VoxelCount = pow(4, depth) * 4;
 
     LOG_INFO("Total Voxels: {}", pow(4, depth) * 4);
     LOG_INFO("Entries: {}", m_Nodes.size());
