@@ -19,6 +19,7 @@ struct PushConstants {
     alignas(16) glm::vec3 cameraForward;
     alignas(16) glm::vec3 cameraRight;
     alignas(16) glm::vec3 cameraUp;
+    alignas(16) glm::mat4 octreeWorld;
     alignas(16) glm::mat4 octreeWorldInverse;
     alignas(16) glm::mat4 octreeScaleInverse;
 };
@@ -196,6 +197,7 @@ void OctreeAS::render(
         .cameraForward = camera.getForwardVector(),
         .cameraRight = camera.getRightVector(),
         .cameraUp = camera.getUpVector(),
+        .octreeWorld = octreeWorld,
         .octreeWorldInverse = octreeWorldInverse,
         .octreeScaleInverse = octreeScaleInverse,
     };

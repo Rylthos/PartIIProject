@@ -6,6 +6,7 @@ struct PushConstants {
   float3 camera_front;
   float3 camera_right;
   float3 camera_up;
+  float4x4 octree_world;
   float4x4 octree_world_inverse;
   float4x4 octree_scale_inverse;
 };
@@ -106,7 +107,9 @@ hit.intersection_checks += 1;
       hit.hit = true;
       hit.colour = node.colour;
       hit.normal = calculateNormal(position, min_bound, max_bound);
-      hit.hit_position = position;
+
+      float4 world_position = mul(float4(position, 1), push_constants.octree_world);
+      hit.hit_position = world_position.xyz / world_position.w;
 
       return hit;
     }
@@ -227,8 +230,8 @@ uint64_t end_cycles = clockARB();
   o_Image[pixelCoord] = float4(mix, 1.);
 #else
   if (hit.hit) {
-    const float3 light_position = float3(1.5, 1.5, 1.5);
-    const float3 light_colour = float3(0.5);
+    const float3 light_position = float3(5, 5, 5);
+    const float3 light_colour = float3(1.0);
     const float3 object_colour = float3(1);
 
     const float ambient_strength = 0.3;
@@ -240,7 +243,7 @@ uint64_t end_cycles = clockARB();
 
     const float falloff = 1 / pow(length(light_position - hit.hit_position), 2);
 
-    const float3 diffuse = diffuse_strength * light_colour * falloff * 0.2;
+    const float3 diffuse = diffuse_strength * light_colour * falloff * 10;
 
     o_Image[pixelCoord] = float4(object_colour * (ambient + diffuse), 1);
   } else {
