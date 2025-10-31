@@ -103,3 +103,18 @@ HitRecord sphereIntersection(Ray ray, float3 center, float radius) {
 
   return record;
 }
+
+float3 calculateNormal(float3 position, float3 minBound, float3 maxBound) {
+  float3 minSide = abs(position - minBound);
+  float3 maxSide = abs(position - maxBound);
+
+  if (minSide.x < EPS) return float3(-1, 0, 0);
+  if (minSide.y < EPS) return float3(0, -1, 0);
+  if (minSide.z < EPS) return float3(0, 0, -1);
+
+  if (maxSide.x < EPS) return float3(1, 0, 0);
+  if (maxSide.y < EPS) return float3(0, 1, 0);
+  if (maxSide.z < EPS) return float3(0, 0, 1);
+
+  return float3(0);
+}

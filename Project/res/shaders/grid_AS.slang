@@ -47,7 +47,7 @@ func traverse(in ray : Ray) -> HitRecord {
   float3 step_size = ray.inverse_direction * step_dir;
 
   // Needs to be initialized;
-  float3 normal;
+  float3 normal = calculateNormal(entry_pos, minBound, maxBound);
 
   for (int i = 0; i < STEP_LIMIT; i++) {
 #ifdef HEATMAP
