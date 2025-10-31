@@ -1,6 +1,14 @@
 #include "ray.slang"
-#include "push_constants.slang"
 #include "default_defines.slang"
+
+struct PushConstants {
+  float3 camera_position;
+  float3 camera_front;
+  float3 camera_right;
+  float3 camera_up;
+  float4x4 octree_world_inverse;
+  float4x4 octree_scale_inverse;
+};
 
 struct OctreeNode {
   uint32_t data;
@@ -53,18 +61,18 @@ struct StackMember {
   float tMax;
 }
 
-func traverse(in ray : Ray) -> HitRecord {
-  const float3 world_offset = float3(0);
-  // const float3 world_dimensions = float3(2); // Not currently working
-
+func traverse(in ray_original : Ray) -> HitRecord {
   float3 min_bound = float3(1);
-  float3 max_bound = float3(3);
+  float3 max_bound = float3(2);
 
   const float3 dimensions = max_bound - min_bound;
 
+  const float4 origin_w = mul(float4(ray_original.origin, 1), push_constants.octree_world_inverse);
+  const float4 direction_w = mul(float4(ray_original.direction, 1), push_constants.octree_scale_inverse);
+
   Ray transformed = Ray(
-    (ray.origin + (min_bound - world_offset)),
-    ray.direction
+    origin_w.xyz / origin_w.w,
+    direction_w.xyz / direction_w.w
   );
 
   HitRecord hit;

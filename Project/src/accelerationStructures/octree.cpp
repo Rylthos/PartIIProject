@@ -4,16 +4,23 @@
 #include <variant>
 #include <vulkan/vulkan_core.h>
 
+#include <glm/glm.hpp>
+#include <glm/gtx/matrix_operation.hpp>
+
 #include "../debug_utils.hpp"
 #include "../logger.hpp"
 #include "../shader_manager.hpp"
 #include "accelerationStructure.hpp"
+#include "glm/ext/matrix_transform.hpp"
+#include "glm/matrix.hpp"
 
 struct PushConstants {
     alignas(16) glm::vec3 cameraPosition;
     alignas(16) glm::vec3 cameraForward;
     alignas(16) glm::vec3 cameraRight;
     alignas(16) glm::vec3 cameraUp;
+    alignas(16) glm::mat4 octreeWorldInverse;
+    alignas(16) glm::mat4 octreeScaleInverse;
 };
 
 OctreeNode::OctreeNode(uint8_t childMask, uint32_t offset)
@@ -148,7 +155,7 @@ void OctreeAS::init(ASStructInfo info)
     LOG_INFO("Final offset: {}", base_offset);
 
     for (size_t i = 0; i < pow(4, depth); i++) {
-        m_Nodes.emplace_back(255, 255, 255);
+        m_Nodes.emplace_back(255, 0, 0);
         m_Nodes.emplace_back(0, 0, 255);
         m_Nodes.emplace_back(0, 255, 0);
         m_Nodes.emplace_back(255, 0, 0);
@@ -175,11 +182,22 @@ void OctreeAS::render(
 {
     beginCmdDebugLabel(cmd, "Octree AS render", { 0.0f, 0.0f, 1.0f, 1.0f });
 
+    glm::vec3 scale = glm::vec3(10);
+
+    glm::mat4 octreeWorld = glm::mat4(1);
+    octreeWorld = glm::scale(octreeWorld, scale);
+    octreeWorld = glm::translate(octreeWorld, glm::vec3(-1));
+    glm::mat4 octreeWorldInverse = glm::inverse(octreeWorld);
+
+    glm::mat4 octreeScaleInverse = glm::inverse(glm::scale(glm::mat4(1), scale));
+
     PushConstants pushConstant = {
         .cameraPosition = camera.getPosition(),
         .cameraForward = camera.getForwardVector(),
         .cameraRight = camera.getRightVector(),
         .cameraUp = camera.getUpVector(),
+        .octreeWorldInverse = octreeWorldInverse,
+        .octreeScaleInverse = octreeScaleInverse,
     };
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_RenderPipeline);
