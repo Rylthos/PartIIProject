@@ -105,6 +105,8 @@ hit.intersection_checks += 1;
     if (node.isSolid) {
       hit.hit = true;
       hit.colour = node.colour;
+      hit.normal = calculateNormal(position, min_bound, max_bound);
+      hit.hit_position = position;
 
       return hit;
     }
@@ -163,6 +165,8 @@ hit.intersection_checks += 1;
       const float maxT = currentTMax;
       if (!transformed.aabb(min_bound, max_bound, currentTMin, currentTMax, minT, maxT))
         break;
+
+      position = transformed.calculate(currentTMin);
 
       current_scale *= 0.5;
     } else { // Child is empty
@@ -223,7 +227,22 @@ uint64_t end_cycles = clockARB();
   o_Image[pixelCoord] = float4(mix, 1.);
 #else
   if (hit.hit) {
-    o_Image[pixelCoord] = float4(hit.colour, 1.);
+    const float3 light_position = float3(1.5, 1.5, 1.5);
+    const float3 light_colour = float3(0.5);
+    const float3 object_colour = float3(1);
+
+    const float ambient_strength = 0.3;
+
+    const float3 ambient = light_colour * ambient_strength;
+
+    const float3 light_dir = normalize(light_position - hit.hit_position);
+    const float diffuse_strength = max(dot(light_dir, hit.normal), 0);
+
+    const float falloff = 1 / pow(length(light_position - hit.hit_position), 2);
+
+    const float3 diffuse = diffuse_strength * light_colour * falloff * 0.2;
+
+    o_Image[pixelCoord] = float4(object_colour * (ambient + diffuse), 1);
   } else {
     o_Image[pixelCoord] = float4(float3(0.2), 1);
   }
