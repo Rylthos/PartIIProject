@@ -230,9 +230,9 @@ uint64_t end_cycles = clockARB();
   o_Image[pixelCoord] = float4(mix, 1.);
 #else
   if (hit.hit) {
-    const float3 light_position = float3(5, 5, 5);
+    const float3 light_position = float3(5, -2, 5);
     const float3 light_colour = float3(1.0);
-    const float3 object_colour = float3(1);
+    const float3 object_colour = hit.colour;
 
     const float ambient_strength = 0.3;
 

@@ -62,6 +62,9 @@ class OctreeAS : public IAccelerationStructure {
     void createRenderPipeline();
     void destroyRenderPipeline();
 
+    void generatePyramid();
+    void generateSponge();
+
   private:
     ASStructInfo m_Info;
 

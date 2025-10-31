@@ -139,33 +139,12 @@ void OctreeAS::init(ASStructInfo info)
     //     OctreeNode(255, 0, 0),
     // };
 
-    // Alternative corners 3 deep
-    m_Nodes = {
-        OctreeNode(0x69, 1),
-    };
+    // generatePyramid();
+    generateSponge();
 
-    const uint32_t depth = 11;
-    uint32_t base_offset = 4;
-
-    for (uint32_t i = 1; i < depth; i++) {
-        for (uint32_t j = 0; j < pow(4, i); j++) {
-            m_Nodes.emplace_back(0x69, base_offset);
-            base_offset += 3;
-        }
-    }
-    LOG_INFO("Final offset: {}", base_offset);
-
-    for (size_t i = 0; i < pow(4, depth); i++) {
-        m_Nodes.emplace_back(255, 0, 0);
-        m_Nodes.emplace_back(0, 0, 255);
-        m_Nodes.emplace_back(0, 255, 0);
-        m_Nodes.emplace_back(255, 0, 0);
-    }
-    m_VoxelCount = pow(4, depth) * 4;
-
-    LOG_INFO("Total Voxels: {}", pow(4, depth) * 4);
-    LOG_INFO("Entries: {}", m_Nodes.size());
-    LOG_INFO("Bytes: {}", sizeof(uint32_t) * m_Nodes.size());
+    // LOG_INFO("Total Voxels: {}", pow(4, depth) * 4);
+    // LOG_INFO("Entries: {}", m_Nodes.size());
+    // LOG_INFO("Bytes: {}", sizeof(uint32_t) * m_Nodes.size());
 
     createDescriptorLayout();
     createBuffers();
@@ -415,4 +394,56 @@ void OctreeAS::createRenderPipeline()
 void OctreeAS::destroyRenderPipeline()
 {
     vkDestroyPipeline(m_Info.device, m_RenderPipeline, nullptr);
+}
+
+void OctreeAS::generatePyramid()
+{
+    m_Nodes = {
+        OctreeNode(0x69, 1),
+    };
+
+    const uint32_t depth = 11;
+    uint32_t base_offset = 4;
+
+    for (uint32_t i = 1; i < depth; i++) {
+        for (uint32_t j = 0; j < pow(4, i); j++) {
+            m_Nodes.emplace_back(0x69, base_offset);
+            base_offset += 3;
+        }
+    }
+    LOG_INFO("Final offset: {}", base_offset);
+
+    for (size_t i = 0; i < pow(4, depth); i++) {
+        m_Nodes.emplace_back(255, 0, 0);
+        m_Nodes.emplace_back(0, 0, 255);
+        m_Nodes.emplace_back(0, 255, 0);
+        m_Nodes.emplace_back(255, 0, 0);
+    }
+    m_VoxelCount = pow(4, depth) * 4;
+}
+
+void OctreeAS::generateSponge()
+{
+    m_Nodes = { OctreeNode(0xDB, 0x1) };
+
+    const uint32_t depth = 8;
+    uint32_t base_offset = 6;
+
+    for (uint32_t i = 1; i < depth; i++) {
+        for (uint32_t j = 0; j < pow(6, i); j++) {
+            m_Nodes.emplace_back(0xDB, base_offset);
+            base_offset += 5;
+        }
+    }
+    LOG_INFO("Final offset: {}", base_offset);
+
+    for (size_t i = 0; i < pow(6, depth); i++) {
+        m_Nodes.emplace_back(255, 0, 0);
+        m_Nodes.emplace_back(0, 0, 255);
+        m_Nodes.emplace_back(0, 255, 0);
+        m_Nodes.emplace_back(255, 255, 255);
+        m_Nodes.emplace_back(255, 0, 255);
+        m_Nodes.emplace_back(0, 255, 255);
+    }
+    m_VoxelCount = pow(6, depth + 1);
 }
