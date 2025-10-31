@@ -76,9 +76,9 @@ void Camera::frameEvent(const Event& event)
 
         // Delta
         if (m_PressedKeys.count(GLFW_KEY_W))
-            resultantForce += m_Forward * glm::vec3(1.f, 0.f, 1.f);
+            resultantForce += glm::normalize(m_Forward * glm::vec3(1.f, 0.f, 1.f));
         if (m_PressedKeys.count(GLFW_KEY_S))
-            resultantForce -= m_Forward * glm::vec3(1.f, 0.f, 1.f);
+            resultantForce -= glm::normalize(m_Forward * glm::vec3(1.f, 0.f, 1.f));
         if (m_PressedKeys.count(GLFW_KEY_A))
             resultantForce -= m_Right;
         if (m_PressedKeys.count(GLFW_KEY_D))
@@ -88,7 +88,7 @@ void Camera::frameEvent(const Event& event)
         if (m_PressedKeys.count(GLFW_KEY_LEFT_CONTROL))
             resultantForce -= m_WorldUp;
         if (m_PressedKeys.count(GLFW_KEY_LEFT_SHIFT))
-            speedup *= 3.f;
+            speedup *= 8.f;
 
         m_Position += resultantForce * m_MovementSpeed * updateEvent.delta * speedup;
     }
