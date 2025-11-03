@@ -67,9 +67,8 @@ func calculateChildIndex(float3 position, int3 step_dir, float scale) -> uint {
 
   const float3 normalized = position - float3(1.); // 0..1
   const float3 cell_min = floor(normalized / (scale * 2)) * (scale * 2);
-  const float3 cell_size = float3(scale);
 
-  const float3 center = cell_min + cell_size;
+  const float3 center = cell_min + scale;
 
   const bool3 mask = normalized > center || (normalized == center && step_dir > 0);
   const int3 octant_mask = int3(1, 4, 2);
@@ -146,11 +145,14 @@ func traverse(in ray_original : Ray) -> HitRecord {
     float3 side_dist = (cell_min + (max(step_dir, int3(0)) * current_scale) - ray.origin) * ray.inverse_direction;
     float tmax = min(min(side_dist.x, side_dist.y), side_dist.z);
     normal = -step_dir * (tmax == side_dist);
+
+    const float3 neighbour_min = select(tmax == side_dist, cell_min + current_scale * step_dir, cell_min + EPS);
+    const float3 neighbour_max = neighbour_min + float3(current_scale) - select(tmax == side_dist, EPS, 0.);
     
     // Biasing: Should aim to clamp instead
     // Leads to high intersection due to aliasing to same cell
     float3 previous_position = position;
-    position = ray.calculate(tmax + EPS);
+    position = clamp(ray.calculate(tmax), neighbour_min, neighbour_max);
 
     // Ascend if the parent bounds now differ
     float3 parent_cell_min = floor(previous_position / (current_scale * 2)) * (current_scale * 2);
