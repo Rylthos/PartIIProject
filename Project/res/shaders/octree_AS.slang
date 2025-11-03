@@ -62,128 +62,119 @@ struct StackMember {
   float tMax;
 }
 
-func traverse(in ray_original : Ray) -> HitRecord {
-  float3 min_bound = float3(1);
-  float3 max_bound = float3(2);
+func calculateChildIndex(float3 position, int3 step_dir, float scale) -> uint {
+  // Bounding between 1 and 2
 
+  const float3 normalized = position - float3(1.); // 0..1
+  const float3 cell_min = floor(normalized / (scale * 2)) * (scale * 2);
+  const float3 cell_size = float3(scale);
+
+  const float3 center = cell_min + cell_size;
+
+  const bool3 mask = normalized > center || (normalized == center && step_dir > 0);
+  const int3 octant_mask = int3(1, 4, 2);
+
+  // Dot product requires shaderIntegerDotProduct
+  return mask.x * octant_mask.x + mask.y * octant_mask.y + mask.z * octant_mask.z;
+}
+
+func traverse(in ray_original : Ray) -> HitRecord {
+  const float3 min_bound = float3(1);
+  const float3 max_bound = float3(2);
   const float3 dimensions = max_bound - min_bound;
 
   const float4 origin_w = mul(float4(ray_original.origin, 1), push_constants.octree_world_inverse);
   const float4 direction_w = mul(float4(ray_original.direction, 1), push_constants.octree_scale_inverse);
 
-  Ray transformed = Ray(
+  Ray ray = Ray(
     origin_w.xyz / origin_w.w,
-    direction_w.xyz / direction_w.w
+    normalize(direction_w.xyz / direction_w.w)
   );
 
   HitRecord hit;
   float boundingTMin, boundingTMax;
-  if (!transformed.aabb(min_bound, max_bound, boundingTMin, boundingTMax, EPS, MAX_FLOAT)) {
+  if (!ray.aabb(min_bound, max_bound, boundingTMin, boundingTMax, EPS, MAX_FLOAT)) {
     return hit;
   }
 
-  float3 position = transformed.calculate(boundingTMin + EPS);
-
-  int current_index = -1;
-  StackMember stack[MAX_DEPTH];
+  int current_index = 0;
+  uint stack[MAX_DEPTH];
 
   float current_scale = 0.5;
-  uint parent = 0;
 
-  OctreeNode node;
-  float t = boundingTMin;
+  uint node_index = 0;
+  OctreeNode node = i_Octree[node_index];
 
-  float currentTMin = boundingTMin;
-  float currentTMax = boundingTMax;
+  float3 position = clamp(ray.calculate(boundingTMin + EPS), float3(0), float3(2 - EPS));
+
+  float3 normal = calculateNormal(position, min_bound, max_bound);
+
+  const int3 step_dir = sign(ray.direction);
 
   for (int i = 0; i < STEP_LIMIT; i++) {
-    node = new OctreeNode(i_Octree[parent]);
 
 #ifdef HEATMAP
-hit.intersection_checks += 1;
+    hit.intersection_checks++;
 #endif
 
-    if (node.isSolid) {
-      hit.hit = true;
-      hit.colour = node.colour;
-      hit.normal = calculateNormal(position, min_bound, max_bound);
+    // Descend
+    uint child_index = calculateChildIndex(position, step_dir, current_scale);
+    while(!node.isSolid && ((node.childMask >> child_index) & 1) != 0) {
+      stack[current_index++] = node_index;
 
-      float4 world_position = mul(float4(position, 1), push_constants.octree_world);
-      hit.hit_position = world_position.xyz / world_position.w;
+#ifdef HEATMAP
+    hit.intersection_checks++;
+#endif
+
+      node_index += node.offset + countbits(node.childMask >> (child_index + 1));
+      node = i_Octree[node_index];
+
+      current_scale /= 2;
+      child_index = calculateChildIndex(position, step_dir, current_scale);
+    }
+
+    if (node.isSolid) { // Is Leaf node
+      hit.hit = true;
+      hit.hit_position = position;
+      hit.colour = node.colour;
+      hit.normal = normal;
 
       return hit;
     }
 
-    if (t >= currentTMax) {
-      // Ascend
-      if (current_index == -1) break;
+    float3 cell_min = floor(position / current_scale) * current_scale;
+    float3 side_dist = (cell_min + (max(step_dir, int3(0)) * current_scale) - ray.origin) * ray.inverse_direction;
+    float tmax = min(min(side_dist.x, side_dist.y), side_dist.z);
+    normal = -step_dir * (tmax == side_dist);
+    
+    // Biasing: Should aim to clamp instead
+    // Leads to high intersection due to aliasing to same cell
+    float3 previous_position = position;
+    position = ray.calculate(tmax + EPS);
 
-      currentTMax = stack[current_index].tMax;
-      parent = stack[current_index].parent;
-      min_bound = stack[current_index].minBound;
+    // Ascend if the parent bounds now differ
+    float3 parent_cell_min = floor(previous_position / (current_scale * 2)) * (current_scale * 2);
+    float3 new_cell_min = floor(position / (current_scale * 2)) * (current_scale * 2);
+    bool3 diff = abs(parent_cell_min - new_cell_min) > EPS;
+    while (diff.x || diff.y || diff.z) {
+
+#ifdef HEATMAP
+    hit.intersection_checks++;
+#endif
+
       current_index--;
+       
+      if (current_index < 0) {
+        return hit;
+      }
 
+      node_index = stack[current_index];
+      node = i_Octree[node_index];
       current_scale *= 2;
 
-      continue;
-    }
-
-    float3 center = min_bound + current_scale * dimensions;
-    float3 boundOffset = float3(0);
-    int octantMask = 0;
-
-    if (position.x > center.x || (position.x == center.x && transformed.direction.x > 0)) {
-      octantMask ^= 1;
-      boundOffset.x = dimensions.x;
-    }
-
-    if (position.z > center.z || (position.z == center.z && transformed.direction.z > 0)) {
-      octantMask ^= 2;
-      boundOffset.z = dimensions.z;
-    }
-
-    if (position.y > center.y || (position.y == center.y && transformed.direction.y > 0)) {
-      octantMask ^= 4;
-      boundOffset.y = dimensions.y;
-    }
-
-    bool childMask = ((node.childMask >> octantMask) & 1) == 1;
-
-    if (childMask) { // Child exists and has content
-      // Descend into child
-      if (node.offset == 0) break;
-
-      current_index++;
-      stack[current_index].parent = parent;
-      stack[current_index].tMax = currentTMax;
-      stack[current_index].minBound = min_bound;
-
-      uint child_offset = countbits(node.childMask >> (octantMask + 1));
-      parent = parent + node.offset + child_offset;
-
-      min_bound = min_bound + boundOffset * current_scale;
-      max_bound = min_bound + dimensions * current_scale;
-
-      const float minT = currentTMin;
-      const float maxT = currentTMax;
-      if (!transformed.aabb(min_bound, max_bound, currentTMin, currentTMax, minT, maxT))
-        break;
-
-      position = transformed.calculate(currentTMin);
-
-      current_scale *= 0.5;
-    } else { // Child is empty
-      // Traverse through air
-
-      float3 octantMinBound = min_bound + boundOffset * current_scale;
-      float3 octantMaxBound = octantMinBound + current_scale * dimensions;
-
-      float t0;
-      if (!transformed.aabb(octantMinBound, octantMaxBound, t0, t, currentTMin, currentTMax))
-        break;
-
-      t += EPS;
-      position = transformed.calculate(t);
+      parent_cell_min = floor(previous_position / (current_scale * 2)) * (current_scale * 2);
+      new_cell_min = floor(position / (current_scale * 2)) * (current_scale * 2);
+      diff = abs(parent_cell_min - new_cell_min) > EPS;
     }
   }
 
@@ -230,22 +221,24 @@ uint64_t end_cycles = clockARB();
   o_Image[pixelCoord] = float4(mix, 1.);
 #else
   if (hit.hit) {
-    const float3 light_position = float3(5, -2, 5);
-    const float3 light_colour = float3(1.0);
-    const float3 object_colour = hit.colour;
-
-    const float ambient_strength = 0.3;
-
-    const float3 ambient = light_colour * ambient_strength;
-
-    const float3 light_dir = normalize(light_position - hit.hit_position);
-    const float diffuse_strength = max(dot(light_dir, hit.normal), 0);
-
-    const float falloff = 1 / pow(length(light_position - hit.hit_position), 2);
-
-    const float3 diffuse = diffuse_strength * light_colour * falloff * 10;
-
-    o_Image[pixelCoord] = float4(object_colour * (ambient + diffuse), 1);
+    // const float3 light_position = float3(5, -2, 5);
+    // const float3 light_colour = float3(1.0);
+    // const float3 object_colour = float3(1);
+    // // const float3 object_colour = hit.colour;
+    //
+    // const float ambient_strength = 0.3;
+    //
+    // const float3 ambient = light_colour * ambient_strength;
+    //
+    // const float3 light_dir = normalize(light_position - hit.hit_position);
+    // const float diffuse_strength = max(dot(light_dir, hit.normal), 0);
+    //
+    // // const float falloff = 1 / pow(length(light_position - hit.hit_position), 2);
+    //
+    // const float3 diffuse = diffuse_strength * light_colour;
+    //
+    // o_Image[pixelCoord] = float4(object_colour * (ambient + diffuse), 1);
+    o_Image[pixelCoord] = float4(hit.colour, 1);
   } else {
     o_Image[pixelCoord] = float4(float3(0.2), 1);
   }

@@ -139,8 +139,8 @@ void OctreeAS::init(ASStructInfo info)
     //     OctreeNode(255, 0, 0),
     // };
 
-    // generatePyramid();
-    generateSponge();
+    generatePyramid();
+    // generateSponge();
 
     // LOG_INFO("Total Voxels: {}", pow(4, depth) * 4);
     // LOG_INFO("Entries: {}", m_Nodes.size());
@@ -162,7 +162,7 @@ void OctreeAS::render(
 {
     beginCmdDebugLabel(cmd, "Octree AS render", { 0.0f, 0.0f, 1.0f, 1.0f });
 
-    glm::vec3 scale = glm::vec3(10);
+    glm::vec3 scale = glm::vec3(2);
 
     glm::mat4 octreeWorld = glm::mat4(1);
     octreeWorld = glm::scale(octreeWorld, scale);
