@@ -228,23 +228,6 @@ uint64_t end_cycles = clockARB();
   o_Image[pixelCoord] = float4(mix, 1.);
 #else
   if (hit.hit) {
-    // const float3 light_position = float3(5, -2, 5);
-    // const float3 light_colour = float3(1.0);
-    // const float3 object_colour = float3(1);
-    // // const float3 object_colour = hit.colour;
-    //
-    // const float ambient_strength = 0.3;
-    //
-    // const float3 ambient = light_colour * ambient_strength;
-    //
-    // const float3 light_dir = normalize(light_position - hit.hit_position);
-    // const float diffuse_strength = max(dot(light_dir, hit.normal), 0);
-    //
-    // // const float falloff = 1 / pow(length(light_position - hit.hit_position), 2);
-    //
-    // const float3 diffuse = diffuse_strength * light_colour;
-    //
-    // o_Image[pixelCoord] = float4(object_colour * (ambient + diffuse), 1);
     o_Image[pixelCoord] = float4(hit.colour, 1);
   } else {
     o_Image[pixelCoord] = float4(float3(0.2), 1);
