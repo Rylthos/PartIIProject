@@ -35,5 +35,5 @@
 #endif
 
 #ifndef MAX_DEPTH
-#define MAX_DEPTH 22
+#define MAX_DEPTH 23
 #endif

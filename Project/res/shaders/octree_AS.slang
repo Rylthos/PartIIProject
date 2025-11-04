@@ -62,15 +62,22 @@ struct StackMember {
   float tMax;
 }
 
-func calculateChildIndex(float3 position, int3 step_dir, float scale) -> uint {
-  // Bounding between 1 and 2
+func scaleExpToFloat(uint scale_exp) -> float {
+    return asfloat((127 << 23) + (1 << scale_exp)) - 1.;
+}
 
-  const float3 normalized = position - float3(1.); // 0..1
-  const float3 cell_min = floor(normalized / (scale * 2)) * (scale * 2);
+func floorScale(float3 value, uint scale_exp) -> float3 {
+  return asfloat(asuint(value) & ~((1 << scale_exp) - 1));
+}
+
+func calculateChildIndex(float3 position, int3 step_dir, uint scale_exp) -> uint {
+  const float3 cell_min = floorScale(position, scale_exp + 1);
+
+  const float scale = scaleExpToFloat(scale_exp);
 
   const float3 center = cell_min + scale;
 
-  const bool3 mask = normalized > center || (normalized == center && step_dir > 0);
+  const bool3 mask = position > center || (position == center && step_dir > 0);
   const int3 octant_mask = int3(1, 4, 2);
 
   // Dot product requires shaderIntegerDotProduct
@@ -96,15 +103,14 @@ func traverse(in ray_original : Ray) -> HitRecord {
     return hit;
   }
 
-  int current_index = 0;
   uint stack[MAX_DEPTH];
 
-  float current_scale = 0.5;
+  uint scale_exp = 22;
 
   uint node_index = 0;
   OctreeNode node = i_Octree[node_index];
 
-  float3 position = clamp(ray.calculate(boundingTMin + EPS), float3(0), float3(2 - EPS));
+  float3 position = clamp(ray.calculate(boundingTMin), float3(1), float3(2 - EPS));
 
   float3 normal = calculateNormal(position, min_bound, max_bound);
 
@@ -117,19 +123,19 @@ func traverse(in ray_original : Ray) -> HitRecord {
 #endif
 
     // Descend
-    uint child_index = calculateChildIndex(position, step_dir, current_scale);
+    uint child_index = calculateChildIndex(position, step_dir, scale_exp);
     while(!node.isSolid && ((node.childMask >> child_index) & 1) != 0) {
-      stack[current_index++] = node_index;
+      stack[scale_exp] = node_index;
 
 #ifdef HEATMAP
-    hit.intersection_checks++;
+      hit.intersection_checks++;
 #endif
 
       node_index += node.offset + countbits(node.childMask >> (child_index + 1));
       node = i_Octree[node_index];
 
-      current_scale /= 2;
-      child_index = calculateChildIndex(position, step_dir, current_scale);
+      scale_exp--;
+      child_index = calculateChildIndex(position, step_dir, scale_exp);
     }
 
     if (node.isSolid) { // Is Leaf node
@@ -141,41 +147,40 @@ func traverse(in ray_original : Ray) -> HitRecord {
       return hit;
     }
 
-    float3 cell_min = floor(position / current_scale) * current_scale;
-    float3 side_dist = (cell_min + (max(step_dir, int3(0)) * current_scale) - ray.origin) * ray.inverse_direction;
+    const float scale = scaleExpToFloat(scale_exp);
+
+    float3 cell_min = floorScale(position, scale_exp);
+    float3 side_dist = (cell_min + (max(step_dir, int3(0)) * scale) - ray.origin) * ray.inverse_direction;
     float tmax = min(min(side_dist.x, side_dist.y), side_dist.z);
     normal = -step_dir * (tmax == side_dist);
 
-    const float3 neighbour_min = select(tmax == side_dist, cell_min + current_scale * step_dir, cell_min + EPS);
-    const float3 neighbour_max = neighbour_min + float3(current_scale) - select(tmax == side_dist, EPS, 0.);
+    const float3 neighbour_min = select(tmax == side_dist, cell_min + scale * step_dir, cell_min + EPS);
+    const float3 neighbour_max = neighbour_min + float3(scale) - select(tmax == side_dist, EPS, 0.);
     
-    // Biasing: Should aim to clamp instead
-    // Leads to high intersection due to aliasing to same cell
     float3 previous_position = position;
     position = clamp(ray.calculate(tmax), neighbour_min, neighbour_max);
 
     // Ascend if the parent bounds now differ
-    float3 parent_cell_min = floor(previous_position / (current_scale * 2)) * (current_scale * 2);
-    float3 new_cell_min = floor(position / (current_scale * 2)) * (current_scale * 2);
+    float3 parent_cell_min = floorScale(previous_position, scale_exp + 1);
+    float3 new_cell_min = floorScale(position, scale_exp + 1);
     bool3 diff = abs(parent_cell_min - new_cell_min) > EPS;
     while (diff.x || diff.y || diff.z) {
 
 #ifdef HEATMAP
-    hit.intersection_checks++;
+      hit.intersection_checks++;
 #endif
 
-      current_index--;
+      scale_exp++;
        
-      if (current_index < 0) {
+      if (scale_exp >= MAX_DEPTH) {
         return hit;
       }
 
-      node_index = stack[current_index];
+      node_index = stack[scale_exp];
       node = i_Octree[node_index];
-      current_scale *= 2;
 
-      parent_cell_min = floor(previous_position / (current_scale * 2)) * (current_scale * 2);
-      new_cell_min = floor(position / (current_scale * 2)) * (current_scale * 2);
+      parent_cell_min = floorScale(previous_position, scale_exp + 1);
+      new_cell_min = floorScale(position, scale_exp + 1);
       diff = abs(parent_cell_min - new_cell_min) > EPS;
     }
   }
