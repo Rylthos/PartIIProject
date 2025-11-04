@@ -8,6 +8,7 @@
 #include "../debug_utils.hpp"
 #include "../logger.hpp"
 #include "../shader_manager.hpp"
+#include "spdlog/spdlog.h"
 
 struct PushConstants {
     alignas(16) glm::vec3 cameraPosition;
@@ -20,11 +21,7 @@ GridAS::GridAS() { }
 
 GridAS::~GridAS()
 {
-    m_StagingBuffer.unmapMemory();
-
-    m_StagingBuffer.cleanup();
-    m_ColourBuffer.cleanup();
-    m_OccupancyBuffer.cleanup();
+    freeBuffers();
 
     freeDescriptorSets();
     destroyDescriptorLayouts();
@@ -39,30 +36,38 @@ void GridAS::init(ASStructInfo info)
 {
     m_Info = info;
 
-    int index = 0;
-    for (auto& voxel : m_Voxels) {
-        int x = index % GRID_DIMENSIONS;
-        int y = (index / GRID_DIMENSIONS) % GRID_DIMENSIONS;
-        int z = (index / (GRID_DIMENSIONS * GRID_DIMENSIONS)) % GRID_DIMENSIONS;
-
-        voxel.visible = (x % 2 == 0 && y % 2 == 0 && z % 2 == 0);
-
-        float r = x / (float)GRID_DIMENSIONS;
-        float g = y / (float)GRID_DIMENSIONS;
-        float b = z / (float)GRID_DIMENSIONS;
-        voxel.colour = glm::vec3(r, g, b);
-        index++;
-    }
-
     createDescriptorLayouts();
-    createBuffer();
-    createDescriptorSets();
 
     createRenderPipelineLayout();
     ShaderManager::getInstance()->addModule("grid_AS",
         std::bind(&GridAS::createRenderPipeline, this),
         std::bind(&GridAS::destroyRenderPipeline, this));
     createRenderPipeline();
+}
+
+void GridAS::fromLoader(Loader& loader)
+{
+    freeBuffers();
+    freeDescriptorSets();
+
+    glm::uvec3 dimensions = loader.getDimensions();
+    m_Voxels.resize(dimensions.x * dimensions.y * dimensions.z);
+    for (size_t z = 0; z < dimensions.z; z++) {
+        for (size_t y = 0; y < dimensions.y; y++) {
+            for (size_t x = 0; x < dimensions.x; x++) {
+                size_t index = x + y * dimensions.x + z * dimensions.x * dimensions.y;
+                auto v = loader.getVoxel({ x, y, z });
+
+                m_Voxels[index] = GridVoxel {
+                    .visible = v.has_value(),
+                    .colour = v.has_value() ? v.value().colour : glm::vec3 { 0, 0, 0 },
+                };
+            }
+        }
+    }
+
+    createBuffer();
+    createDescriptorSets();
 }
 
 void GridAS::render(
@@ -178,6 +183,8 @@ void GridAS::createBuffer()
     }
     dataOccupancy[current_index] = current_mask;
 
+    m_StagingBuffer.unmapMemory();
+
     VkCommandBuffer cmd;
     VkCommandBufferAllocateInfo commandBufferAI {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -213,6 +220,13 @@ void GridAS::createBuffer()
     vkQueueWaitIdle(m_Info.graphicsQueue);
 
     vkFreeCommandBuffers(m_Info.device, m_Info.commandPool, 1, &cmd);
+}
+
+void GridAS::freeBuffers()
+{
+    m_StagingBuffer.cleanup();
+    m_ColourBuffer.cleanup();
+    m_OccupancyBuffer.cleanup();
 }
 
 void GridAS::createDescriptorSets()
@@ -274,6 +288,8 @@ void GridAS::createDescriptorSets()
 
 void GridAS::freeDescriptorSets()
 {
+    if (m_BufferSet == VK_NULL_HANDLE)
+        return;
     vkFreeDescriptorSets(m_Info.device, m_Info.descriptorPool, 1, &m_BufferSet);
 }
 

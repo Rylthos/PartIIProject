@@ -7,6 +7,8 @@
 #include "glm/common.hpp"
 #include "logger.hpp"
 
+#include "loaders/equationLoader.hpp"
+
 #include "imgui.h"
 #include "shader_manager.hpp"
 
@@ -59,6 +61,17 @@ void ASManager::setAS(ASType type)
         assert(false && "Invalid Type provided");
     }
     m_CurrentAS->init(m_InitInfo);
+    EquationLoader loader {
+        glm::uvec3(32),
+        std::function([](glm::uvec3 dimensions, glm::uvec3 index) {
+            if (index.x % 2 == 0 && index.y % 3 == 0 && index.z % 4 == 0) {
+                return std::make_optional(
+                    Voxel { .colour = glm::vec3(glm::vec3(index) / glm::vec3(dimensions)) });
+            }
+            return std::optional<Voxel>();
+        }),
+    };
+    m_CurrentAS->fromLoader(loader);
 }
 
 void ASManager::updateShaders()

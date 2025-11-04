@@ -157,6 +157,8 @@ void OctreeAS::init(ASStructInfo info)
     createRenderPipeline();
 }
 
+void OctreeAS::fromLoader(Loader& loader) { }
+
 void OctreeAS::render(
     VkCommandBuffer cmd, Camera camera, VkDescriptorSet drawImageSet, VkExtent2D imageSize)
 {

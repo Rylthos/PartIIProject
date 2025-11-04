@@ -6,15 +6,15 @@
 #include <array>
 
 #include "../buffer.hpp"
+#include "../voxel.hpp"
+#include "glm/fwd.hpp"
 
 #include <glm/glm.hpp>
 
-#define GRID_DIMENSIONS 32
-
 class GridAS : public IAccelerationStructure {
-    struct Voxel {
-        glm::vec3 colour;
+    struct GridVoxel {
         bool visible;
+        glm::vec3 colour;
     };
 
   public:
@@ -22,6 +22,7 @@ class GridAS : public IAccelerationStructure {
     ~GridAS();
 
     void init(ASStructInfo info) override;
+    void fromLoader(Loader& loader) override;
     void render(VkCommandBuffer cmd, Camera camera, VkDescriptorSet drawImageSet,
         VkExtent2D imageSize) override;
 
@@ -35,6 +36,7 @@ class GridAS : public IAccelerationStructure {
     void destroyDescriptorLayouts();
 
     void createBuffer();
+    void freeBuffers();
 
     void createDescriptorSets();
     void freeDescriptorSets();
@@ -46,7 +48,7 @@ class GridAS : public IAccelerationStructure {
     void destroyRenderPipeline();
 
   private:
-    std::array<Voxel, GRID_DIMENSIONS * GRID_DIMENSIONS * GRID_DIMENSIONS> m_Voxels;
+    std::vector<GridVoxel> m_Voxels;
 
     ASStructInfo m_Info;
 
@@ -55,7 +57,7 @@ class GridAS : public IAccelerationStructure {
     Buffer m_StagingBuffer;
 
     VkDescriptorSetLayout m_BufferSetLayout;
-    VkDescriptorSet m_BufferSet;
+    VkDescriptorSet m_BufferSet = VK_NULL_HANDLE;
 
     VkPipeline m_RenderPipeline;
     VkPipelineLayout m_RenderPipelineLayout;

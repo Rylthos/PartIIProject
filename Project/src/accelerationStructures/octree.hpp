@@ -39,6 +39,7 @@ class OctreeAS : public IAccelerationStructure {
     ~OctreeAS();
 
     void init(ASStructInfo info) override;
+    void fromLoader(Loader& loader) override;
     void render(VkCommandBuffer cmd, Camera camera, VkDescriptorSet drawImageSet,
         VkExtent2D imageSize) override;
 

@@ -5,6 +5,7 @@
 #include <vulkan/vulkan_core.h>
 
 #include "../camera.hpp"
+#include "../loaders/loader.hpp"
 
 struct ASStructInfo {
     VkDevice device;
@@ -23,6 +24,7 @@ class IAccelerationStructure {
     virtual ~IAccelerationStructure() { }
 
     virtual void init(ASStructInfo info) = 0;
+    virtual void fromLoader(Loader& loader) = 0;
     virtual void render(
         VkCommandBuffer cmd, Camera camera, VkDescriptorSet drawImageSet, VkExtent2D imageSize)
         = 0;

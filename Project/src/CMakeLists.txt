@@ -12,12 +12,15 @@ set (SOURCE_LIST
   "debug_utils.cpp" "debug_utils.hpp"
   "acceleration_structure_manager.cpp" "acceleration_structure_manager.cpp"
   "buffer.cpp" "buffer.hpp"
+  "voxel.hpp"
 )
 
 add_compile_definitions(GLM_ENABLE_EXPERIMENTAL)
 
 add_executable(${PROJECT_NAME} ${SOURCE_LIST})
+
 add_subdirectory(accelerationStructures)
+add_subdirectory(loaders)
 
 target_compile_options(${PROJECT_NAME}
   PRIVATE -g -O
