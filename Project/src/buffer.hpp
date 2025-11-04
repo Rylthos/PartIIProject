@@ -2,6 +2,7 @@
 
 #include "vk_mem_alloc.h"
 #include "vulkan/vulkan.h"
+#include <vulkan/vulkan_core.h>
 
 class Buffer {
   public:
@@ -30,7 +31,7 @@ class Buffer {
     VkDevice m_Device;
     VmaAllocator m_Allocator;
 
-    VkBuffer m_Buffer;
+    VkBuffer m_Buffer = VK_NULL_HANDLE;
     VmaAllocation m_Allocation;
     VkDeviceSize m_Size;
 };
