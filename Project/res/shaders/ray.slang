@@ -65,8 +65,8 @@ struct Ray {
     float tMin = max(t0, 0);
     float tMax = min(t1, MAX_FLOAT);
 
-    if (t1 > t0) {
-      return t0;
+    if (tMax > tMin) {
+      return tMin;
     }
 
     return -1;
