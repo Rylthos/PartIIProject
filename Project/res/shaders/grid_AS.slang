@@ -1,3 +1,5 @@
+#define EPS 1e-4
+
 #include "push_constants.slang"
 #include "ray.slang"
 #include "default_defines.slang"

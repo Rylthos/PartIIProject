@@ -64,10 +64,15 @@ void ASManager::setAS(ASType type)
     EquationLoader loader {
         glm::uvec3(32),
         std::function([](glm::uvec3 dimensions, glm::uvec3 index) {
-            if (index.x % 2 == 0 && index.y % 3 == 0 && index.z % 4 == 0) {
-                return std::make_optional(
-                    Voxel { .colour = glm::vec3(glm::vec3(index) / glm::vec3(dimensions)) });
+            const uint32_t radius = 16;
+            glm::vec3 center = glm::vec3(dimensions) / 2.f;
+            const glm::vec3 position = glm::vec3(index) - center;
+
+            if (glm::length(position) < radius) {
+                glm::vec3 normal = glm::normalize(glm::abs(position - center));
+                return std::make_optional(Voxel { .colour = normal });
             }
+
             return std::optional<Voxel>();
         }),
     };

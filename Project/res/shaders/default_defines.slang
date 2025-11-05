@@ -27,7 +27,8 @@
 #endif // CYCLES
 
 #ifndef EPS
-#define EPS 1e-5
+// Small power of 2
+#define EPS (asfloat((127 << 23) + (1 << 10)) - 1)
 #endif
 
 #ifndef MAX_FLOAT
