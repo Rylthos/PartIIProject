@@ -1,3 +1,5 @@
+#pragma once
+
 struct HitRecord {
   bool hit;
   float3 colour;
