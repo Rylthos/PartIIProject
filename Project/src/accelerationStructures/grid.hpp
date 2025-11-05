@@ -49,6 +49,7 @@ class GridAS : public IAccelerationStructure {
 
   private:
     std::vector<GridVoxel> m_Voxels;
+    glm::uvec3 m_Dimensions;
 
     ASStructInfo m_Info;
 

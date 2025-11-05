@@ -1,8 +1,15 @@
 #define EPS 1e-4
 
-#include "push_constants.slang"
 #include "ray.slang"
 #include "default_defines.slang"
+
+struct PushConstants {
+  float3 camera_position;
+  float3 camera_front;
+  float3 camera_right;
+  float3 camera_up;
+  uint3 dimensions;
+};
 
 [[vk_push_constant]]
 PushConstants push_constants;
@@ -16,11 +23,9 @@ StructuredBuffer<uint8_t> i_Occupancy;
 [[vk::binding(1, 1)]]
 StructuredBuffer<float> i_Colour;
 
-#define GRID_LENGTH 32
-
 func traverse(in ray : Ray) -> HitRecord {
   const float3 minBound = float3(0);
-  const float3 maxBound = float3(GRID_LENGTH * VOXEL_SIZE);
+  const float3 maxBound = float3(push_constants.dimensions * VOXEL_SIZE);
 
   HitRecord hit;
   hit.hit = false;
@@ -39,10 +44,12 @@ func traverse(in ray : Ray) -> HitRecord {
 
   int3 voxel_pos = int3(floor(entry_pos));
   if (voxel_pos.x < 0 || voxel_pos.y < 0 || voxel_pos.z < 0 ||
-      voxel_pos.x >= GRID_LENGTH || voxel_pos.y >= GRID_LENGTH || voxel_pos.z >= GRID_LENGTH)
+      voxel_pos.x >= push_constants.dimensions.x ||
+      voxel_pos.y >= push_constants.dimensions.y ||
+      voxel_pos.z >= push_constants.dimensions.z)
     return hit;
 
-  voxel_pos = clamp(voxel_pos, int3(0), int3(GRID_LENGTH - 1));
+  voxel_pos = clamp(voxel_pos, int3(0), int3(push_constants.dimensions - 1));
 
   int3 step_dir = sign(ray.direction);
   float3 next_dist = abs((voxel_pos + max(step_dir, int3(0)) - entry_pos) * ray.inverse_direction);
@@ -56,7 +63,7 @@ func traverse(in ray : Ray) -> HitRecord {
   hit.intersection_checks += 1;
 #endif
 
-    uint index = voxel_pos.x + voxel_pos.y * GRID_LENGTH + voxel_pos.z * GRID_LENGTH * GRID_LENGTH;
+    uint index = voxel_pos.x + voxel_pos.y * push_constants.dimensions.x + voxel_pos.z * push_constants.dimensions.x * push_constants.dimensions.y;
     uint array_index = index / 8;
     uint bit_index = index % 8;
 
@@ -79,7 +86,9 @@ func traverse(in ray : Ray) -> HitRecord {
 
     // Outside bounds
     if (voxel_pos.x < 0 || voxel_pos.y < 0 || voxel_pos.z < 0 ||
-        voxel_pos.x >= GRID_LENGTH || voxel_pos.y >= GRID_LENGTH || voxel_pos.z >= GRID_LENGTH)
+        voxel_pos.x >= push_constants.dimensions.x ||
+        voxel_pos.y >= push_constants.dimensions.y ||
+        voxel_pos.z >= push_constants.dimensions.z)
       return hit;
   }
 

@@ -15,6 +15,7 @@ struct PushConstants {
     alignas(16) glm::vec3 cameraForward;
     alignas(16) glm::vec3 cameraRight;
     alignas(16) glm::vec3 cameraUp;
+    alignas(16) glm::uvec3 dimensions;
 };
 
 GridAS::GridAS() { }
@@ -50,12 +51,13 @@ void GridAS::fromLoader(Loader& loader)
     freeBuffers();
     freeDescriptorSets();
 
-    glm::uvec3 dimensions = loader.getDimensions();
-    m_Voxels.resize(dimensions.x * dimensions.y * dimensions.z);
-    for (size_t z = 0; z < dimensions.z; z++) {
-        for (size_t y = 0; y < dimensions.y; y++) {
-            for (size_t x = 0; x < dimensions.x; x++) {
-                size_t index = x + y * dimensions.x + z * dimensions.x * dimensions.y;
+    m_Dimensions = loader.getDimensions();
+
+    m_Voxels.resize(m_Dimensions.x * m_Dimensions.y * m_Dimensions.z);
+    for (size_t z = 0; z < m_Dimensions.z; z++) {
+        for (size_t y = 0; y < m_Dimensions.y; y++) {
+            for (size_t x = 0; x < m_Dimensions.x; x++) {
+                size_t index = x + y * m_Dimensions.x + z * m_Dimensions.x * m_Dimensions.y;
                 auto v = loader.getVoxel({ x, y, z });
 
                 m_Voxels[index] = GridVoxel {
@@ -80,6 +82,7 @@ void GridAS::render(
         .cameraForward = camera.getForwardVector(),
         .cameraRight = camera.getRightVector(),
         .cameraUp = camera.getUpVector(),
+        .dimensions = m_Dimensions,
     };
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_RenderPipeline);
