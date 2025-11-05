@@ -139,8 +139,9 @@ func traverse(in ray_original : Ray) -> HitRecord {
     }
 
     if (node.isSolid) { // Is Leaf node
+      float4 pos = mul(float4(position, 1.), push_constants.octree_world);
       hit.hit = true;
-      hit.hit_position = position;
+      hit.hit_position = pos.xyz / pos.w;
       hit.colour = node.colour;
       hit.normal = normal;
 
@@ -156,7 +157,7 @@ func traverse(in ray_original : Ray) -> HitRecord {
 
     const float3 neighbour_min = select(tmax == side_dist, cell_min + scale * step_dir, cell_min + EPS);
     const float3 neighbour_max = neighbour_min + float3(scale) - select(tmax == side_dist, EPS, 0.);
-    
+
     float3 previous_position = position;
     position = clamp(ray.calculate(tmax), neighbour_min, neighbour_max);
 
@@ -171,7 +172,7 @@ func traverse(in ray_original : Ray) -> HitRecord {
 #endif
 
       scale_exp++;
-       
+
       if (scale_exp >= MAX_DEPTH) {
         return hit;
       }
