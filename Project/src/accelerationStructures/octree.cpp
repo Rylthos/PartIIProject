@@ -1,5 +1,6 @@
 #include "octree.hpp"
 #include <memory>
+#include <queue>
 #include <unistd.h>
 #include <variant>
 #include <vulkan/vulkan_core.h>
@@ -66,8 +67,7 @@ OctreeAS::OctreeAS() { }
 OctreeAS::~OctreeAS()
 {
     freeDescriptorSet();
-    m_StagingBuffer.cleanup();
-    m_OctreeBuffer.cleanup();
+    freeBuffers();
 
     destroyDescriptorLayout();
 
@@ -81,74 +81,7 @@ void OctreeAS::init(ASStructInfo info)
 {
     m_Info = info;
 
-    // Single Node
-    // m_Nodes = {
-    //     OctreeNode(0, 255, 255),
-    // };
-
-    // Descending corner
-    // for (size_t i = 0; i < 10; i++) {
-    //     m_Nodes.emplace_back(0xFF, 0x1);
-    //     m_Nodes.emplace_back(255, 255, 255);
-    //     m_Nodes.emplace_back(255, 0, 255);
-    //     m_Nodes.emplace_back(255, 255, 0);
-    //     m_Nodes.emplace_back(0, 255, 255);
-    //     m_Nodes.emplace_back(0, 0, 255);
-    //     m_Nodes.emplace_back(0, 255, 0);
-    //     m_Nodes.emplace_back(255, 0, 0);
-    // }
-    //
-    // m_Nodes.emplace_back(0, 0, 0);
-
-    // Alternative Corners
-    // m_Nodes = {
-    //     OctreeNode(0x69, 0x1),
-    //     OctreeNode(255, 255, 255),
-    //     OctreeNode(0, 0, 255),
-    //     OctreeNode(0, 255, 0),
-    //     OctreeNode(255, 0, 0),
-    // };
-
-    // Alternative corners 2 deep
-    // m_Nodes = {
-    //     OctreeNode(0x69, 0x1),
-    //
-    //     OctreeNode(0x69, 0x4),
-    //     OctreeNode(0x69, 0x7),
-    //     OctreeNode(0x69, 0xA),
-    //     OctreeNode(0x69, 0xD),
-    //
-    //     OctreeNode(255, 255, 255),
-    //     OctreeNode(0, 0, 255),
-    //     OctreeNode(0, 255, 0),
-    //     OctreeNode(255, 0, 0),
-    //
-    //     OctreeNode(255, 255, 255),
-    //     OctreeNode(0, 0, 255),
-    //     OctreeNode(0, 255, 0),
-    //     OctreeNode(255, 0, 0),
-    //
-    //     OctreeNode(255, 255, 255),
-    //     OctreeNode(0, 0, 255),
-    //     OctreeNode(0, 255, 0),
-    //     OctreeNode(255, 0, 0),
-    //
-    //     OctreeNode(255, 255, 255),
-    //     OctreeNode(0, 0, 255),
-    //     OctreeNode(0, 255, 0),
-    //     OctreeNode(255, 0, 0),
-    // };
-
-    generatePyramid();
-    // generateSponge();
-
-    // LOG_INFO("Total Voxels: {}", pow(4, depth) * 4);
-    // LOG_INFO("Entries: {}", m_Nodes.size());
-    // LOG_INFO("Bytes: {}", sizeof(uint32_t) * m_Nodes.size());
-
     createDescriptorLayout();
-    createBuffers();
-    createDescriptorSet();
 
     createRenderPipelineLayout();
     ShaderManager::getInstance()->addModule("octree_AS",
@@ -157,7 +90,137 @@ void OctreeAS::init(ASStructInfo info)
     createRenderPipeline();
 }
 
-void OctreeAS::fromLoader(Loader& loader) { }
+void OctreeAS::fromLoader(Loader& loader)
+{
+    struct IntermediaryNode {
+        glm::u8vec3 colour;
+        bool visible;
+        bool parent;
+        uint8_t childMask;
+        uint32_t childStartIndex = 0;
+    };
+
+    freeBuffers();
+    freeDescriptorSet();
+
+    uint64_t current_code = 0;
+    const glm::uvec3 dimensions = loader.getDimensions();
+    uint64_t final_code = dimensions.x * dimensions.y * dimensions.z;
+
+    const uint32_t max_depth = 23;
+    uint32_t current_depth = max_depth - 1;
+
+    std::array<std::deque<IntermediaryNode>, max_depth> queues;
+    std::vector<IntermediaryNode> intermediaryNodes;
+
+    m_VoxelCount = 0;
+
+    std::function<IntermediaryNode(const std::optional<Voxel>)> convert
+        = [](const std::optional<Voxel> v) {
+              if (v.has_value()) {
+                  glm::vec3 colour = v.value().colour;
+                  return IntermediaryNode {
+                      .colour = glm::u8vec3 { colour.x * 255, colour.y * 255, colour.z * 255 },
+                      .visible = 1,
+                      .parent = false,
+                      .childMask = 0,
+                  };
+              } else
+                  return IntermediaryNode { .visible = false };
+          };
+
+    std::function<std::optional<IntermediaryNode>(const std::deque<IntermediaryNode>&)> allEqual
+        = [](const std::deque<IntermediaryNode>& nodes) {
+              assert(nodes.size() == 8);
+              if (nodes.at(0).parent)
+                  return std::optional<IntermediaryNode> {};
+
+              bool allVisible = nodes.at(0).visible;
+              glm::u8vec3 colour = nodes.at(0).colour;
+              for (uint32_t i = 1; i < 8; i++) {
+                  if (nodes.at(i).parent) {
+                      return std::optional<IntermediaryNode> {};
+                  }
+
+                  if (nodes.at(i).visible != allVisible) {
+                      return std::optional<IntermediaryNode> {};
+                  }
+
+                  if (nodes.at(i).colour != colour) {
+                      return std::optional<IntermediaryNode> {};
+                  }
+              }
+
+              return std::optional<IntermediaryNode>(IntermediaryNode {
+                  .colour = colour, .visible = allVisible, .parent = false, .childMask = 0 });
+          };
+
+    while (current_code != final_code) {
+        const auto current_voxel = loader.getVoxelMorton(current_code);
+        current_code++;
+
+        current_depth = max_depth - 1;
+        queues[current_depth].push_back(convert(current_voxel));
+
+        while (current_depth > 0 && queues[current_depth].size() == 8) {
+            IntermediaryNode node;
+
+            bool shouldContinue = true;
+            const auto& possible_parent_node = allEqual(queues[current_depth]);
+
+            if (possible_parent_node.has_value()) {
+                queues[current_depth - 1].push_back(possible_parent_node.value());
+                shouldContinue = false;
+            }
+
+            if (shouldContinue) {
+                uint8_t childMask = 0;
+                for (int8_t i = 0; i < 8; i++) {
+                    if (queues[current_depth].at(i).visible) {
+                        childMask |= (1 << i);
+                        intermediaryNodes.push_back(queues[current_depth].at(i));
+                        if (!queues[current_depth].at(i).parent
+                            && queues[current_depth].at(i).visible) {
+                            m_VoxelCount += pow(8, 22 - current_depth);
+                        }
+                    }
+                }
+
+                IntermediaryNode parent = {
+                    .visible = true,
+                    .parent = true,
+                    .childMask = childMask,
+                    .childStartIndex = (uint32_t)(intermediaryNodes.size() - 1),
+                };
+
+                queues[current_depth - 1].push_back(parent);
+            }
+
+            queues[current_depth].clear();
+            current_depth--;
+        }
+    }
+    assert(queues[current_depth].size() == 1);
+    intermediaryNodes.push_back(queues[current_depth].at(0));
+    if (!queues[current_depth].at(0).parent && queues[current_depth].at(0).visible) {
+        m_VoxelCount += pow(8, 22 - current_depth);
+    }
+
+    m_Nodes.clear();
+    m_Nodes.reserve(intermediaryNodes.size());
+    for (ssize_t i = intermediaryNodes.size() - 1; i >= 0; i--) {
+        const IntermediaryNode& node = intermediaryNodes[i];
+
+        if (node.parent) {
+            m_Nodes.push_back(OctreeNode(node.childMask, i - node.childStartIndex));
+        } else if (node.visible) {
+            m_Nodes.push_back(OctreeNode(node.colour.x, node.colour.y, node.colour.z));
+        }
+    }
+
+    createBuffers();
+    createDescriptorSet();
+}
 
 void OctreeAS::render(
     VkCommandBuffer cmd, Camera camera, VkDescriptorSet drawImageSet, VkExtent2D imageSize)
@@ -285,6 +348,12 @@ void OctreeAS::createBuffers()
     vkFreeCommandBuffers(m_Info.device, m_Info.commandPool, 1, &cmd);
 }
 
+void OctreeAS::freeBuffers()
+{
+    m_StagingBuffer.cleanup();
+    m_OctreeBuffer.cleanup();
+}
+
 void OctreeAS::createDescriptorSet()
 {
     VkDescriptorSetAllocateInfo setAI {
@@ -323,6 +392,9 @@ void OctreeAS::createDescriptorSet()
 
 void OctreeAS::freeDescriptorSet()
 {
+    if (m_BufferSet == VK_NULL_HANDLE)
+        return;
+
     vkFreeDescriptorSets(m_Info.device, m_Info.descriptorPool, 1, &m_BufferSet);
 }
 
@@ -398,54 +470,54 @@ void OctreeAS::destroyRenderPipeline()
     vkDestroyPipeline(m_Info.device, m_RenderPipeline, nullptr);
 }
 
-void OctreeAS::generatePyramid()
-{
-    m_Nodes = {
-        OctreeNode(0x69, 1),
-    };
-
-    const uint32_t depth = 11;
-    uint32_t base_offset = 4;
-
-    for (uint32_t i = 1; i < depth; i++) {
-        for (uint32_t j = 0; j < pow(4, i); j++) {
-            m_Nodes.emplace_back(0x69, base_offset);
-            base_offset += 3;
-        }
-    }
-    LOG_INFO("Final offset: {}", base_offset);
-
-    for (size_t i = 0; i < pow(4, depth); i++) {
-        m_Nodes.emplace_back(255, 0, 0);
-        m_Nodes.emplace_back(0, 0, 255);
-        m_Nodes.emplace_back(0, 255, 0);
-        m_Nodes.emplace_back(255, 0, 0);
-    }
-    m_VoxelCount = pow(4, depth) * 4;
-}
-
-void OctreeAS::generateSponge()
-{
-    m_Nodes = { OctreeNode(0xDB, 0x1) };
-
-    const uint32_t depth = 8;
-    uint32_t base_offset = 6;
-
-    for (uint32_t i = 1; i < depth; i++) {
-        for (uint32_t j = 0; j < pow(6, i); j++) {
-            m_Nodes.emplace_back(0xDB, base_offset);
-            base_offset += 5;
-        }
-    }
-    LOG_INFO("Final offset: {}", base_offset);
-
-    for (size_t i = 0; i < pow(6, depth); i++) {
-        m_Nodes.emplace_back(255, 0, 0);
-        m_Nodes.emplace_back(0, 0, 255);
-        m_Nodes.emplace_back(0, 255, 0);
-        m_Nodes.emplace_back(255, 255, 255);
-        m_Nodes.emplace_back(255, 0, 255);
-        m_Nodes.emplace_back(0, 255, 255);
-    }
-    m_VoxelCount = pow(6, depth + 1);
-}
+// void OctreeAS::generatePyramid()
+// {
+//     m_Nodes = {
+//         OctreeNode(0x69, 1),
+//     };
+//
+//     const uint32_t depth = 11;
+//     uint32_t base_offset = 4;
+//
+//     for (uint32_t i = 1; i < depth; i++) {
+//         for (uint32_t j = 0; j < pow(4, i); j++) {
+//             m_Nodes.emplace_back(0x69, base_offset);
+//             base_offset += 3;
+//         }
+//     }
+//     LOG_INFO("Final offset: {}", base_offset);
+//
+//     for (size_t i = 0; i < pow(4, depth); i++) {
+//         m_Nodes.emplace_back(255, 0, 0);
+//         m_Nodes.emplace_back(0, 0, 255);
+//         m_Nodes.emplace_back(0, 255, 0);
+//         m_Nodes.emplace_back(255, 0, 0);
+//     }
+//     m_VoxelCount = pow(4, depth) * 4;
+// }
+//
+// void OctreeAS::generateSponge()
+// {
+//     m_Nodes = { OctreeNode(0xDB, 0x1) };
+//
+//     const uint32_t depth = 8;
+//     uint32_t base_offset = 6;
+//
+//     for (uint32_t i = 1; i < depth; i++) {
+//         for (uint32_t j = 0; j < pow(6, i); j++) {
+//             m_Nodes.emplace_back(0xDB, base_offset);
+//             base_offset += 5;
+//         }
+//     }
+//     LOG_INFO("Final offset: {}", base_offset);
+//
+//     for (size_t i = 0; i < pow(6, depth); i++) {
+//         m_Nodes.emplace_back(255, 0, 0);
+//         m_Nodes.emplace_back(0, 0, 255);
+//         m_Nodes.emplace_back(0, 255, 0);
+//         m_Nodes.emplace_back(255, 255, 255);
+//         m_Nodes.emplace_back(255, 0, 255);
+//         m_Nodes.emplace_back(0, 255, 255);
+//     }
+//     m_VoxelCount = pow(6, depth + 1);
+// }

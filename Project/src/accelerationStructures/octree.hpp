@@ -5,6 +5,7 @@
 #include "../buffer.hpp"
 
 #include <variant>
+#include <vulkan/vulkan_core.h>
 
 class OctreeNode {
   public:
@@ -53,6 +54,7 @@ class OctreeAS : public IAccelerationStructure {
     void destroyDescriptorLayout();
 
     void createBuffers();
+    void freeBuffers();
 
     void createDescriptorSet();
     void freeDescriptorSet();
@@ -63,14 +65,11 @@ class OctreeAS : public IAccelerationStructure {
     void createRenderPipeline();
     void destroyRenderPipeline();
 
-    void generatePyramid();
-    void generateSponge();
-
   private:
     ASStructInfo m_Info;
 
     VkDescriptorSetLayout m_BufferSetLayout;
-    VkDescriptorSet m_BufferSet;
+    VkDescriptorSet m_BufferSet = VK_NULL_HANDLE;
 
     VkPipelineLayout m_RenderPipelineLayout;
     VkPipeline m_RenderPipeline;

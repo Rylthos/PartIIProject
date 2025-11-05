@@ -61,16 +61,18 @@ void ASManager::setAS(ASType type)
         assert(false && "Invalid Type provided");
     }
     m_CurrentAS->init(m_InitInfo);
+    const uint32_t sideLength = 1 << 8;
     EquationLoader loader {
-        glm::uvec3(32),
+        glm::uvec3(sideLength),
         std::function([](glm::uvec3 dimensions, glm::uvec3 index) {
-            const uint32_t radius = 16;
+            const float radius = sideLength / 3.f;
             glm::vec3 center = glm::vec3(dimensions) / 2.f;
             const glm::vec3 position = glm::vec3(index) - center;
 
             if (glm::length(position) < radius) {
                 glm::vec3 normal = glm::normalize(glm::abs(position - center));
-                return std::make_optional(Voxel { .colour = normal });
+                // return std::make_optional(Voxel { .colour = normal });
+                return std::make_optional(Voxel { .colour = glm::vec3(1) });
             }
 
             return std::optional<Voxel>();

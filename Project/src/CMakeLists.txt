@@ -13,6 +13,7 @@ set (SOURCE_LIST
   "acceleration_structure_manager.cpp" "acceleration_structure_manager.cpp"
   "buffer.cpp" "buffer.hpp"
   "voxel.hpp"
+  "morton_code.cpp" "morton_code.hpp"
 )
 
 add_compile_definitions(GLM_ENABLE_EXPERIMENTAL)
