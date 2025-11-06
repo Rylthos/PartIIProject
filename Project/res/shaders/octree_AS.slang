@@ -24,13 +24,20 @@ struct OctreeNode {
   property bool isSolid {
     get { return ((data >> 30) & 0x1) != 0; }
   }
+  property bool isFar {
+    get { return (data & 0x00200000) != 0; }
+  }
 
   // Node properties
   property uint32_t childMask { // Only lower 8 bits used
     get { return (data >> 22) & 0xFF; }
   }
   property uint32_t offset {
-    get { return (data & 0x003FFFFF); }
+    get { return (data & 0x001FFFFF); }
+  }
+
+  property uint32_t farPtr {
+    get { return data; }
   }
 
   // Lead properties
@@ -133,7 +140,12 @@ func traverse(in ray_original : Ray) -> HitRecord {
       hit.intersection_checks++;
 #endif
 
-      node_index += node.offset + countbits(node.childMask >> (child_index + 1));
+      uint index = node.offset;
+      if (node.isFar) {
+        index += i_Octree[index].farPtr;
+      }
+
+      node_index += index + countbits(node.childMask >> (child_index + 1));
       node = i_Octree[node_index];
 
       scale_exp--;
@@ -231,8 +243,8 @@ uint64_t end_cycles = clockARB();
   o_Image[pixelCoord] = float4(mix, 1.);
 #else
   if (hit.hit) {
-    // o_Image[pixelCoord] = float4(hit.colour, 1);
-    o_Image[pixelCoord] = float4(calculateColour(hit, float3(5, -1, 5), float3(1)), 1);
+    o_Image[pixelCoord] = float4(hit.colour, 1);
+    // o_Image[pixelCoord] = float4(calculateColour(hit, float3(5, -1, 5), float3(1)), 1);
   } else {
     o_Image[pixelCoord] = float4(float3(0.2), 1);
   }

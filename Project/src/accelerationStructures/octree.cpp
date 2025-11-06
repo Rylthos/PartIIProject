@@ -25,6 +25,8 @@ struct PushConstants {
     alignas(16) glm::mat4 octreeScaleInverse;
 };
 
+OctreeNode::OctreeNode(uint32_t ptr) { m_CurrentType = ptr; }
+
 OctreeNode::OctreeNode(uint8_t childMask, uint32_t offset)
 {
     m_CurrentType = NodeType {
@@ -48,6 +50,7 @@ uint32_t OctreeNode::getData()
 {
     if (const NodeType* node = std::get_if<NodeType>(&m_CurrentType)) {
         uint32_t flags = (((uint32_t)node->flags & 0x3) << 30);
+        assert(node->offset < 0x3FFFFF && "Incorrect pointer value given");
         uint32_t childMask = ((uint32_t)node->childMask & 0xFF) << 22;
         uint32_t offset = ((uint32_t)node->offset & 0x3FFFFF) << 0;
         return flags | childMask | offset;
@@ -57,6 +60,8 @@ uint32_t OctreeNode::getData()
         uint32_t g = ((uint32_t)leaf->g) << 8;
         uint32_t b = ((uint32_t)leaf->b) << 0;
         return flags | r | g | b;
+    } else if (const uint32_t* ptr = std::get_if<uint32_t>(&m_CurrentType)) {
+        return *ptr;
     } else {
         assert(false && "Not possible");
     }
@@ -92,6 +97,10 @@ void OctreeAS::init(ASStructInfo info)
 
 void OctreeAS::fromLoader(Loader& loader)
 {
+    std::chrono::steady_clock timer;
+
+    auto start = timer.now();
+
     struct IntermediaryNode {
         glm::u8vec3 colour;
         bool visible;
@@ -162,6 +171,18 @@ void OctreeAS::fromLoader(Loader& loader)
         current_depth = max_depth - 1;
         queues[current_depth].push_back(convert(current_voxel));
 
+        if (current_code % 5000000 == 0) {
+            auto current = timer.now();
+
+            std::chrono::duration<float, std::milli> difference = current - start;
+            float timeElapsed = difference.count() / 1000.0f;
+            float percent = (float)current_code / (float)final_code;
+            float timeRemaining = (timeElapsed / percent) - timeElapsed;
+            LOG_INFO(
+                "Percent searched: {:6.6f} | Time elapsed: {:6.3f}s | Time remaining: {:6.3f}s",
+                percent, timeElapsed, timeRemaining);
+        }
+
         while (current_depth > 0 && queues[current_depth].size() == 8) {
             IntermediaryNode node;
 
@@ -208,15 +229,24 @@ void OctreeAS::fromLoader(Loader& loader)
 
     m_Nodes.clear();
     m_Nodes.reserve(intermediaryNodes.size());
+
+    // BROKEN: Doesn't work if offset is greater then 2^21
+    size_t offset = 0;
     for (ssize_t i = intermediaryNodes.size() - 1; i >= 0; i--) {
         const IntermediaryNode& node = intermediaryNodes[i];
 
         if (node.parent) {
-            m_Nodes.push_back(OctreeNode(node.childMask, i - node.childStartIndex));
+            size_t target = i - node.childStartIndex + offset;
+            assert(target < 0x200000 && "Far pointers not handled");
+            m_Nodes.push_back(OctreeNode(node.childMask, target));
         } else if (node.visible) {
             m_Nodes.push_back(OctreeNode(node.colour.x, node.colour.y, node.colour.z));
         }
     }
+    auto end = timer.now();
+
+    std::chrono::duration<float, std::milli> difference = end - start;
+    LOG_INFO("Octree generation time: {}", difference.count() / 1000.0f);
 
     createBuffers();
     createDescriptorSet();
@@ -469,55 +499,3 @@ void OctreeAS::destroyRenderPipeline()
 {
     vkDestroyPipeline(m_Info.device, m_RenderPipeline, nullptr);
 }
-
-// void OctreeAS::generatePyramid()
-// {
-//     m_Nodes = {
-//         OctreeNode(0x69, 1),
-//     };
-//
-//     const uint32_t depth = 11;
-//     uint32_t base_offset = 4;
-//
-//     for (uint32_t i = 1; i < depth; i++) {
-//         for (uint32_t j = 0; j < pow(4, i); j++) {
-//             m_Nodes.emplace_back(0x69, base_offset);
-//             base_offset += 3;
-//         }
-//     }
-//     LOG_INFO("Final offset: {}", base_offset);
-//
-//     for (size_t i = 0; i < pow(4, depth); i++) {
-//         m_Nodes.emplace_back(255, 0, 0);
-//         m_Nodes.emplace_back(0, 0, 255);
-//         m_Nodes.emplace_back(0, 255, 0);
-//         m_Nodes.emplace_back(255, 0, 0);
-//     }
-//     m_VoxelCount = pow(4, depth) * 4;
-// }
-//
-// void OctreeAS::generateSponge()
-// {
-//     m_Nodes = { OctreeNode(0xDB, 0x1) };
-//
-//     const uint32_t depth = 8;
-//     uint32_t base_offset = 6;
-//
-//     for (uint32_t i = 1; i < depth; i++) {
-//         for (uint32_t j = 0; j < pow(6, i); j++) {
-//             m_Nodes.emplace_back(0xDB, base_offset);
-//             base_offset += 5;
-//         }
-//     }
-//     LOG_INFO("Final offset: {}", base_offset);
-//
-//     for (size_t i = 0; i < pow(6, depth); i++) {
-//         m_Nodes.emplace_back(255, 0, 0);
-//         m_Nodes.emplace_back(0, 0, 255);
-//         m_Nodes.emplace_back(0, 255, 0);
-//         m_Nodes.emplace_back(255, 255, 255);
-//         m_Nodes.emplace_back(255, 0, 255);
-//         m_Nodes.emplace_back(0, 255, 255);
-//     }
-//     m_VoxelCount = pow(6, depth + 1);
-// }

@@ -23,9 +23,11 @@ add_executable(${PROJECT_NAME} ${SOURCE_LIST})
 add_subdirectory(accelerationStructures)
 add_subdirectory(loaders)
 
-target_compile_options(${PROJECT_NAME}
-  PRIVATE -g -O
-)
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+  target_compile_options(${PROJECT_NAME}
+    PRIVATE -g -O
+  )
+endif()
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
   glm::glm

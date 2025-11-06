@@ -9,6 +9,7 @@
 
 class OctreeNode {
   public:
+    OctreeNode(uint32_t offset);
     OctreeNode(uint8_t childMask, uint32_t offset);
     OctreeNode(uint8_t r, uint8_t g, uint8_t b);
 
@@ -31,7 +32,7 @@ class OctreeNode {
         uint32_t g : 8;
         uint32_t b : 8;
     };
-    std::variant<NodeType, LeafType> m_CurrentType;
+    std::variant<NodeType, LeafType, uint32_t> m_CurrentType;
 };
 
 class OctreeAS : public IAccelerationStructure {
