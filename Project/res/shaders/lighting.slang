@@ -1,7 +1,7 @@
 #include "hit_record.slang"
 
 func calculateColour(in hit: HitRecord, in light_pos: float3, in light_colour: float3) -> float3 {
-  const float ambient_strength = 0.1;
+  const float ambient_strength = 0.3;
 
   const float3 ambient = ambient_strength * light_colour;
 

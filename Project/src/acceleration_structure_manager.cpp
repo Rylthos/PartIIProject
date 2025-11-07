@@ -62,7 +62,7 @@ void ASManager::setAS(ASType type)
         assert(false && "Invalid Type provided");
     }
     m_CurrentAS->init(m_InitInfo);
-    const uint32_t sideLength = 1 << 9;
+    const uint32_t sideLength = 1 << 8;
     // EquationLoader loader {
     //     glm::uvec3(sideLength),
     //     std::function([](glm::uvec3 dimensions, glm::uvec3 index) {

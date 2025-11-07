@@ -519,8 +519,8 @@ void OctreeAS::writeChildrenNodes(const std::vector<IntermediaryNode>& nodes, si
         size_t childIndex = parentNode.childStartIndex - i;
         const IntermediaryNode childNode = nodes.at(childIndex);
 
-        // Exceeds normal pointer with room for other nodes to add far pointerserror
-        if (currentOffset > 0x100000) {
+        // Exceeds normal pointer with room for other nodes to add far pointers
+        if (currentOffset >= 0x1F0000) {
             farPointerCount += 1;
             m_Nodes.push_back(OctreeNode(0));
         }
@@ -538,9 +538,9 @@ void OctreeAS::writeChildrenNodes(const std::vector<IntermediaryNode>& nodes, si
             size_t offset = childStartingIndex - (startingIndex + i);
             writeChildrenNodes(nodes, childIndex);
 
-            if (offset >= 0x100000) {
+            if (offset >= 0x200000) {
                 size_t farPointerIndex = startingIndex + childrenCount + currentFarPointer;
-                assert(childStartingIndex - farPointerIndex < 0xFFFFFFFF);
+                assert(childStartingIndex - farPointerIndex <= 0xFFFFFFFF);
 
                 m_Nodes[farPointerIndex] = OctreeNode(childStartingIndex - farPointerIndex);
 
@@ -551,4 +551,5 @@ void OctreeAS::writeChildrenNodes(const std::vector<IntermediaryNode>& nodes, si
             m_Nodes[startingIndex + i] = OctreeNode(childNode.childMask, offset);
         }
     }
+    assert(farPointerCount >= currentFarPointer && "Pointers should match");
 }

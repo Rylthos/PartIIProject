@@ -243,8 +243,8 @@ uint64_t end_cycles = clockARB();
   o_Image[pixelCoord] = float4(mix, 1.);
 #else
   if (hit.hit) {
-    o_Image[pixelCoord] = float4(hit.colour, 1);
-    // o_Image[pixelCoord] = float4(calculateColour(hit, float3(5, -1, 5), float3(1)), 1);
+    // o_Image[pixelCoord] = float4(hit.colour, 1);
+    o_Image[pixelCoord] = float4(calculateColour(hit, float3(0, -1, 0), float3(1)), 1);
   } else {
     o_Image[pixelCoord] = float4(float3(0.2), 1);
   }
