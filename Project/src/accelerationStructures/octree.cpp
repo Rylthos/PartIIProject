@@ -293,7 +293,10 @@ void OctreeAS::render(
 void OctreeAS::updateShaders() { ShaderManager::getInstance()->moduleUpdated("octree_AS"); }
 
 uint64_t OctreeAS::getMemoryUsage() { return m_OctreeBuffer.getSize(); }
-uint64_t OctreeAS::getVoxels() { return m_VoxelCount; }
+
+uint64_t OctreeAS::getStoredVoxels() { return m_Nodes.size(); }
+
+uint64_t OctreeAS::getTotalVoxels() { return m_VoxelCount; }
 
 void OctreeAS::createDescriptorLayout()
 {

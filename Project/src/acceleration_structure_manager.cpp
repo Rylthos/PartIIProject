@@ -298,9 +298,13 @@ void ASManager::UI(const Event& event)
             ImGui::Text(" %lu MiB", bytes / (1024 * 1024));
             ImGui::Text(" %lu GiB", bytes / (1024 * 1024 * 1024));
 
-            uint64_t voxels = m_CurrentAS->getVoxels();
+            uint64_t voxels = m_CurrentAS->getTotalVoxels();
             ImGui::Text("Voxels");
             ImGui::Text(" %lu", voxels);
+
+            uint64_t storedVoxels = m_CurrentAS->getStoredVoxels();
+            ImGui::Text("Stored Voxels");
+            ImGui::Text(" %lu", storedVoxels);
 
             ImGui::Text("Bytes / Voxel");
             ImGui::Text(" %5.2f", (float)bytes / (float)voxels);

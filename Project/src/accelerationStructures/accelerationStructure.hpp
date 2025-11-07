@@ -32,7 +32,8 @@ class IAccelerationStructure {
     virtual void updateShaders() { }
 
     virtual uint64_t getMemoryUsage() = 0;
-    virtual uint64_t getVoxels() = 0;
+    virtual uint64_t getStoredVoxels() = 0;
+    virtual uint64_t getTotalVoxels() = 0;
 
   protected:
   private:
