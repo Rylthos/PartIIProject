@@ -36,6 +36,15 @@ class OctreeNode {
 };
 
 class OctreeAS : public IAccelerationStructure {
+    struct IntermediaryNode {
+        glm::u8vec3 colour;
+        bool visible;
+        bool parent;
+        uint8_t childMask;
+        uint32_t childStartIndex = 0;
+        uint32_t childCount = 0;
+    };
+
   public:
     OctreeAS();
     ~OctreeAS();
@@ -65,6 +74,8 @@ class OctreeAS : public IAccelerationStructure {
 
     void createRenderPipeline();
     void destroyRenderPipeline();
+
+    void writeChildrenNodes(const std::vector<IntermediaryNode>& nodes, size_t index);
 
   private:
     ASStructInfo m_Info;

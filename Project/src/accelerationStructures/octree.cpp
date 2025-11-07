@@ -13,6 +13,7 @@
 #include "../shader_manager.hpp"
 #include "accelerationStructure.hpp"
 #include "glm/ext/matrix_transform.hpp"
+#include "glm/integer.hpp"
 #include "glm/matrix.hpp"
 
 struct PushConstants {
@@ -101,14 +102,6 @@ void OctreeAS::fromLoader(Loader& loader)
 
     auto start = timer.now();
 
-    struct IntermediaryNode {
-        glm::u8vec3 colour;
-        bool visible;
-        bool parent;
-        uint8_t childMask;
-        uint32_t childStartIndex = 0;
-    };
-
     freeBuffers();
     freeDescriptorSet();
 
@@ -133,6 +126,7 @@ void OctreeAS::fromLoader(Loader& loader)
                       .visible = 1,
                       .parent = false,
                       .childMask = 0,
+                      .childCount = 0,
                   };
               } else
                   return IntermediaryNode { .visible = false };
@@ -146,6 +140,7 @@ void OctreeAS::fromLoader(Loader& loader)
 
               bool allVisible = nodes.at(0).visible;
               glm::u8vec3 colour = nodes.at(0).colour;
+              uint32_t count = 0;
               for (uint32_t i = 1; i < 8; i++) {
                   if (nodes.at(i).parent) {
                       return std::optional<IntermediaryNode> {};
@@ -158,10 +153,17 @@ void OctreeAS::fromLoader(Loader& loader)
                   if (nodes.at(i).colour != colour) {
                       return std::optional<IntermediaryNode> {};
                   }
+
+                  count += nodes.at(i).childCount + 1;
               }
 
               return std::optional<IntermediaryNode>(IntermediaryNode {
-                  .colour = colour, .visible = allVisible, .parent = false, .childMask = 0 });
+                  .colour = colour,
+                  .visible = allVisible,
+                  .parent = false,
+                  .childMask = 0,
+                  .childCount = count,
+              });
           };
 
     while (current_code != final_code) {
@@ -196,6 +198,7 @@ void OctreeAS::fromLoader(Loader& loader)
 
             if (shouldContinue) {
                 uint8_t childMask = 0;
+                uint32_t childCount = 0;
                 for (int8_t i = 0; i < 8; i++) {
                     if (queues[current_depth].at(i).visible) {
                         childMask |= (1 << i);
@@ -204,6 +207,7 @@ void OctreeAS::fromLoader(Loader& loader)
                             && queues[current_depth].at(i).visible) {
                             m_VoxelCount += pow(8, 22 - current_depth);
                         }
+                        childCount += queues[current_depth].at(i).childCount + 1;
                     }
                 }
 
@@ -212,6 +216,7 @@ void OctreeAS::fromLoader(Loader& loader)
                     .parent = true,
                     .childMask = childMask,
                     .childStartIndex = (uint32_t)(intermediaryNodes.size() - 1),
+                    .childCount = childCount,
                 };
 
                 queues[current_depth - 1].push_back(parent);
@@ -230,19 +235,13 @@ void OctreeAS::fromLoader(Loader& loader)
     m_Nodes.clear();
     m_Nodes.reserve(intermediaryNodes.size());
 
-    // BROKEN: Doesn't work if offset is greater then 2^21
-    size_t offset = 0;
-    for (ssize_t i = intermediaryNodes.size() - 1; i >= 0; i--) {
-        const IntermediaryNode& node = intermediaryNodes[i];
-
-        if (node.parent) {
-            size_t target = i - node.childStartIndex + offset;
-            assert(target < 0x200000 && "Far pointers not handled");
-            m_Nodes.push_back(OctreeNode(node.childMask, target));
-        } else if (node.visible) {
-            m_Nodes.push_back(OctreeNode(node.colour.x, node.colour.y, node.colour.z));
-        }
+    {
+        const IntermediaryNode& finalNode = intermediaryNodes[intermediaryNodes.size() - 1];
+        m_Nodes.push_back(OctreeNode(finalNode.childMask, 1));
     }
+
+    writeChildrenNodes(intermediaryNodes, intermediaryNodes.size() - 1);
+
     auto end = timer.now();
 
     std::chrono::duration<float, std::milli> difference = end - start;
@@ -498,4 +497,58 @@ void OctreeAS::createRenderPipeline()
 void OctreeAS::destroyRenderPipeline()
 {
     vkDestroyPipeline(m_Info.device, m_RenderPipeline, nullptr);
+}
+
+void OctreeAS::writeChildrenNodes(const std::vector<IntermediaryNode>& nodes, size_t index)
+{
+    size_t startingIndex = m_Nodes.size();
+
+    const IntermediaryNode& parentNode = nodes.at(index);
+    uint8_t childrenCount = glm::bitCount(parentNode.childMask);
+
+    for (uint8_t i = 0; i < childrenCount; i++) {
+        size_t childIndex = parentNode.childStartIndex - i;
+        const IntermediaryNode childNode = nodes.at(childIndex);
+
+        m_Nodes.push_back(OctreeNode(childNode.colour.r, childNode.colour.g, childNode.colour.b));
+    }
+
+    size_t currentOffset = 0;
+    uint8_t farPointerCount = 0;
+    for (uint8_t i = 0; i < childrenCount; i++) {
+        size_t childIndex = parentNode.childStartIndex - i;
+        const IntermediaryNode childNode = nodes.at(childIndex);
+
+        // Exceeds normal pointer with room for other nodes to add far pointerserror
+        if (currentOffset > 0x100000) {
+            farPointerCount += 1;
+            m_Nodes.push_back(OctreeNode(0));
+        }
+
+        currentOffset += childNode.childCount + 1;
+    }
+
+    uint8_t currentFarPointer = 0;
+    for (uint8_t i = 0; i < childrenCount; i++) {
+        size_t childIndex = parentNode.childStartIndex - i;
+        const IntermediaryNode childNode = nodes.at(childIndex);
+
+        if (childNode.parent) {
+            size_t childStartingIndex = m_Nodes.size();
+            size_t offset = childStartingIndex - (startingIndex + i);
+            writeChildrenNodes(nodes, childIndex);
+
+            if (offset >= 0x100000) {
+                size_t farPointerIndex = startingIndex + childrenCount + currentFarPointer;
+                assert(childStartingIndex - farPointerIndex < 0xFFFFFFFF);
+
+                m_Nodes[farPointerIndex] = OctreeNode(childStartingIndex - farPointerIndex);
+
+                offset = 0x200000 + farPointerIndex - (startingIndex + i);
+                currentFarPointer++;
+            }
+
+            m_Nodes[startingIndex + i] = OctreeNode(childNode.childMask, offset);
+        }
+    }
 }

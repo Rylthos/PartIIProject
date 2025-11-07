@@ -140,12 +140,12 @@ func traverse(in ray_original : Ray) -> HitRecord {
       hit.intersection_checks++;
 #endif
 
-      uint index = node.offset;
+      uint offset = node.offset;
       if (node.isFar) {
-        index += i_Octree[index].farPtr;
+        offset += i_Octree[node_index + offset].farPtr;
       }
 
-      node_index += index + countbits(node.childMask >> (child_index + 1));
+      node_index += offset + countbits(node.childMask >> (child_index + 1));
       node = i_Octree[node_index];
 
       scale_exp--;
