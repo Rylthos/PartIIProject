@@ -87,8 +87,16 @@ func calculateChildIndex(float3 position, uint scale_exp) -> uint {
 }
 
 func countbits_64(uint64_t value, uint shift) -> uint {
-  if (shift == 64) return 0;
-  return countbits(value >> shift);
+uint himask = uint(value);
+    uint count = 0;
+
+    if (shift >= 32) {
+        count = countbits(himask);
+        himask = uint(value >> 32);
+    }
+    uint m = 1u << (shift & 31u);
+    count += countbits(himask & (m - 1u));
+    return count;
 }
 
 func traverse(in ray_original : Ray) -> HitRecord {
@@ -134,8 +142,8 @@ for (int i = 0; i < STEP_LIMIT; i++) {
 #endif
 
       uint offset = node.offset;
-      uint child_offset = countbits_64(node.childMask, child_index + 1);
-      node_index = offset + child_offset;
+      uint child_offset = countbits_64(node.childMask, child_index);
+      node_index += offset + child_offset;
       node = i_Contree[node_index];
 
       scale_exp -= 2;

@@ -97,14 +97,30 @@ void ContreeAS::fromLoader(Loader& loader)
         ContreeNode(0xFFFFFFFFFFFFFFFF, 0x1, 255, 255, 255),
     };
 
-    for (ssize_t i = 63; i >= 0; i--) {
-        glm::ivec3 index {
-            i % 4,
-            (i / 4) % 4,
-            (i / 16) % 4,
+    uint32_t offset = 0;
+    for (size_t i = 0; i < 64; i++) {
+        m_Nodes.push_back(ContreeNode(0xFFFFFFFFFFFFFFFF, (64 - i) + offset, 255, 255, 255));
+        offset += 64;
+    }
+
+    uint32_t sidelength = pow(4, 2);
+    uint32_t voxels = pow(sidelength, 3);
+    for (size_t j = 0; j < 64; j++) {
+        glm::ivec3 offset = {
+            j % 4,
+            (j / 4) % 4,
+            (j / 16) % 4,
         };
-        glm::vec3 colour = glm::vec3(index) / glm::vec3(4.f);
-        m_Nodes.push_back(ContreeNode(colour.x, colour.y, colour.z));
+        offset *= 4;
+        for (size_t i = 0; i < 64; i++) {
+            glm::ivec3 index {
+                i % 4,
+                (i / 4) % 4,
+                (i / 16) % 4,
+            };
+            glm::vec3 colour = (glm::vec3(offset + index)) / glm::vec3(sidelength);
+            m_Nodes.push_back(ContreeNode(colour.x, colour.y, colour.z));
+        }
     }
 
     createBuffers();
@@ -203,8 +219,6 @@ void ContreeAS::createBuffers()
         const auto& node = m_Nodes[i].getData();
         data[i * 2] = node[0];
         data[i * 2 + 1] = node[1];
-
-        LOG_INFO("{} | 0x{:x} 0x{:x}", i, node[0], node[1]);
     }
 
     m_StagingBuffer.unmapMemory();
