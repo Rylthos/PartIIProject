@@ -12,6 +12,7 @@
 enum class ASType : uint8_t {
     GRID = 0,
     OCTREE = 1,
+    CONTREE = 2,
     MAX_TYPE,
 };
 
@@ -55,6 +56,6 @@ class ASManager {
 
     RenderStyle m_CurrentRenderStyle = RenderStyle::NORMAL;
 
-    ASType m_CurrentType = ASType::OCTREE;
+    ASType m_CurrentType = ASType::CONTREE;
     std::unique_ptr<IAccelerationStructure> m_CurrentAS;
 };
