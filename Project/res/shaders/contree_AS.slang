@@ -48,15 +48,15 @@ struct ContreeNode {
 
   // Leafs
   property float r {
-    get { return asfloat((high & 0xFFFFFFFF) / (float)0xFFFFFFFF); }
+    get { return (high & 0xFFFFFFFF) / (float)0xFFFF; }
   }
 
   property float g {
-    get { return asfloat(((low >> 32) & 0xFFFFFFFF) / (float)0xFFFFFFFF); }
+    get { return ((low >> 32) & 0xFFFFFFFF) / (float)0XFFFF; }
   }
 
   property float b {
-    get { return asfloat((low & 0xFFFFFFFF) / (float)0xFFFFFFFF); }
+    get { return (low & 0xFFFFFFFF) / (float)0xFFFF; }
   }
 
   property float3 colour {

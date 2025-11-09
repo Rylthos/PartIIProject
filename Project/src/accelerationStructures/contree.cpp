@@ -31,11 +31,14 @@ ContreeNode::ContreeNode(uint64_t childMask, uint32_t offset, uint8_t r, uint8_t
 
 ContreeNode::ContreeNode(float r, float g, float b)
 {
+    uint32_t rI = (uint32_t)(std::clamp(r, 0.f, 1.f) * (float)0xFFFF);
+    uint32_t gI = (uint32_t)(std::clamp(g, 0.f, 1.f) * (float)0xFFFF);
+    uint32_t bI = (uint32_t)(std::clamp(b, 0.f, 1.f) * (float)0xFFFF);
     m_CurrentType = LeafType {
         .flags = CONTREE_FLAG_SOLID,
-        .r = (uint32_t)(std::clamp(r, 0.f, 1.f) * 0xFFFFFFFF),
-        .g = (uint32_t)(std::clamp(g, 0.f, 1.f) * 0xFFFFFFFF),
-        .b = (uint32_t)(std::clamp(b, 0.f, 1.f) * 0xFFFFFFFF),
+        .r = rI,
+        .g = gI,
+        .b = bI,
     };
 }
 
