@@ -230,12 +230,19 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
 #endif
 
 #ifdef HEATMAP
+  if (hit.intersection_checks != 0) {
+      float3 mix = lerp(MIN_INTERSECTION_COLOUR, MAX_INTERSECTION_COLOUR, float3(hit.intersection_checks / float(INTERSECTION_MAX)));
+    o_Image[pixelCoord] = float4(mix, 1.);
+  } else {
+    o_Image[pixelCoord] = float4(0);
+  }
 #elif defined(CYCLES)
   float3 mix = lerp(MIN_CYCLE_COLOUR, MAX_CYCLE_COLOUR, float3((end_cycles - start_cycles) / float(CYCLE_MAX)));
   o_Image[pixelCoord] = float4(mix, 1.);
 #else
   if (hit.hit) {
-    o_Image[pixelCoord] = float4(hit.colour, 1);
+    o_Image[pixelCoord] = float4(calculateColour(hit, float3(0, -1, 0), float3(1)), 1);
+    // o_Image[pixelCoord] = float4(hit.colour, 1);
   } else {
     o_Image[pixelCoord] = float4(0.2);
   }
