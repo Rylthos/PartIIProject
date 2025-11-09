@@ -6,4 +6,7 @@
 namespace MortonCode {
 uint64_t encode(glm::uvec3 position);
 glm::uvec3 decode(uint64_t code);
+
+uint64_t encode2(glm::uvec3 position);
+glm::uvec3 decode2(uint64_t code);
 }
