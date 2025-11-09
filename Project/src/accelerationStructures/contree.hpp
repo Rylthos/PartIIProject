@@ -38,6 +38,15 @@ class ContreeNode {
 };
 
 class ContreeAS : public IAccelerationStructure {
+    struct IntermediaryNode {
+        glm::vec3 colour;
+        bool visible;
+        bool parent;
+        uint64_t childMask;
+        uint32_t childStartIndex = 0;
+        uint32_t childCount = 0;
+    };
+
   public:
     ContreeAS();
     ~ContreeAS();

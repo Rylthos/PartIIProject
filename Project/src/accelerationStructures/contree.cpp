@@ -7,6 +7,9 @@
 
 #include "../debug_utils.hpp"
 #include "../shader_manager.hpp"
+#include "slang.h"
+
+#include <deque>
 
 struct PushConstants {
     alignas(16) glm::vec3 cameraPosition;
@@ -96,34 +99,124 @@ void ContreeAS::fromLoader(Loader& loader)
     freeDescriptorSet();
     destroyBuffers();
 
-    m_Nodes = {
-        ContreeNode(0xFFFFFFFFFFFFFFFF, 0x1, 255, 255, 255),
-    };
+    uint64_t currentCode = 0;
+    const glm::uvec3 dimensions = loader.getDimensions();
+    assert((int)log2(dimensions.x) % 2 == 0 && "Contree requires sidelenght to be a power of 4");
 
-    uint32_t offset = 0;
-    for (size_t i = 0; i < 64; i++) {
-        m_Nodes.push_back(ContreeNode(0xFFFFFFFFFFFFFFFF, (64 - i) + offset, 255, 255, 255));
-        offset += 64;
+    uint64_t finalCode = dimensions.x * dimensions.y * dimensions.z;
+
+    const uint32_t maxDepth = 11;
+    uint32_t currentDepth = maxDepth;
+
+    std::array<std::deque<IntermediaryNode>, maxDepth> queues;
+    std::vector<IntermediaryNode> intermediaryNodes;
+
+    m_VoxelCount = 0;
+
+    std::function<IntermediaryNode(const std::optional<Voxel>)> convert
+        = [](const std::optional<Voxel> v) {
+              if (v.has_value()) {
+                  glm::vec3 colour = v.value().colour;
+                  return IntermediaryNode {
+                      .colour = colour,
+                      .visible = true,
+                      .parent = false,
+                      .childMask = 0,
+                  };
+              } else {
+                  return IntermediaryNode {
+                      .visible = false,
+                  };
+              }
+          };
+
+    std::function<std::optional<IntermediaryNode>(const std::deque<IntermediaryNode>&)> allEqual
+        = [](const std::deque<IntermediaryNode>& nodes) {
+              assert(nodes.size() == 64);
+              bool allVisible = nodes.at(0).visible;
+              glm::vec3 colour = nodes.at(0).colour;
+              uint32_t count = 0;
+
+              for (uint32_t i = 0; i < 64; i++) {
+                  if (nodes.at(i).parent || nodes.at(i).visible != allVisible
+                      || nodes.at(i).colour != colour) {
+                      return std::optional<IntermediaryNode> {};
+                  }
+                  count += nodes.at(i).childCount + 1;
+              }
+
+              return std::optional<IntermediaryNode>(IntermediaryNode {
+                  .colour = colour,
+                  .visible = allVisible,
+                  .parent = false,
+                  .childMask = 0,
+                  .childCount = count,
+              });
+          };
+
+    while (currentCode != finalCode) {
+        const auto currentVoxel = loader.getVoxelMorton2(currentCode);
+        currentCode++;
+
+        currentDepth = maxDepth - 1;
+        queues[currentDepth].push_back(convert(currentVoxel));
+
+        while (currentDepth > 0 && queues[currentDepth].size() == 64) {
+            IntermediaryNode node;
+
+            const auto& possibleParentNode = allEqual(queues[currentDepth]);
+
+            if (possibleParentNode.has_value()) {
+                queues[currentDepth - 1].push_back(possibleParentNode.value());
+            } else {
+                uint64_t childMask = 0;
+                uint32_t childCount = 0;
+                for (int8_t i = 63; i >= 0; i--) {
+                    if (queues[currentDepth].at(i).visible) {
+                        childMask |= (1ull << i);
+                        intermediaryNodes.push_back(queues[currentDepth].at(i));
+                        if (!queues[currentDepth].at(i).parent) {
+                            m_VoxelCount += pow(64, 10 - currentDepth);
+                        }
+                        childCount += queues[currentDepth].at(i).childCount + 1;
+                    }
+                }
+
+                IntermediaryNode parent = {
+                    .visible = childMask != 0,
+                    .parent = true,
+                    .childMask = childMask,
+                    .childStartIndex = (uint32_t)(intermediaryNodes.size() - 1),
+                    .childCount = childCount,
+                };
+
+                queues[currentDepth - 1].push_back(parent);
+            }
+            queues[currentDepth].clear();
+            currentDepth--;
+        }
+    }
+    assert(queues[currentDepth].size() == 1);
+    intermediaryNodes.push_back(queues[currentDepth].at(0));
+    if (!queues[currentDepth].at(0).parent && queues[currentDepth].at(0).visible) {
+        m_VoxelCount += pow(64, 10 - currentDepth);
     }
 
-    uint32_t sidelength = pow(4, 2);
-    uint32_t voxels = pow(sidelength, 3);
-    for (size_t j = 0; j < 64; j++) {
-        glm::ivec3 offset = {
-            j % 4,
-            (j / 4) % 4,
-            (j / 16) % 4,
-        };
-        offset *= 4;
-        for (size_t i = 0; i < 64; i++) {
-            glm::ivec3 index {
-                i % 4,
-                (i / 4) % 4,
-                (i / 16) % 4,
-            };
-            glm::vec3 colour = (glm::vec3(offset + index)) / glm::vec3(sidelength);
-            m_Nodes.push_back(ContreeNode(colour.x, colour.y, colour.z));
+    m_Nodes.clear();
+    m_Nodes.reserve(intermediaryNodes.size());
+
+    size_t index = intermediaryNodes.size() - 1;
+    for (auto it = intermediaryNodes.rbegin(); it != intermediaryNodes.rend(); it++) {
+        if (it->parent) {
+            glm::vec3 c = it->colour * 255.f;
+            glm::u8vec3 colour = glm::u8vec3(c.r, c.g, c.b);
+            uint32_t targetOffset = index - it->childStartIndex;
+            m_Nodes.push_back(
+                ContreeNode(it->childMask, targetOffset, colour.r, colour.g, colour.b));
+        } else if (it->visible) {
+            m_Nodes.push_back(ContreeNode(it->colour.r, it->colour.g, it->colour.b));
         }
+        index--;
     }
 
     createBuffers();
@@ -174,8 +267,8 @@ void ContreeAS::render(
 void ContreeAS::updateShaders() { ShaderManager::getInstance()->moduleUpdated("contree_AS"); }
 
 uint64_t ContreeAS::getMemoryUsage() { return m_ContreeBuffer.getSize(); }
-uint64_t ContreeAS::getStoredVoxels() { return 0; }
-uint64_t ContreeAS::getTotalVoxels() { return 0; }
+uint64_t ContreeAS::getStoredVoxels() { return m_Nodes.size(); }
+uint64_t ContreeAS::getTotalVoxels() { return m_VoxelCount; }
 
 void ContreeAS::createDescriptorLayout()
 {
