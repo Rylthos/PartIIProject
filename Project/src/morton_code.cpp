@@ -86,18 +86,18 @@ glm::uvec3 decode(uint64_t code)
 
 uint64_t encode2(glm::uvec3 index)
 {
-    uint32_t x = splitBy3(index.x);
-    uint32_t y = splitBy3(index.y);
-    uint32_t z = splitBy3(index.z);
+    uint32_t x = splitBy2x3(index.x);
+    uint32_t y = splitBy2x3(index.y);
+    uint32_t z = splitBy2x3(index.z);
 
     return x | y << 4 | z << 2;
 }
 
 glm::uvec3 decode2(uint64_t code)
 {
-    uint32_t x = combineBy3(code);
-    uint32_t y = combineBy3(code >> 4);
-    uint32_t z = combineBy3(code >> 2);
+    uint32_t x = combineBy2x3(code);
+    uint32_t y = combineBy2x3(code >> 2);
+    uint32_t z = combineBy2x3(code >> 4);
 
     return glm::uvec3(x, y, z);
 }
