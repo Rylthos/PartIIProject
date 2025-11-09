@@ -188,15 +188,11 @@ void OctreeAS::fromLoader(Loader& loader)
         while (current_depth > 0 && queues[current_depth].size() == 8) {
             IntermediaryNode node;
 
-            bool shouldContinue = true;
             const auto& possible_parent_node = allEqual(queues[current_depth]);
 
             if (possible_parent_node.has_value()) {
                 queues[current_depth - 1].push_back(possible_parent_node.value());
-                shouldContinue = false;
-            }
-
-            if (shouldContinue) {
+            } else {
                 uint8_t childMask = 0;
                 uint32_t childCount = 0;
                 for (int8_t i = 0; i < 8; i++) {
@@ -212,7 +208,7 @@ void OctreeAS::fromLoader(Loader& loader)
                 }
 
                 IntermediaryNode parent = {
-                    .visible = true,
+                    .visible = childMask != 0,
                     .parent = true,
                     .childMask = childMask,
                     .childStartIndex = (uint32_t)(intermediaryNodes.size() - 1),
