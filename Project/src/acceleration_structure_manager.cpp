@@ -75,26 +75,25 @@ void ASManager::setAS(ASType type)
     }
     m_CurrentAS->init(m_InitInfo);
     const uint32_t sideLength = 1 << 8;
+    // std::unique_ptr<Loader> loader = std::make_unique<EquationLoader>(
+    //     glm::uvec3(sideLength), std::function([](glm::uvec3 dimensions, glm::uvec3 index) {
+    //         return Voxel { .colour = glm::vec3(index) / glm::vec3(dimensions - 1u) };
+    //     }));
     std::unique_ptr<Loader> loader = std::make_unique<EquationLoader>(
         glm::uvec3(sideLength), std::function([](glm::uvec3 dimensions, glm::uvec3 index) {
-            return Voxel { .colour = glm::vec3(index) / glm::vec3(dimensions - 1u) };
+            const float radius = sideLength / 2.2f;
+            glm::vec3 center = glm::vec3(dimensions) / 2.f;
+            const glm::vec3 position = glm::vec3(index) - center;
+
+            if (glm::length(position) < radius) {
+                glm::vec3 normal = glm::normalize(glm::abs(position - center));
+                // return std::make_optional(Voxel { .colour = normal });
+                return std::make_optional(Voxel { .colour = glm::vec3(1) });
+            }
+
+            return std::optional<Voxel>();
         }));
-    // EquationLoader loader {
-    //     glm::uvec3(sideLength),
-    //     std::function([](glm::uvec3 dimensions, glm::uvec3 index) {
-    //         const float radius = sideLength / 2.2f;
-    //         glm::vec3 center = glm::vec3(dimensions) / 2.f;
-    //         const glm::vec3 position = glm::vec3(index) - center;
-    //
-    //         if (glm::length(position) < radius) {
-    //             glm::vec3 normal = glm::normalize(glm::abs(position - center));
-    //             // return std::make_optional(Voxel { .colour = normal });
-    //             return std::make_optional(Voxel { .colour = glm::vec3(1) });
-    //         }
-    //
-    //         return std::optional<Voxel>();
-    //     }),
-    // };
+
     m_CurrentAS->fromLoader(std::move(loader));
 }
 
@@ -318,6 +317,17 @@ void ASManager::UI(const Event& event)
 
             ImGui::Text("Bytes / Voxel");
             ImGui::Text(" %5.2f", (float)bytes / (float)voxels);
+        }
+        ImGui::End();
+
+        if (ImGui::Begin("AS Generation")) {
+            ImGui::Text("Status: %s", m_CurrentAS->isGenerating() ? "Generating" : "Finished");
+            float time = m_CurrentAS->getGenerationTime();
+            float percent = m_CurrentAS->getGenerationCompletion();
+            float timeRemaining = (time / percent) - time;
+            ImGui::Text("  Time       : %6.2f", time);
+            ImGui::Text("  Completion : %6.5f", percent);
+            ImGui::Text("  Remaining  : %6.5f", timeRemaining);
         }
         ImGui::End();
     }

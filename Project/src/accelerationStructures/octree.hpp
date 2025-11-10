@@ -5,6 +5,7 @@
 #include "../buffer.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <variant>
 #include <vulkan/vulkan_core.h>
 
@@ -62,6 +63,10 @@ class OctreeAS : public IAccelerationStructure {
     uint64_t getStoredVoxels() override;
     uint64_t getTotalVoxels() override;
 
+    bool isGenerating() override;
+    float getGenerationCompletion() override;
+    float getGenerationTime() override;
+
   private:
     void createDescriptorLayout();
     void destroyDescriptorLayout();
@@ -79,8 +84,9 @@ class OctreeAS : public IAccelerationStructure {
     void destroyRenderPipeline();
 
     void generateNodes(std::stop_token stoken, std::unique_ptr<Loader> loader);
-    void writeChildrenNodes(
-        std::stop_token stoken, const std::vector<IntermediaryNode>& nodes, size_t index);
+    void writeChildrenNodes(std::stop_token stoken, const std::vector<IntermediaryNode>& nodes,
+        size_t index, std::chrono::steady_clock clock,
+        const std::chrono::steady_clock::time_point startTime);
 
   private:
     ASStructInfo m_Info;
@@ -101,4 +107,8 @@ class OctreeAS : public IAccelerationStructure {
     std::jthread m_GenerationThread;
     bool m_FinishedGeneration = false;
     bool m_UpdateBuffers = false;
+    bool m_Generating = false;
+
+    float m_GenerationCompletion = 0.f;
+    float m_GenerationTime = 0.f;
 };

@@ -104,6 +104,8 @@ void OctreeAS::fromLoader(std::unique_ptr<Loader>&& loader)
     m_FinishedGeneration = false;
     ShaderManager::getInstance()->removeMacro("OCTREE_GENERATION_FINISHED");
 
+    m_Generating = true;
+
     m_GenerationThread
         = std::jthread([this, loader = std::move(loader)](std::stop_token stoken) mutable {
               generateNodes(stoken, std::move(loader));
@@ -164,6 +166,7 @@ void OctreeAS::update(float dt)
         createDescriptorSet();
         m_FinishedGeneration = true;
         m_UpdateBuffers = false;
+        m_Generating = false;
     }
 }
 
@@ -174,6 +177,12 @@ uint64_t OctreeAS::getMemoryUsage() { return m_OctreeBuffer.getSize(); }
 uint64_t OctreeAS::getStoredVoxels() { return m_Nodes.size(); }
 
 uint64_t OctreeAS::getTotalVoxels() { return m_VoxelCount; }
+
+bool OctreeAS::isGenerating() { return m_Generating; }
+
+float OctreeAS::getGenerationCompletion() { return m_GenerationCompletion; }
+
+float OctreeAS::getGenerationTime() { return m_GenerationTime; }
 
 void OctreeAS::createDescriptorLayout()
 {
@@ -456,17 +465,11 @@ void OctreeAS::generateNodes(std::stop_token stoken, std::unique_ptr<Loader> loa
         current_depth = max_depth - 1;
         queues[current_depth].push_back(convert(current_voxel));
 
-        if (current_code % 5000000 == 0) {
-            auto current = timer.now();
+        auto current = timer.now();
 
-            std::chrono::duration<float, std::milli> difference = current - start;
-            float timeElapsed = difference.count() / 1000.0f;
-            float percent = (float)current_code / (float)final_code;
-            float timeRemaining = (timeElapsed / percent) - timeElapsed;
-            LOG_INFO(
-                "Percent searched: {:6.6f} | Time elapsed: {:6.3f}s | Time remaining: {:6.3f}s",
-                percent, timeElapsed, timeRemaining);
-        }
+        std::chrono::duration<float, std::milli> difference = current - start;
+        m_GenerationCompletion = ((float)current_code / (float)final_code) * (3. / 4.f);
+        m_GenerationTime = difference.count() / 1000.0f;
 
         while (current_depth > 0 && queues[current_depth].size() == 8) {
             if (stoken.stop_requested())
@@ -522,18 +525,23 @@ void OctreeAS::generateNodes(std::stop_token stoken, std::unique_ptr<Loader> loa
         m_Nodes.push_back(OctreeNode(finalNode.childMask, 1));
     }
 
-    writeChildrenNodes(stoken, intermediaryNodes, intermediaryNodes.size() - 1);
+    LOG_INFO("Generate Children");
+
+    writeChildrenNodes(stoken, intermediaryNodes, intermediaryNodes.size() - 1, timer, start);
 
     auto end = timer.now();
 
     std::chrono::duration<float, std::milli> difference = end - start;
-    LOG_INFO("Octree generation time: {}", difference.count() / 1000.0f);
+
+    m_GenerationTime = difference.count() / 1000.0f;
+    m_GenerationCompletion = 1.f;
 
     m_UpdateBuffers = true;
 }
 
-void OctreeAS::writeChildrenNodes(
-    std::stop_token stoken, const std::vector<IntermediaryNode>& nodes, size_t index)
+void OctreeAS::writeChildrenNodes(std::stop_token stoken,
+    const std::vector<IntermediaryNode>& nodes, size_t index, std::chrono::steady_clock clock,
+    const std::chrono::steady_clock::time_point startTime)
 {
     if (stoken.stop_requested())
         return;
@@ -565,6 +573,11 @@ void OctreeAS::writeChildrenNodes(
         currentOffset += childNode.childCount + 1;
     }
 
+    auto current = clock.now();
+    std::chrono::duration<float, std::milli> difference = current - startTime;
+    m_GenerationTime = difference.count() / 1000.0f;
+    m_GenerationCompletion = 0.75 + ((nodes.size() - index) / (float)nodes.size()) / 2.f;
+
     uint8_t currentFarPointer = 0;
     for (uint8_t i = 0; i < childrenCount; i++) {
         size_t childIndex = parentNode.childStartIndex - i;
@@ -573,7 +586,7 @@ void OctreeAS::writeChildrenNodes(
         if (childNode.parent) {
             size_t childStartingIndex = m_Nodes.size();
             size_t offset = childStartingIndex - (startingIndex + i);
-            writeChildrenNodes(stoken, nodes, childIndex);
+            writeChildrenNodes(stoken, nodes, childIndex, clock, startTime);
 
             if (offset >= 0x200000) {
                 size_t farPointerIndex = startingIndex + childrenCount + currentFarPointer;

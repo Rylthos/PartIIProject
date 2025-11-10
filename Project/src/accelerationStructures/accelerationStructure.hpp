@@ -36,6 +36,10 @@ class IAccelerationStructure {
     virtual uint64_t getStoredVoxels() = 0;
     virtual uint64_t getTotalVoxels() = 0;
 
+    virtual bool isGenerating() { return false; }
+    virtual float getGenerationCompletion() { return 1.f; }
+    virtual float getGenerationTime() { return 0.f; }
+
   protected:
   private:
 };
