@@ -33,5 +33,5 @@ class Buffer {
 
     VkBuffer m_Buffer = VK_NULL_HANDLE;
     VmaAllocation m_Allocation;
-    VkDeviceSize m_Size;
+    VkDeviceSize m_Size = 0;
 };
