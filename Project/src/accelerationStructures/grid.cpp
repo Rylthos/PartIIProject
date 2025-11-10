@@ -46,19 +46,19 @@ void GridAS::init(ASStructInfo info)
     createRenderPipeline();
 }
 
-void GridAS::fromLoader(Loader& loader)
+void GridAS::fromLoader(std::unique_ptr<Loader>&& loader)
 {
     freeBuffers();
     freeDescriptorSets();
 
-    m_Dimensions = loader.getDimensions();
+    m_Dimensions = loader->getDimensions();
 
     m_Voxels.resize(m_Dimensions.x * m_Dimensions.y * m_Dimensions.z);
     for (size_t z = 0; z < m_Dimensions.z; z++) {
         for (size_t y = 0; y < m_Dimensions.y; y++) {
             for (size_t x = 0; x < m_Dimensions.x; x++) {
                 size_t index = x + y * m_Dimensions.x + z * m_Dimensions.x * m_Dimensions.y;
-                auto v = loader.getVoxel({ x, y, z });
+                auto v = loader->getVoxel({ x, y, z });
 
                 m_Voxels[index] = GridVoxel {
                     .visible = v.has_value(),

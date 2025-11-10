@@ -36,6 +36,7 @@ class ASManager {
 
     void render(
         VkCommandBuffer cmd, Camera camera, VkDescriptorSet drawImageSet, VkExtent2D imageSize);
+    void update(float dt);
 
     void setAS(ASType type);
 
@@ -56,6 +57,6 @@ class ASManager {
 
     RenderStyle m_CurrentRenderStyle = RenderStyle::NORMAL;
 
-    ASType m_CurrentType = ASType::CONTREE;
+    ASType m_CurrentType = ASType::OCTREE;
     std::unique_ptr<IAccelerationStructure> m_CurrentAS;
 };

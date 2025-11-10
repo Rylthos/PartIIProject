@@ -27,7 +27,7 @@ class Loader {
         return getVoxel(index);
     }
 
-    glm::uvec3 getDimensions() { return p_Dimensions; }
+    glm::uvec3 getDimensions() const { return p_Dimensions; }
 
   protected:
     glm::uvec3 p_Dimensions;

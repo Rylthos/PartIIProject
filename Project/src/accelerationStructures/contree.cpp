@@ -1,4 +1,5 @@
 #include "contree.hpp"
+#include <memory>
 #include <vulkan/vulkan_core.h>
 
 #include <glm/ext/matrix_transform.hpp>
@@ -94,13 +95,13 @@ void ContreeAS::init(ASStructInfo info)
     createRenderPipeline();
 }
 
-void ContreeAS::fromLoader(Loader& loader)
+void ContreeAS::fromLoader(std::unique_ptr<Loader>&& loader)
 {
     freeDescriptorSet();
     destroyBuffers();
 
     uint64_t currentCode = 0;
-    const glm::uvec3 dimensions = loader.getDimensions();
+    const glm::uvec3 dimensions = loader->getDimensions();
     assert((int)log2(dimensions.x) % 2 == 0 && "Contree requires sidelenght to be a power of 4");
 
     uint64_t finalCode = dimensions.x * dimensions.y * dimensions.z;
@@ -155,7 +156,7 @@ void ContreeAS::fromLoader(Loader& loader)
           };
 
     while (currentCode != finalCode) {
-        const auto currentVoxel = loader.getVoxelMorton2(currentCode);
+        const auto currentVoxel = loader->getVoxelMorton2(currentCode);
         currentCode++;
 
         currentDepth = maxDepth - 1;

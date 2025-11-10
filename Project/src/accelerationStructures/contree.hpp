@@ -52,7 +52,7 @@ class ContreeAS : public IAccelerationStructure {
     ~ContreeAS();
 
     void init(ASStructInfo info) override;
-    void fromLoader(Loader& loader) override;
+    void fromLoader(std::unique_ptr<Loader>&& loader) override;
     void render(VkCommandBuffer cmd, Camera camera, VkDescriptorSet drawImageSet,
         VkExtent2D imageSize) override;
 

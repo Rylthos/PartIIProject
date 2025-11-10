@@ -4,6 +4,7 @@
 
 #include "../buffer.hpp"
 
+#include <algorithm>
 #include <variant>
 #include <vulkan/vulkan_core.h>
 
@@ -50,9 +51,10 @@ class OctreeAS : public IAccelerationStructure {
     ~OctreeAS();
 
     void init(ASStructInfo info) override;
-    void fromLoader(Loader& loader) override;
+    void fromLoader(std::unique_ptr<Loader>&& loader) override;
     void render(VkCommandBuffer cmd, Camera camera, VkDescriptorSet drawImageSet,
         VkExtent2D imageSize) override;
+    void update(float dt) override;
 
     void updateShaders() override;
 
@@ -76,7 +78,9 @@ class OctreeAS : public IAccelerationStructure {
     void createRenderPipeline();
     void destroyRenderPipeline();
 
-    void writeChildrenNodes(const std::vector<IntermediaryNode>& nodes, size_t index);
+    void generateNodes(std::stop_token stoken, std::unique_ptr<Loader> loader);
+    void writeChildrenNodes(
+        std::stop_token stoken, const std::vector<IntermediaryNode>& nodes, size_t index);
 
   private:
     ASStructInfo m_Info;
@@ -93,4 +97,8 @@ class OctreeAS : public IAccelerationStructure {
     Buffer m_OctreeBuffer;
 
     uint64_t m_VoxelCount = 0;
+
+    std::jthread m_GenerationThread;
+    bool m_FinishedGeneration = false;
+    bool m_UpdateBuffers = false;
 };

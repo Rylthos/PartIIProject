@@ -46,6 +46,13 @@ void ASManager::render(
     m_CurrentAS->render(cmd, camera, drawImageSet, imageSize);
 }
 
+void ASManager::update(float dt)
+{
+    assert(m_CurrentAS);
+
+    m_CurrentAS->update(dt);
+}
+
 void ASManager::setAS(ASType type)
 {
     vkDeviceWaitIdle(m_InitInfo.device);
@@ -68,29 +75,27 @@ void ASManager::setAS(ASType type)
     }
     m_CurrentAS->init(m_InitInfo);
     const uint32_t sideLength = 1 << 8;
+    std::unique_ptr<Loader> loader = std::make_unique<EquationLoader>(
+        glm::uvec3(sideLength), std::function([](glm::uvec3 dimensions, glm::uvec3 index) {
+            return Voxel { .colour = glm::vec3(index) / glm::vec3(dimensions - 1u) };
+        }));
     // EquationLoader loader {
     //     glm::uvec3(sideLength),
     //     std::function([](glm::uvec3 dimensions, glm::uvec3 index) {
-    //         return Voxel { .colour = glm::vec3(index) / glm::vec3(dimensions - 1u) };
+    //         const float radius = sideLength / 2.2f;
+    //         glm::vec3 center = glm::vec3(dimensions) / 2.f;
+    //         const glm::vec3 position = glm::vec3(index) - center;
+    //
+    //         if (glm::length(position) < radius) {
+    //             glm::vec3 normal = glm::normalize(glm::abs(position - center));
+    //             // return std::make_optional(Voxel { .colour = normal });
+    //             return std::make_optional(Voxel { .colour = glm::vec3(1) });
+    //         }
+    //
+    //         return std::optional<Voxel>();
     //     }),
     // };
-    EquationLoader loader {
-        glm::uvec3(sideLength),
-        std::function([](glm::uvec3 dimensions, glm::uvec3 index) {
-            const float radius = sideLength / 2.2f;
-            glm::vec3 center = glm::vec3(dimensions) / 2.f;
-            const glm::vec3 position = glm::vec3(index) - center;
-
-            if (glm::length(position) < radius) {
-                glm::vec3 normal = glm::normalize(glm::abs(position - center));
-                // return std::make_optional(Voxel { .colour = normal });
-                return std::make_optional(Voxel { .colour = glm::vec3(1) });
-            }
-
-            return std::optional<Voxel>();
-        }),
-    };
-    m_CurrentAS->fromLoader(loader);
+    m_CurrentAS->fromLoader(std::move(loader));
 }
 
 void ASManager::updateShaders()

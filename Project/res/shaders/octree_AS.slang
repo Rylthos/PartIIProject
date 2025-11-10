@@ -225,7 +225,11 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
                 push_constants.camera_up
   );
 
-  HitRecord hit = traverse(ray);
+  HitRecord hit;
+#ifdef OCTREE_GENERATION_FINISHED
+    hit = traverse(ray);
+#endif
+
 
 #ifdef CYCLES
 uint64_t end_cycles = clockARB();

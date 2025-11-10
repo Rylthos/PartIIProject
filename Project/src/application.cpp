@@ -915,6 +915,8 @@ void Application::update(float delta)
 
     ShaderManager::getInstance()->updateShaders();
 
+    ASManager::getManager()->update(delta);
+
     UpdateEvent event;
     event.delta = delta;
     post(event);
