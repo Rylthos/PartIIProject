@@ -74,7 +74,7 @@ void ASManager::setAS(ASType type)
         assert(false && "Invalid Type provided");
     }
     m_CurrentAS->init(m_InitInfo);
-    const uint32_t sideLength = 1 << 10;
+    const uint32_t sideLength = 1 << 8;
     // std::unique_ptr<Loader> loader = std::make_unique<EquationLoader>(
     //     glm::uvec3(sideLength), std::function([](glm::uvec3 dimensions, glm::uvec3 index) {
     //         return Voxel { .colour = glm::vec3(index) / glm::vec3(dimensions - 1u) };
@@ -311,9 +311,9 @@ void ASManager::UI(const Event& event)
             ImGui::Text("Voxels");
             ImGui::Text(" %lu", voxels);
 
-            uint64_t storedVoxels = m_CurrentAS->getStoredVoxels();
-            ImGui::Text("Stored Voxels");
-            ImGui::Text(" %lu", storedVoxels);
+            uint64_t nodes = m_CurrentAS->getNodes();
+            ImGui::Text("Nodes");
+            ImGui::Text(" %lu", nodes);
 
             ImGui::Text("Bytes / Voxel");
             ImGui::Text(" %5.2f", (float)bytes / (float)voxels);

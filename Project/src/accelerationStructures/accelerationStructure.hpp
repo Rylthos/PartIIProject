@@ -23,7 +23,7 @@ class IAccelerationStructure {
     IAccelerationStructure() { }
     virtual ~IAccelerationStructure() { }
 
-    virtual void init(ASStructInfo info) = 0;
+    virtual void init(ASStructInfo info) { p_Info = info; }
     virtual void fromLoader(std::unique_ptr<Loader>&& loader) = 0;
     virtual void render(
         VkCommandBuffer cmd, Camera camera, VkDescriptorSet drawImageSet, VkExtent2D imageSize)
@@ -33,13 +33,25 @@ class IAccelerationStructure {
     virtual void updateShaders() { }
 
     virtual uint64_t getMemoryUsage() = 0;
-    virtual uint64_t getStoredVoxels() = 0;
-    virtual uint64_t getTotalVoxels() = 0;
+    virtual uint64_t getTotalVoxels() { return p_VoxelCount; }
+    virtual uint64_t getNodes() = 0;
 
-    virtual bool isGenerating() { return false; }
-    virtual float getGenerationCompletion() { return 1.f; }
-    virtual float getGenerationTime() { return 0.f; }
+    virtual bool isGenerating() { return p_Generating; }
+    virtual float getGenerationCompletion() { return p_GenerationCompletion; }
+    virtual float getGenerationTime() { return p_GenerationTime; }
 
   protected:
+    ASStructInfo p_Info;
+
+    uint64_t p_VoxelCount = 0;
+
+    std::jthread p_GenerationThread;
+    bool p_FinishedGeneration = false;
+    bool p_UpdateBuffers = false;
+    bool p_Generating = false;
+
+    float p_GenerationCompletion = 0.f;
+    float p_GenerationTime = 0.f;
+
   private:
 };

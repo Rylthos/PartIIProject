@@ -8,6 +8,7 @@
 
 #include "../debug_utils.hpp"
 #include "../shader_manager.hpp"
+#include "accelerationStructure.hpp"
 #include "slang.h"
 
 #include <deque>
@@ -72,7 +73,7 @@ std::array<uint64_t, 2> ContreeNode::getData()
 ContreeAS::ContreeAS() { }
 ContreeAS::~ContreeAS()
 {
-    m_GenerationThread.request_stop();
+    p_GenerationThread.request_stop();
 
     freeDescriptorSet();
     destroyBuffers();
@@ -87,7 +88,8 @@ ContreeAS::~ContreeAS()
 
 void ContreeAS::init(ASStructInfo info)
 {
-    m_Info = info;
+    IAccelerationStructure::init(info);
+
     createDescriptorLayout();
     createRenderPipelineLayout();
 
@@ -99,13 +101,13 @@ void ContreeAS::init(ASStructInfo info)
 
 void ContreeAS::fromLoader(std::unique_ptr<Loader>&& loader)
 {
-    m_FinishedGeneration = false;
+    p_FinishedGeneration = false;
     ShaderManager::getInstance()->removeMacro("CONTREE_GENERATION_FINISHED");
 
-    m_GenerationThread.request_stop();
+    p_GenerationThread.request_stop();
 
-    m_Generating = true;
-    m_GenerationThread
+    p_Generating = true;
+    p_GenerationThread
         = std::jthread([this, loader = std::move(loader)](std::stop_token stoken) mutable {
               generateNodes(stoken, std::move(loader));
           });
@@ -120,9 +122,8 @@ void ContreeAS::render(
 
     std::vector<VkDescriptorSet> descriptorSets = {
         drawImageSet,
-        // m_BufferSet,
     };
-    if (m_FinishedGeneration) {
+    if (p_FinishedGeneration) {
         descriptorSets.push_back(m_BufferSet);
     }
 
@@ -166,9 +167,9 @@ void ContreeAS::update(float dt)
 
         createBuffers();
         createDescriptorSet();
-        m_FinishedGeneration = true;
+        p_FinishedGeneration = true;
         m_UpdateBuffers = false;
-        m_Generating = false;
+        p_Generating = false;
     }
 }
 
@@ -194,23 +195,23 @@ void ContreeAS::createDescriptorLayout()
         .pBindings = bindings.data(),
     };
 
-    vkCreateDescriptorSetLayout(m_Info.device, &setLayoutCI, nullptr, &m_BufferSetLayout);
+    vkCreateDescriptorSetLayout(p_Info.device, &setLayoutCI, nullptr, &m_BufferSetLayout);
 }
 
 void ContreeAS::destroyDescriptorLayout()
 {
-    vkDestroyDescriptorSetLayout(m_Info.device, m_BufferSetLayout, nullptr);
+    vkDestroyDescriptorSetLayout(p_Info.device, m_BufferSetLayout, nullptr);
 }
 
 void ContreeAS::createBuffers()
 {
     VkDeviceSize size = sizeof(uint64_t) * 2 * m_Nodes.size();
-    m_ContreeBuffer.init(m_Info.device, m_Info.allocator, size,
+    m_ContreeBuffer.init(p_Info.device, p_Info.allocator, size,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
         VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
     m_ContreeBuffer.setName("Contree node buffer");
 
-    m_StagingBuffer.init(m_Info.device, m_Info.allocator, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+    m_StagingBuffer.init(p_Info.device, p_Info.allocator, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
         VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_HOST);
     m_StagingBuffer.setName("Staging buffer");
 
@@ -227,11 +228,11 @@ void ContreeAS::createBuffers()
     VkCommandBufferAllocateInfo commandBufferAI {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
         .pNext = nullptr,
-        .commandPool = m_Info.commandPool,
+        .commandPool = p_Info.commandPool,
         .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
         .commandBufferCount = 1,
     };
-    VK_CHECK(vkAllocateCommandBuffers(m_Info.device, &commandBufferAI, &cmd),
+    VK_CHECK(vkAllocateCommandBuffers(p_Info.device, &commandBufferAI, &cmd),
         "Failed to allocate command buffer");
 
     VkCommandBufferBeginInfo commandBI {
@@ -253,10 +254,10 @@ void ContreeAS::createBuffers()
         .pCommandBuffers = &cmd,
     };
 
-    vkQueueSubmit(m_Info.graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(m_Info.graphicsQueue);
+    vkQueueSubmit(p_Info.graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+    vkQueueWaitIdle(p_Info.graphicsQueue);
 
-    vkFreeCommandBuffers(m_Info.device, m_Info.commandPool, 1, &cmd);
+    vkFreeCommandBuffers(p_Info.device, p_Info.commandPool, 1, &cmd);
 }
 
 void ContreeAS::destroyBuffers()
@@ -270,11 +271,11 @@ void ContreeAS::createDescriptorSet()
     VkDescriptorSetAllocateInfo setAI {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
         .pNext = nullptr,
-        .descriptorPool = m_Info.descriptorPool,
+        .descriptorPool = p_Info.descriptorPool,
         .descriptorSetCount = 1,
         .pSetLayouts = &m_BufferSetLayout,
     };
-    vkAllocateDescriptorSets(m_Info.device, &setAI, &m_BufferSet);
+    vkAllocateDescriptorSets(p_Info.device, &setAI, &m_BufferSet);
 
     VkDescriptorBufferInfo octreeBI {
         .buffer = m_ContreeBuffer.getBuffer(),
@@ -298,18 +299,21 @@ void ContreeAS::createDescriptorSet()
     };
 
     vkUpdateDescriptorSets(
-        m_Info.device, writeDescriptorSets.size(), writeDescriptorSets.data(), 0, nullptr);
+        p_Info.device, writeDescriptorSets.size(), writeDescriptorSets.data(), 0, nullptr);
+
+    setDebugName(
+        p_Info.device, VK_OBJECT_TYPE_DESCRIPTOR_SET, (uint64_t)m_BufferSet, "Contree buffer set");
 }
 
 void ContreeAS::freeDescriptorSet()
 {
-    vkFreeDescriptorSets(m_Info.device, m_Info.descriptorPool, 1, &m_BufferSet);
+    vkFreeDescriptorSets(p_Info.device, p_Info.descriptorPool, 1, &m_BufferSet);
 }
 
 void ContreeAS::createRenderPipelineLayout()
 {
     std::vector<VkDescriptorSetLayout> descriptorSetLayouts
-        = { m_Info.drawImageDescriptorLayout, m_BufferSetLayout };
+        = { p_Info.drawImageDescriptorLayout, m_BufferSetLayout };
 
     std::vector<VkPushConstantRange> pushConstantRanges = {
         {
@@ -329,16 +333,16 @@ void ContreeAS::createRenderPipelineLayout()
         .pPushConstantRanges = pushConstantRanges.data(),
     };
 
-    VK_CHECK(vkCreatePipelineLayout(m_Info.device, &layoutCI, nullptr, &m_RenderPipelineLayout),
+    VK_CHECK(vkCreatePipelineLayout(p_Info.device, &layoutCI, nullptr, &m_RenderPipelineLayout),
         "Failed to create render pipeline layout");
 
-    setDebugName(m_Info.device, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)m_RenderPipelineLayout,
+    setDebugName(p_Info.device, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)m_RenderPipelineLayout,
         "Contree render pipeline layout");
 }
 
 void ContreeAS::destroyRenderPipelineLayout()
 {
-    vkDestroyPipelineLayout(m_Info.device, m_RenderPipelineLayout, nullptr);
+    vkDestroyPipelineLayout(p_Info.device, m_RenderPipelineLayout, nullptr);
 }
 
 void ContreeAS::createRenderPipeline()
@@ -366,16 +370,16 @@ void ContreeAS::createRenderPipeline()
     };
 
     VK_CHECK(vkCreateComputePipelines(
-                 m_Info.device, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &m_RenderPipeline),
+                 p_Info.device, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &m_RenderPipeline),
         "Failed to create contree render pipeline");
 
-    setDebugName(m_Info.device, VK_OBJECT_TYPE_PIPELINE, (uint64_t)m_RenderPipeline,
+    setDebugName(p_Info.device, VK_OBJECT_TYPE_PIPELINE, (uint64_t)m_RenderPipeline,
         "Contree render pipeline");
 }
 
 void ContreeAS::destroyRenderPipeline()
 {
-    vkDestroyPipeline(m_Info.device, m_RenderPipeline, nullptr);
+    vkDestroyPipeline(p_Info.device, m_RenderPipeline, nullptr);
 }
 
 void ContreeAS::generateNodes(std::stop_token stoken, std::unique_ptr<Loader> loader)
@@ -396,7 +400,7 @@ void ContreeAS::generateNodes(std::stop_token stoken, std::unique_ptr<Loader> lo
     std::array<std::deque<IntermediaryNode>, maxDepth> queues;
     std::vector<IntermediaryNode> intermediaryNodes;
 
-    m_VoxelCount = 0;
+    p_VoxelCount = 0;
 
     std::function<IntermediaryNode(const std::optional<Voxel>)> convert
         = [](const std::optional<Voxel> v) {
@@ -451,8 +455,8 @@ void ContreeAS::generateNodes(std::stop_token stoken, std::unique_ptr<Loader> lo
 
         auto current = timer.now();
         std::chrono::duration<float, std::milli> difference = current - start;
-        m_GenerationCompletion = ((float)currentCode / (float)finalCode) * (3. / 4.f);
-        m_GenerationTime = difference.count() / 1000.0f;
+        p_GenerationCompletion = ((float)currentCode / (float)finalCode) * (3. / 4.f);
+        p_GenerationTime = difference.count() / 1000.0f;
 
         while (currentDepth > 0 && queues[currentDepth].size() == 64) {
             if (stoken.stop_requested())
@@ -472,7 +476,7 @@ void ContreeAS::generateNodes(std::stop_token stoken, std::unique_ptr<Loader> lo
                         childMask |= (1ull << i);
                         intermediaryNodes.push_back(queues[currentDepth].at(i));
                         if (!queues[currentDepth].at(i).parent) {
-                            m_VoxelCount += pow(64, 10 - currentDepth);
+                            p_VoxelCount += pow(64, 10 - currentDepth);
                         }
                         childCount += queues[currentDepth].at(i).childCount + 1;
                     }
@@ -495,7 +499,7 @@ void ContreeAS::generateNodes(std::stop_token stoken, std::unique_ptr<Loader> lo
     assert(queues[currentDepth].size() == 1);
     intermediaryNodes.push_back(queues[currentDepth].at(0));
     if (!queues[currentDepth].at(0).parent && queues[currentDepth].at(0).visible) {
-        m_VoxelCount += pow(64, 10 - currentDepth);
+        p_VoxelCount += pow(64, 10 - currentDepth);
     }
 
     m_Nodes.clear();
@@ -508,9 +512,9 @@ void ContreeAS::generateNodes(std::stop_token stoken, std::unique_ptr<Loader> lo
 
         auto current = timer.now();
         std::chrono::duration<float, std::milli> difference = current - start;
-        m_GenerationCompletion = 0.75
+        p_GenerationCompletion = 0.75
             + (((intermediaryNodes.size() - index) / (float)intermediaryNodes.size()) * 0.25f);
-        m_GenerationTime = difference.count() / 1000.0f;
+        p_GenerationTime = difference.count() / 1000.0f;
 
         if (it->parent) {
             glm::vec3 c = it->colour * 255.f;

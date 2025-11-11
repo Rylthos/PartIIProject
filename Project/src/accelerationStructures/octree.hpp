@@ -60,12 +60,7 @@ class OctreeAS : public IAccelerationStructure {
     void updateShaders() override;
 
     uint64_t getMemoryUsage() override { return m_OctreeBuffer.getSize(); }
-    uint64_t getStoredVoxels() override { return m_Nodes.size(); }
-    uint64_t getTotalVoxels() override { return m_VoxelCount; }
-
-    bool isGenerating() override { return m_Generating; }
-    float getGenerationCompletion() override { return m_GenerationCompletion; }
-    float getGenerationTime() override { return m_GenerationTime; }
+    uint64_t getNodes() override { return m_Nodes.size(); }
 
   private:
     void createDescriptorLayout();
@@ -89,8 +84,6 @@ class OctreeAS : public IAccelerationStructure {
         const std::chrono::steady_clock::time_point startTime);
 
   private:
-    ASStructInfo m_Info;
-
     VkDescriptorSetLayout m_BufferSetLayout;
     VkDescriptorSet m_BufferSet = VK_NULL_HANDLE;
 
@@ -102,13 +95,5 @@ class OctreeAS : public IAccelerationStructure {
     Buffer m_StagingBuffer;
     Buffer m_OctreeBuffer;
 
-    uint64_t m_VoxelCount = 0;
-
-    std::jthread m_GenerationThread;
-    bool m_FinishedGeneration = false;
     bool m_UpdateBuffers = false;
-    bool m_Generating = false;
-
-    float m_GenerationCompletion = 0.f;
-    float m_GenerationTime = 0.f;
 };

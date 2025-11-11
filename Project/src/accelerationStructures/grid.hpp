@@ -28,9 +28,12 @@ class GridAS : public IAccelerationStructure {
 
     void updateShaders() override;
 
-    uint64_t getMemoryUsage() override;
-    uint64_t getStoredVoxels() override;
-    uint64_t getTotalVoxels() override;
+    uint64_t getMemoryUsage() override
+    {
+        return m_OccupancyBuffer.getSize() + m_ColourBuffer.getSize();
+    }
+    uint64_t getNodes() override { return m_Voxels.size(); }
+    uint64_t getTotalVoxels() override { return m_Voxels.size(); }
 
   private:
     void createDescriptorLayouts();
@@ -51,8 +54,6 @@ class GridAS : public IAccelerationStructure {
   private:
     std::vector<GridVoxel> m_Voxels;
     glm::uvec3 m_Dimensions;
-
-    ASStructInfo m_Info;
 
     Buffer m_OccupancyBuffer;
     Buffer m_ColourBuffer;

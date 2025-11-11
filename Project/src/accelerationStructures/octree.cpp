@@ -73,7 +73,7 @@ OctreeAS::OctreeAS() { }
 
 OctreeAS::~OctreeAS()
 {
-    m_GenerationThread.request_stop();
+    p_GenerationThread.request_stop();
 
     freeDescriptorSet();
     freeBuffers();
@@ -88,7 +88,7 @@ OctreeAS::~OctreeAS()
 
 void OctreeAS::init(ASStructInfo info)
 {
-    m_Info = info;
+    IAccelerationStructure::init(info);
 
     createDescriptorLayout();
 
@@ -101,13 +101,13 @@ void OctreeAS::init(ASStructInfo info)
 
 void OctreeAS::fromLoader(std::unique_ptr<Loader>&& loader)
 {
-    m_FinishedGeneration = false;
+    p_FinishedGeneration = false;
     ShaderManager::getInstance()->removeMacro("OCTREE_GENERATION_FINISHED");
 
-    m_GenerationThread.request_stop();
+    p_GenerationThread.request_stop();
 
-    m_Generating = true;
-    m_GenerationThread
+    p_Generating = true;
+    p_GenerationThread
         = std::jthread([this, loader = std::move(loader)](std::stop_token stoken) mutable {
               generateNodes(stoken, std::move(loader));
           });
@@ -141,7 +141,7 @@ void OctreeAS::render(
     std::vector<VkDescriptorSet> descriptorSets = {
         drawImageSet,
     };
-    if (m_FinishedGeneration) {
+    if (p_FinishedGeneration) {
         descriptorSets.push_back(m_BufferSet);
     }
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_RenderPipelineLayout, 0,
@@ -165,9 +165,9 @@ void OctreeAS::update(float dt)
 
         createBuffers();
         createDescriptorSet();
-        m_FinishedGeneration = true;
+        p_FinishedGeneration = true;
         m_UpdateBuffers = false;
-        m_Generating = false;
+        p_Generating = false;
     }
 }
 
@@ -192,23 +192,23 @@ void OctreeAS::createDescriptorLayout()
         .pBindings = bindings.data(),
     };
 
-    vkCreateDescriptorSetLayout(m_Info.device, &setLayoutCI, nullptr, &m_BufferSetLayout);
+    vkCreateDescriptorSetLayout(p_Info.device, &setLayoutCI, nullptr, &m_BufferSetLayout);
 }
 
 void OctreeAS::destroyDescriptorLayout()
 {
-    vkDestroyDescriptorSetLayout(m_Info.device, m_BufferSetLayout, nullptr);
+    vkDestroyDescriptorSetLayout(p_Info.device, m_BufferSetLayout, nullptr);
 }
 
 void OctreeAS::createBuffers()
 {
     VkDeviceSize size = sizeof(uint32_t) * m_Nodes.size();
-    m_OctreeBuffer.init(m_Info.device, m_Info.allocator, size,
+    m_OctreeBuffer.init(p_Info.device, p_Info.allocator, size,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
         VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
     m_OctreeBuffer.setName("Octree node buffer");
 
-    m_StagingBuffer.init(m_Info.device, m_Info.allocator, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+    m_StagingBuffer.init(p_Info.device, p_Info.allocator, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
         VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_HOST);
     m_StagingBuffer.setName("Staging buffer");
 
@@ -223,11 +223,11 @@ void OctreeAS::createBuffers()
     VkCommandBufferAllocateInfo commandBufferAI {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
         .pNext = nullptr,
-        .commandPool = m_Info.commandPool,
+        .commandPool = p_Info.commandPool,
         .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
         .commandBufferCount = 1,
     };
-    VK_CHECK(vkAllocateCommandBuffers(m_Info.device, &commandBufferAI, &cmd),
+    VK_CHECK(vkAllocateCommandBuffers(p_Info.device, &commandBufferAI, &cmd),
         "Failed to allocate command buffer");
 
     VkCommandBufferBeginInfo commandBI {
@@ -249,10 +249,10 @@ void OctreeAS::createBuffers()
         .pCommandBuffers = &cmd,
     };
 
-    vkQueueSubmit(m_Info.graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(m_Info.graphicsQueue);
+    vkQueueSubmit(p_Info.graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+    vkQueueWaitIdle(p_Info.graphicsQueue);
 
-    vkFreeCommandBuffers(m_Info.device, m_Info.commandPool, 1, &cmd);
+    vkFreeCommandBuffers(p_Info.device, p_Info.commandPool, 1, &cmd);
 }
 
 void OctreeAS::freeBuffers()
@@ -266,11 +266,11 @@ void OctreeAS::createDescriptorSet()
     VkDescriptorSetAllocateInfo setAI {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
         .pNext = nullptr,
-        .descriptorPool = m_Info.descriptorPool,
+        .descriptorPool = p_Info.descriptorPool,
         .descriptorSetCount = 1,
         .pSetLayouts = &m_BufferSetLayout,
     };
-    vkAllocateDescriptorSets(m_Info.device, &setAI, &m_BufferSet);
+    vkAllocateDescriptorSets(p_Info.device, &setAI, &m_BufferSet);
 
     VkDescriptorBufferInfo octreeBI {
         .buffer = m_OctreeBuffer.getBuffer(),
@@ -294,7 +294,7 @@ void OctreeAS::createDescriptorSet()
     };
 
     vkUpdateDescriptorSets(
-        m_Info.device, writeDescriptorSets.size(), writeDescriptorSets.data(), 0, nullptr);
+        p_Info.device, writeDescriptorSets.size(), writeDescriptorSets.data(), 0, nullptr);
 }
 
 void OctreeAS::freeDescriptorSet()
@@ -302,13 +302,13 @@ void OctreeAS::freeDescriptorSet()
     if (m_BufferSet == VK_NULL_HANDLE)
         return;
 
-    vkFreeDescriptorSets(m_Info.device, m_Info.descriptorPool, 1, &m_BufferSet);
+    vkFreeDescriptorSets(p_Info.device, p_Info.descriptorPool, 1, &m_BufferSet);
 }
 
 void OctreeAS::createRenderPipelineLayout()
 {
     std::vector<VkDescriptorSetLayout> descriptorSetLayouts
-        = { m_Info.drawImageDescriptorLayout, m_BufferSetLayout };
+        = { p_Info.drawImageDescriptorLayout, m_BufferSetLayout };
 
     std::vector<VkPushConstantRange> pushConstantRanges = {
         {
@@ -328,16 +328,16 @@ void OctreeAS::createRenderPipelineLayout()
         .pPushConstantRanges = pushConstantRanges.data(),
     };
 
-    VK_CHECK(vkCreatePipelineLayout(m_Info.device, &layoutCI, nullptr, &m_RenderPipelineLayout),
+    VK_CHECK(vkCreatePipelineLayout(p_Info.device, &layoutCI, nullptr, &m_RenderPipelineLayout),
         "Failed to create render pipeline layout");
 
-    setDebugName(m_Info.device, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)m_RenderPipelineLayout,
+    setDebugName(p_Info.device, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)m_RenderPipelineLayout,
         "Octree render pipeline layout");
 }
 
 void OctreeAS::destroyRenderPipelineLayout()
 {
-    vkDestroyPipelineLayout(m_Info.device, m_RenderPipelineLayout, nullptr);
+    vkDestroyPipelineLayout(p_Info.device, m_RenderPipelineLayout, nullptr);
 }
 
 void OctreeAS::createRenderPipeline()
@@ -365,16 +365,16 @@ void OctreeAS::createRenderPipeline()
     };
 
     VK_CHECK(vkCreateComputePipelines(
-                 m_Info.device, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &m_RenderPipeline),
+                 p_Info.device, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &m_RenderPipeline),
         "Failed to create octree render pipeline");
 
-    setDebugName(m_Info.device, VK_OBJECT_TYPE_PIPELINE, (uint64_t)m_RenderPipeline,
+    setDebugName(p_Info.device, VK_OBJECT_TYPE_PIPELINE, (uint64_t)m_RenderPipeline,
         "Octree render pipeline");
 }
 
 void OctreeAS::destroyRenderPipeline()
 {
-    vkDestroyPipeline(m_Info.device, m_RenderPipeline, nullptr);
+    vkDestroyPipeline(p_Info.device, m_RenderPipeline, nullptr);
 }
 
 void OctreeAS::generateNodes(std::stop_token stoken, std::unique_ptr<Loader> loader)
@@ -393,7 +393,7 @@ void OctreeAS::generateNodes(std::stop_token stoken, std::unique_ptr<Loader> loa
     std::array<std::deque<IntermediaryNode>, max_depth> queues;
     std::vector<IntermediaryNode> intermediaryNodes;
 
-    m_VoxelCount = 0;
+    p_VoxelCount = 0;
 
     std::function<IntermediaryNode(const std::optional<Voxel>)> convert
         = [](const std::optional<Voxel> v) {
@@ -457,8 +457,8 @@ void OctreeAS::generateNodes(std::stop_token stoken, std::unique_ptr<Loader> loa
         auto current = timer.now();
 
         std::chrono::duration<float, std::milli> difference = current - start;
-        m_GenerationCompletion = ((float)current_code / (float)final_code) * (3. / 4.f);
-        m_GenerationTime = difference.count() / 1000.0f;
+        p_GenerationCompletion = ((float)current_code / (float)final_code) * (3. / 4.f);
+        p_GenerationTime = difference.count() / 1000.0f;
 
         while (current_depth > 0 && queues[current_depth].size() == 8) {
             if (stoken.stop_requested())
@@ -479,7 +479,7 @@ void OctreeAS::generateNodes(std::stop_token stoken, std::unique_ptr<Loader> loa
                         intermediaryNodes.push_back(queues[current_depth].at(i));
                         if (!queues[current_depth].at(i).parent
                             && queues[current_depth].at(i).visible) {
-                            m_VoxelCount += pow(8, 22 - current_depth);
+                            p_VoxelCount += pow(8, 22 - current_depth);
                         }
                         childCount += queues[current_depth].at(i).childCount + 1;
                     }
@@ -503,7 +503,7 @@ void OctreeAS::generateNodes(std::stop_token stoken, std::unique_ptr<Loader> loa
     assert(queues[current_depth].size() == 1);
     intermediaryNodes.push_back(queues[current_depth].at(0));
     if (!queues[current_depth].at(0).parent && queues[current_depth].at(0).visible) {
-        m_VoxelCount += pow(8, 22 - current_depth);
+        p_VoxelCount += pow(8, 22 - current_depth);
     }
 
     m_Nodes.clear();
@@ -520,8 +520,8 @@ void OctreeAS::generateNodes(std::stop_token stoken, std::unique_ptr<Loader> loa
 
     std::chrono::duration<float, std::milli> difference = end - start;
 
-    m_GenerationTime = difference.count() / 1000.0f;
-    m_GenerationCompletion = 1.f;
+    p_GenerationTime = difference.count() / 1000.0f;
+    p_GenerationCompletion = 1.f;
 
     m_UpdateBuffers = true;
 }
@@ -562,8 +562,8 @@ void OctreeAS::writeChildrenNodes(std::stop_token stoken,
 
     auto current = clock.now();
     std::chrono::duration<float, std::milli> difference = current - startTime;
-    m_GenerationTime = difference.count() / 1000.0f;
-    m_GenerationCompletion = 0.75 + ((nodes.size() - index) / (float)nodes.size()) / 2.f;
+    p_GenerationTime = difference.count() / 1000.0f;
+    p_GenerationCompletion = 0.75 + ((nodes.size() - index) / (float)nodes.size()) * 0.25f;
 
     uint8_t currentFarPointer = 0;
     for (uint8_t i = 0; i < childrenCount; i++) {

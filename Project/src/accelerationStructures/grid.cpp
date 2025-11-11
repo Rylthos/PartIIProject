@@ -35,7 +35,7 @@ GridAS::~GridAS()
 
 void GridAS::init(ASStructInfo info)
 {
-    m_Info = info;
+    IAccelerationStructure::init(info);
 
     createDescriptorLayouts();
 
@@ -102,10 +102,6 @@ void GridAS::render(
 
 void GridAS::updateShaders() { ShaderManager::getInstance()->moduleUpdated("grid_AS"); }
 
-uint64_t GridAS::getMemoryUsage() { return m_OccupancyBuffer.getSize() + m_ColourBuffer.getSize(); }
-uint64_t GridAS::getStoredVoxels() { return m_Voxels.size(); }
-uint64_t GridAS::getTotalVoxels() { return m_Voxels.size(); }
-
 void GridAS::createDescriptorLayouts()
 {
     std::vector<VkDescriptorSetLayoutBinding> bindings = {
@@ -134,16 +130,16 @@ void GridAS::createDescriptorLayouts()
     };
 
     VK_CHECK(vkCreateDescriptorSetLayout(
-                 m_Info.device, &descriptorSetLayoutCI, nullptr, &m_BufferSetLayout),
+                 p_Info.device, &descriptorSetLayoutCI, nullptr, &m_BufferSetLayout),
         "Failed to create buffer set layout");
 
-    setDebugName(m_Info.device, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, (uint64_t)m_BufferSetLayout,
+    setDebugName(p_Info.device, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, (uint64_t)m_BufferSetLayout,
         "Grid buffer set layout");
 }
 
 void GridAS::destroyDescriptorLayouts()
 {
-    vkDestroyDescriptorSetLayout(m_Info.device, m_BufferSetLayout, nullptr);
+    vkDestroyDescriptorSetLayout(p_Info.device, m_BufferSetLayout, nullptr);
 }
 
 void GridAS::createBuffer()
@@ -151,17 +147,17 @@ void GridAS::createBuffer()
     VkDeviceSize occupancyBufferSize = std::ceil(m_Voxels.size() / 8.); // Convert to bytes
     VkDeviceSize colourBufferSize = sizeof(glm::vec3) * m_Voxels.size();
 
-    m_OccupancyBuffer.init(m_Info.device, m_Info.allocator, occupancyBufferSize,
+    m_OccupancyBuffer.init(p_Info.device, p_Info.allocator, occupancyBufferSize,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
         VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
     m_OccupancyBuffer.setName("Grid occupancy buffer");
 
-    m_ColourBuffer.init(m_Info.device, m_Info.allocator, colourBufferSize,
+    m_ColourBuffer.init(p_Info.device, p_Info.allocator, colourBufferSize,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
         VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
     m_ColourBuffer.setName("Grid colour buffer");
 
-    m_StagingBuffer.init(m_Info.device, m_Info.allocator, occupancyBufferSize + colourBufferSize,
+    m_StagingBuffer.init(p_Info.device, p_Info.allocator, occupancyBufferSize + colourBufferSize,
         VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,
         VMA_MEMORY_USAGE_AUTO_PREFER_HOST);
     m_StagingBuffer.setName("Grid staging buffer");
@@ -193,11 +189,11 @@ void GridAS::createBuffer()
     VkCommandBufferAllocateInfo commandBufferAI {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
         .pNext = nullptr,
-        .commandPool = m_Info.commandPool,
+        .commandPool = p_Info.commandPool,
         .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
         .commandBufferCount = 1,
     };
-    VK_CHECK(vkAllocateCommandBuffers(m_Info.device, &commandBufferAI, &cmd),
+    VK_CHECK(vkAllocateCommandBuffers(p_Info.device, &commandBufferAI, &cmd),
         "Failed to allocate command buffer");
 
     VkCommandBufferBeginInfo commandBI {
@@ -220,10 +216,10 @@ void GridAS::createBuffer()
         .pCommandBuffers = &cmd,
     };
 
-    vkQueueSubmit(m_Info.graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(m_Info.graphicsQueue);
+    vkQueueSubmit(p_Info.graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+    vkQueueWaitIdle(p_Info.graphicsQueue);
 
-    vkFreeCommandBuffers(m_Info.device, m_Info.commandPool, 1, &cmd);
+    vkFreeCommandBuffers(p_Info.device, p_Info.commandPool, 1, &cmd);
 }
 
 void GridAS::freeBuffers()
@@ -238,12 +234,12 @@ void GridAS::createDescriptorSets()
     VkDescriptorSetAllocateInfo descriptorSetAI {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
         .pNext = nullptr,
-        .descriptorPool = m_Info.descriptorPool,
+        .descriptorPool = p_Info.descriptorPool,
         .descriptorSetCount = 1,
         .pSetLayouts = &m_BufferSetLayout,
     };
 
-    VK_CHECK(vkAllocateDescriptorSets(m_Info.device, &descriptorSetAI, &m_BufferSet),
+    VK_CHECK(vkAllocateDescriptorSets(p_Info.device, &descriptorSetAI, &m_BufferSet),
         "Failed to allocate descriptor set");
 
     VkDescriptorBufferInfo occupancyBI {
@@ -285,8 +281,8 @@ void GridAS::createDescriptorSets()
          }
     };
 
-    vkUpdateDescriptorSets(m_Info.device, writeSets.size(), writeSets.data(), 0, nullptr);
-    setDebugName(m_Info.device, VK_OBJECT_TYPE_DESCRIPTOR_SET, (uint64_t)m_BufferSet,
+    vkUpdateDescriptorSets(p_Info.device, writeSets.size(), writeSets.data(), 0, nullptr);
+    setDebugName(p_Info.device, VK_OBJECT_TYPE_DESCRIPTOR_SET, (uint64_t)m_BufferSet,
         "Grid buffer descriptor set");
 }
 
@@ -294,7 +290,7 @@ void GridAS::freeDescriptorSets()
 {
     if (m_BufferSet == VK_NULL_HANDLE)
         return;
-    vkFreeDescriptorSets(m_Info.device, m_Info.descriptorPool, 1, &m_BufferSet);
+    vkFreeDescriptorSets(p_Info.device, p_Info.descriptorPool, 1, &m_BufferSet);
 }
 
 void GridAS::createRenderPipelineLayout()
@@ -305,7 +301,7 @@ void GridAS::createRenderPipelineLayout()
     pushConstantRange.size = sizeof(PushConstants);
 
     std::vector<VkDescriptorSetLayout> descriptorsSetLayouts = {
-        m_Info.drawImageDescriptorLayout,
+        p_Info.drawImageDescriptorLayout,
         m_BufferSetLayout,
     };
 
@@ -318,16 +314,16 @@ void GridAS::createRenderPipelineLayout()
     layoutCI.pushConstantRangeCount = 1;
     layoutCI.pPushConstantRanges = &pushConstantRange;
 
-    VK_CHECK(vkCreatePipelineLayout(m_Info.device, &layoutCI, nullptr, &m_RenderPipelineLayout),
+    VK_CHECK(vkCreatePipelineLayout(p_Info.device, &layoutCI, nullptr, &m_RenderPipelineLayout),
         "Failed to create render pipeline layout");
 
-    setDebugName(m_Info.device, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)m_RenderPipelineLayout,
+    setDebugName(p_Info.device, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)m_RenderPipelineLayout,
         "Grid render pipeline layout");
 }
 
 void GridAS::destroyRenderPipelineLayout()
 {
-    vkDestroyPipelineLayout(m_Info.device, m_RenderPipelineLayout, nullptr);
+    vkDestroyPipelineLayout(p_Info.device, m_RenderPipelineLayout, nullptr);
 }
 
 void GridAS::createRenderPipeline()
@@ -355,14 +351,14 @@ void GridAS::createRenderPipeline()
     };
 
     VK_CHECK(vkCreateComputePipelines(
-                 m_Info.device, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &m_RenderPipeline),
+                 p_Info.device, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &m_RenderPipeline),
         "Failed to create Grid render pipeline");
 
     setDebugName(
-        m_Info.device, VK_OBJECT_TYPE_PIPELINE, (uint64_t)m_RenderPipeline, "Grid render pipeline");
+        p_Info.device, VK_OBJECT_TYPE_PIPELINE, (uint64_t)m_RenderPipeline, "Grid render pipeline");
 }
 
 void GridAS::destroyRenderPipeline()
 {
-    vkDestroyPipeline(m_Info.device, m_RenderPipeline, nullptr);
+    vkDestroyPipeline(p_Info.device, m_RenderPipeline, nullptr);
 }

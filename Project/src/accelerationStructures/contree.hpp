@@ -61,12 +61,7 @@ class ContreeAS : public IAccelerationStructure {
     void updateShaders() override;
 
     uint64_t getMemoryUsage() override { return m_ContreeBuffer.getSize(); }
-    uint64_t getStoredVoxels() override { return m_Nodes.size(); }
-    uint64_t getTotalVoxels() override { return m_VoxelCount; }
-
-    bool isGenerating() override { return m_Generating; }
-    float getGenerationCompletion() override { return m_GenerationCompletion; }
-    float getGenerationTime() override { return m_GenerationTime; }
+    uint64_t getNodes() override { return m_Nodes.size(); }
 
   private:
     void createDescriptorLayout();
@@ -87,8 +82,6 @@ class ContreeAS : public IAccelerationStructure {
     void generateNodes(std::stop_token stoken, std::unique_ptr<Loader> loader);
 
   private:
-    ASStructInfo m_Info;
-
     VkDescriptorSetLayout m_BufferSetLayout;
     VkDescriptorSet m_BufferSet;
 
@@ -100,13 +93,5 @@ class ContreeAS : public IAccelerationStructure {
     Buffer m_StagingBuffer;
     Buffer m_ContreeBuffer;
 
-    uint64_t m_VoxelCount;
-
-    std::jthread m_GenerationThread;
-    bool m_FinishedGeneration = false;
     bool m_UpdateBuffers = false;
-    bool m_Generating = false;
-
-    float m_GenerationCompletion = 0.f;
-    float m_GenerationTime = 0.f;
 };
