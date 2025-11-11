@@ -1,5 +1,6 @@
 #include "logger.hpp"
 
+#include "spdlog/common.h"
 #include "spdlog/sinks/ringbuffer_sink.h"
 #include "spdlog/sinks/stdout_sinks.h"
 
@@ -33,6 +34,31 @@ void Logger::UI(const Event& event)
 
     if (frameEvent.type() == FrameEventType::UI) {
         if (ImGui::Begin("Logger")) {
+            const uint32_t maxLevel = spdlog::level::n_levels;
+            const char* levels[] = { "trace", "debug", "info", "warn", "error", "critical", "off" };
+            static uint8_t currentLevel = spdlog::level::info;
+            const char* previewValue = levels[currentLevel];
+
+            ImGui::Text("Logging Level");
+            ImGui::SameLine();
+            ImGui::PushItemWidth(0.15 * ImGui::GetWindowWidth());
+            if (ImGui::BeginCombo("##LoggingLevel", previewValue)) {
+                for (uint32_t i = 0; i < maxLevel; i++) {
+                    const bool isSelected = (currentLevel == i);
+                    if (ImGui::Selectable(levels[i], isSelected)) {
+                        currentLevel = i;
+
+                        s_RingBuffer->set_level(
+                            static_cast<spdlog::level::level_enum>(currentLevel));
+                    }
+
+                    if (isSelected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+            ImGui::PopItemWidth();
+
             if (ImGui::BeginChild("scrolling", ImVec2(0, 0), ImGuiChildFlags_None,
                     ImGuiWindowFlags_HorizontalScrollbar)) {
                 std::vector<std::string> log_messages = s_RingBuffer->last_formatted();

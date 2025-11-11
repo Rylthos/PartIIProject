@@ -55,12 +55,13 @@ void ASManager::update(float dt)
 
 void ASManager::setAS(ASType type)
 {
+    m_CurrentType = type;
     vkDeviceWaitIdle(m_InitInfo.device);
 
     if (m_CurrentAS)
         delete m_CurrentAS.release();
 
-    switch (type) {
+    switch (m_CurrentType) {
     case ASType::GRID:
         m_CurrentAS = std::make_unique<GridAS>();
         break;
@@ -73,6 +74,7 @@ void ASManager::setAS(ASType type)
     default:
         assert(false && "Invalid Type provided");
     }
+    LOG_INFO("Changed to {}", typeToStringMap[m_CurrentType]);
     m_CurrentAS->init(m_InitInfo);
     const uint32_t sideLength = 1 << 8;
     // std::unique_ptr<Loader> loader = std::make_unique<EquationLoader>(
