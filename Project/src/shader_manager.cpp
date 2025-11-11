@@ -317,6 +317,7 @@ void ShaderManager::addFileHandler(ModuleHandler& module, const FileName& file)
     if (m_FileHandlers.contains(file)) {
         module.fileDependencies.insert(file);
         m_FileHandlers[file].refCount += 1;
+        m_FileHandlers[file].dependents.insert(module.moduleName);
     } else {
         FileHandler handler = {
             .filePath = file,
@@ -341,6 +342,7 @@ void ShaderManager::removeFileHandler(ModuleHandler& module, const FileName& fil
 
     module.fileDependencies.erase(file);
     m_FileHandlers[file].refCount -= 1;
+    m_FileHandlers[file].dependents.erase(module.moduleName);
 
     if (m_FileHandlers[file].refCount == 0) {
         FileWatcher::getInstance()->removeWatcher(file);
