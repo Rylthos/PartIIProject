@@ -35,7 +35,7 @@ class ASManager {
     void cleanup();
 
     void render(
-        VkCommandBuffer cmd, Camera camera, VkDescriptorSet drawImageSet, VkExtent2D imageSize);
+        VkCommandBuffer cmd, Camera camera, VkDescriptorSet renderSet, VkExtent2D imageSize);
     void update(float dt);
 
     void setAS(ASType type);

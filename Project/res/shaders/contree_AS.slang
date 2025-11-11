@@ -2,12 +2,10 @@
 #include "hit_record.slang"
 #include "lighting.slang"
 #include "default_defines.slang"
+#include "render_descriptor.slang"
 
 struct PushConstants {
   float3 camera_position;
-  float3 camera_front;
-  float3 camera_right;
-  float3 camera_up;
   float4x4 contree_world;
   float4x4 contree_world_inverse;
   float4x4 contree_scale_inverse;
@@ -66,9 +64,6 @@ struct ContreeNode {
 
 [[vk_push_constant]]
 PushConstants push_constants;
-
-[[vk::binding(0, 0)]]
-RWTexture2D<float4> o_Image;
 
 [[vk::binding(0, 1)]]
 StructuredBuffer<ContreeNode> i_Contree;
@@ -209,19 +204,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
 #endif
   int2 pixelCoord = int2(dispatchThreadID.xy);
 
-  int width, height;
-  o_Image.GetDimensions(width, height);
-  float aspect = float(width) / float(height);
-
-  float2 uv = pixelCoord / float2(width, height);
-
-  Ray ray = Ray(aspect,
-                uv,
-                push_constants.camera_position,
-                push_constants.camera_front,
-                push_constants.camera_right,
-                push_constants.camera_up
-  );
+  Ray ray = Ray(push_constants.camera_position, i_RayDirectionImage[pixelCoord].xyz);
 
   HitRecord hit;
 #ifdef CONTREE_GENERATION_FINISHED

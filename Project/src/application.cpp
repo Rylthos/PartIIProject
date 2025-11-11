@@ -20,9 +20,17 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_vulkan.h"
 #include "spdlog/fmt/bundled/base.h"
+#include "spdlog/spdlog.h"
 
 #define STORAGE_IMAGE_SIZE 1000
 #define STORAGE_BUFFER_SIZE 1000
+
+struct SetupPushConstants {
+    alignas(16) glm::vec3 cameraPosition;
+    alignas(16) glm::vec3 cameraFront;
+    alignas(16) glm::vec3 cameraRight;
+    alignas(16) glm::vec3 cameraUp;
+};
 
 void transitionImage(VkCommandBuffer commandBuffer, VkImage target, VkImageLayout currentLayout,
     VkImageLayout targetLayout)
@@ -103,7 +111,7 @@ void Application::init()
     ShaderManager::getInstance()->init(m_VkDevice);
 
     createSwapchain();
-    createDrawImages();
+    createImages();
 
     createCommandPools();
 
@@ -113,6 +121,13 @@ void Application::init()
 
     createDescriptorPool();
     createDescriptorLayouts();
+
+    ShaderManager::getInstance()->addModule("ray_generation",
+        std::bind(&Application::createSetupPipeline, this),
+        std::bind(&Application::destroySetupPipeline, this));
+    createSetupPipelineLayout();
+    createSetupPipeline();
+
     createDescriptors();
 
     ASManager::getManager()->init({
@@ -122,7 +137,7 @@ void Application::init()
         .graphicsQueueIndex = m_GraphicsQueue.queueFamily,
         .descriptorPool = m_VkDescriptorPool,
         .commandPool = m_GeneralPool,
-        .drawImageDescriptorLayout = m_DrawImageDescriptorLayout,
+        .renderDescriptorLayout = m_RenderDescriptorLayout,
     });
 
     createQueryPool();
@@ -171,6 +186,9 @@ void Application::cleanup()
 
     destroyQueryPool();
 
+    destroySetupPipelineLayout();
+    destroySetupPipeline();
+
     destroyDescriptorLayouts();
     destroyDescriptorPool();
 
@@ -180,7 +198,7 @@ void Application::cleanup()
 
     destroyCommandPools();
 
-    destroyDrawImages();
+    destroyImages();
     destroySwapchain();
 
     vmaDestroyAllocator(m_VmaAllocator);
@@ -313,24 +331,30 @@ void Application::destroySwapchain()
     LOG_DEBUG("Destroyed swapchain");
 }
 
+void Application::createImages()
+{
+    createRayDirectionImages();
+    createDrawImages();
+}
+
 void Application::createDrawImages()
 {
     VkExtent3D extent = { m_Window.getWindowSize().x, m_Window.getWindowSize().y, 1 };
     VkFormat format = VK_FORMAT_R16G16B16A16_SFLOAT;
 
-    VkImageCreateInfo imageCI {};
-    imageCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    imageCI.flags = 0;
-    imageCI.imageType = VK_IMAGE_TYPE_2D;
-    imageCI.format = format;
-    imageCI.extent = extent;
-    imageCI.mipLevels = 1;
-    imageCI.arrayLayers = 1;
-    imageCI.samples = VK_SAMPLE_COUNT_1_BIT;
-    imageCI.tiling = VK_IMAGE_TILING_OPTIMAL;
-    imageCI.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT
+    VkImageCreateInfo drawImageCI {};
+    drawImageCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    drawImageCI.flags = 0;
+    drawImageCI.imageType = VK_IMAGE_TYPE_2D;
+    drawImageCI.format = format;
+    drawImageCI.extent = extent;
+    drawImageCI.mipLevels = 1;
+    drawImageCI.arrayLayers = 1;
+    drawImageCI.samples = VK_SAMPLE_COUNT_1_BIT;
+    drawImageCI.tiling = VK_IMAGE_TILING_OPTIMAL;
+    drawImageCI.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT
         | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    imageCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    drawImageCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
     VmaAllocationCreateInfo allocationCI {};
     allocationCI.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
@@ -353,7 +377,7 @@ void Application::createDrawImages()
         m_PerFrameData[i].drawImage.format = format;
         m_PerFrameData[i].drawImage.extent = extent;
 
-        VK_CHECK(vmaCreateImage(m_VmaAllocator, &imageCI, &allocationCI,
+        VK_CHECK(vmaCreateImage(m_VmaAllocator, &drawImageCI, &allocationCI,
                      &m_PerFrameData[i].drawImage.image, &m_PerFrameData[i].drawImage.allocation,
                      nullptr),
             "Failed to allocate draw image");
@@ -373,15 +397,78 @@ void Application::createDrawImages()
     LOG_DEBUG("Created draw images");
 }
 
-void Application::destroyDrawImages()
+void Application::createRayDirectionImages()
+{
+    VkExtent3D extent = { m_Window.getWindowSize().x, m_Window.getWindowSize().y, 1 };
+    VkFormat format = VK_FORMAT_R16G16B16A16_SFLOAT;
+
+    VkImageCreateInfo drawImageCI {};
+    drawImageCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    drawImageCI.flags = 0;
+    drawImageCI.imageType = VK_IMAGE_TYPE_2D;
+    drawImageCI.format = format;
+    drawImageCI.extent = extent;
+    drawImageCI.mipLevels = 1;
+    drawImageCI.arrayLayers = 1;
+    drawImageCI.samples = VK_SAMPLE_COUNT_1_BIT;
+    drawImageCI.tiling = VK_IMAGE_TILING_OPTIMAL;
+    drawImageCI.usage = VK_IMAGE_USAGE_STORAGE_BIT;
+    drawImageCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VmaAllocationCreateInfo allocationCI {};
+    allocationCI.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+    allocationCI.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+
+    VkImageViewCreateInfo imageViewCI {};
+    imageViewCI.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    imageViewCI.pNext = nullptr;
+    imageViewCI.flags = 0;
+    imageViewCI.image = VK_NULL_HANDLE;
+    imageViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    imageViewCI.format = format;
+    imageViewCI.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    imageViewCI.subresourceRange.baseMipLevel = 0;
+    imageViewCI.subresourceRange.levelCount = 1;
+    imageViewCI.subresourceRange.baseArrayLayer = 0;
+    imageViewCI.subresourceRange.layerCount = 1;
+
+    for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
+        m_PerFrameData[i].rayDirectionImage.format = format;
+        m_PerFrameData[i].rayDirectionImage.extent = extent;
+
+        VK_CHECK(vmaCreateImage(m_VmaAllocator, &drawImageCI, &allocationCI,
+                     &m_PerFrameData[i].rayDirectionImage.image,
+                     &m_PerFrameData[i].rayDirectionImage.allocation, nullptr),
+            "Failed to allocate ray direction image");
+
+        setDebugName(m_VkDevice, VK_OBJECT_TYPE_IMAGE,
+            (uint64_t)m_PerFrameData[i].rayDirectionImage.image, "Ray direction image");
+
+        imageViewCI.image = m_PerFrameData[i].rayDirectionImage.image;
+        VK_CHECK(vkCreateImageView(
+                     m_VkDevice, &imageViewCI, nullptr, &m_PerFrameData[i].rayDirectionImage.view),
+            "Failed to create image view");
+
+        setDebugName(m_VkDevice, VK_OBJECT_TYPE_IMAGE_VIEW,
+            (uint64_t)m_PerFrameData[i].rayDirectionImage.view, "Ray direction image view");
+    }
+
+    LOG_DEBUG("Created ray direction images");
+}
+
+void Application::destroyImages()
 {
     for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
         vkDestroyImageView(m_VkDevice, m_PerFrameData[i].drawImage.view, nullptr);
         vmaDestroyImage(m_VmaAllocator, m_PerFrameData[i].drawImage.image,
             m_PerFrameData[i].drawImage.allocation);
+
+        vkDestroyImageView(m_VkDevice, m_PerFrameData[i].rayDirectionImage.view, nullptr);
+        vmaDestroyImage(m_VmaAllocator, m_PerFrameData[i].rayDirectionImage.image,
+            m_PerFrameData[i].rayDirectionImage.allocation);
     }
 
-    LOG_DEBUG("Destroyed draw images");
+    LOG_DEBUG("Destroyed images");
 }
 
 void Application::createCommandPools()
@@ -569,6 +656,12 @@ void Application::createDescriptorPool()
 
 void Application::createDescriptorLayouts()
 {
+    createSetupDescriptorLayout();
+    createRenderDescriptorLayout();
+}
+
+void Application::createSetupDescriptorLayout()
+{
     std::vector<VkDescriptorSetLayoutBinding> bindings = {
         {
          .binding = 0,
@@ -576,7 +669,7 @@ void Application::createDescriptorLayouts()
          .descriptorCount = 1,
          .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
          .pImmutableSamplers = VK_NULL_HANDLE,
-         },
+         }
     };
     VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCI {};
     descriptorSetLayoutCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -586,18 +679,135 @@ void Application::createDescriptorLayouts()
     descriptorSetLayoutCI.pBindings = bindings.data();
 
     VK_CHECK(vkCreateDescriptorSetLayout(
-                 m_VkDevice, &descriptorSetLayoutCI, nullptr, &m_DrawImageDescriptorLayout),
+                 m_VkDevice, &descriptorSetLayoutCI, nullptr, &m_SetupDescriptorLayout),
         "Failed to create compute descriptor set layout");
 
     setDebugName(m_VkDevice, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT,
-        (uint64_t)m_DrawImageDescriptorLayout, "Draw image descriptor layout");
+        (uint64_t)m_SetupDescriptorLayout, "Setup descriptor layout");
+}
+
+void Application::createRenderDescriptorLayout()
+{
+    std::vector<VkDescriptorSetLayoutBinding> bindings = {
+        {
+         .binding = 0,
+         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+         .descriptorCount = 1,
+         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+         .pImmutableSamplers = VK_NULL_HANDLE,
+         },
+        {
+         .binding = 1,
+         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+         .descriptorCount = 1,
+         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+         .pImmutableSamplers = VK_NULL_HANDLE,
+         }
+    };
+    VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCI {};
+    descriptorSetLayoutCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    descriptorSetLayoutCI.pNext = nullptr;
+    descriptorSetLayoutCI.flags = 0;
+    descriptorSetLayoutCI.bindingCount = static_cast<uint32_t>(bindings.size());
+    descriptorSetLayoutCI.pBindings = bindings.data();
+
+    VK_CHECK(vkCreateDescriptorSetLayout(
+                 m_VkDevice, &descriptorSetLayoutCI, nullptr, &m_RenderDescriptorLayout),
+        "Failed to create compute descriptor set layout");
+
+    setDebugName(m_VkDevice, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT,
+        (uint64_t)m_RenderDescriptorLayout, "Render descriptor layout");
+}
+
+void Application::destroyDescriptorLayouts()
+{
+    vkDestroyDescriptorSetLayout(m_VkDevice, m_SetupDescriptorLayout, nullptr);
+    vkDestroyDescriptorSetLayout(m_VkDevice, m_RenderDescriptorLayout, nullptr);
+}
+
+void Application::createSetupPipelineLayout()
+{
+    std::vector<VkDescriptorSetLayout> descriptorSetLayouts = { m_SetupDescriptorLayout };
+
+    std::vector<VkPushConstantRange> pushConstantRanges = {
+        {
+         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+         .offset = 0,
+         .size = sizeof(SetupPushConstants),
+         },
+    };
+
+    VkPipelineLayoutCreateInfo layoutCI {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+        .pNext = nullptr,
+        .flags = 0,
+        .setLayoutCount = static_cast<uint32_t>(descriptorSetLayouts.size()),
+        .pSetLayouts = descriptorSetLayouts.data(),
+        .pushConstantRangeCount = static_cast<uint32_t>(pushConstantRanges.size()),
+        .pPushConstantRanges = pushConstantRanges.data(),
+    };
+
+    VK_CHECK(vkCreatePipelineLayout(m_VkDevice, &layoutCI, nullptr, &m_VkSetupPipelineLayout),
+        "Failed to create setup pipeline layout");
+
+    setDebugName(m_VkDevice, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)m_VkSetupPipelineLayout,
+        "Setup pipeline layout");
+}
+
+void Application::destroySetupPipelineLayout()
+{
+    vkDestroyPipelineLayout(m_VkDevice, m_VkSetupPipelineLayout, nullptr);
+}
+
+void Application::createSetupPipeline()
+{
+    VkShaderModule shaderModule = ShaderManager::getInstance()->getShaderModule("ray_generation");
+
+    VkPipelineShaderStageCreateInfo shaderStageCI {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+        .pNext = nullptr,
+        .flags = 0,
+        .stage = VK_SHADER_STAGE_COMPUTE_BIT,
+        .module = shaderModule,
+        .pName = "main",
+        .pSpecializationInfo = nullptr,
+    };
+
+    VkComputePipelineCreateInfo pipelineCI {
+        .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+        .pNext = nullptr,
+        .flags = 0,
+        .stage = shaderStageCI,
+        .layout = m_VkSetupPipelineLayout,
+        .basePipelineHandle = VK_NULL_HANDLE,
+        .basePipelineIndex = 0,
+    };
+
+    VK_CHECK(vkCreateComputePipelines(
+                 m_VkDevice, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &m_VkSetupPipeline),
+        "Failed to create octree render pipeline");
+
+    setDebugName(
+        m_VkDevice, VK_OBJECT_TYPE_PIPELINE, (uint64_t)m_VkSetupPipeline, "Setup pipeline");
+}
+
+void Application::destroySetupPipeline()
+{
+    vkDestroyPipeline(m_VkDevice, m_VkSetupPipeline, nullptr);
 }
 
 void Application::createDescriptors()
 {
+    createSetupDescriptor();
+    createRenderDescriptor();
+}
+
+void Application::createSetupDescriptor()
+{
     std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
-    for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++)
-        descriptorSetLayouts.push_back(m_DrawImageDescriptorLayout);
+    for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
+        descriptorSetLayouts.push_back(m_SetupDescriptorLayout);
+    }
 
     VkDescriptorSetAllocateInfo descriptorSetAI {};
     descriptorSetAI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -614,7 +824,7 @@ void Application::createDescriptors()
     for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
         VkDescriptorImageInfo imageInfo {};
         imageInfo.sampler = VK_NULL_HANDLE;
-        imageInfo.imageView = m_PerFrameData[i].drawImage.view;
+        imageInfo.imageView = m_PerFrameData[i].rayDirectionImage.view;
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
         std::vector<VkWriteDescriptorSet> writeSets = {
@@ -635,19 +845,84 @@ void Application::createDescriptors()
         vkUpdateDescriptorSets(m_VkDevice, writeSets.size(), writeSets.data(), 0, nullptr);
 
         setDebugName(m_VkDevice, VK_OBJECT_TYPE_DESCRIPTOR_SET, (uint64_t)descriptorSets[i],
-            "Draw image descriptor");
+            "Setup descriptor");
     }
 
     for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
-        m_PerFrameData[i].drawImageDescriptorSet = descriptorSets[i];
+        m_PerFrameData[i].setupDescriptorSet = descriptorSets[i];
     }
 
-    LOG_DEBUG("Created descriptors");
+    LOG_DEBUG("Created setup descriptors");
 }
 
-void Application::destroyDescriptorLayouts()
+void Application::createRenderDescriptor()
 {
-    vkDestroyDescriptorSetLayout(m_VkDevice, m_DrawImageDescriptorLayout, nullptr);
+    std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
+    for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
+        descriptorSetLayouts.push_back(m_RenderDescriptorLayout);
+    }
+
+    VkDescriptorSetAllocateInfo descriptorSetAI {};
+    descriptorSetAI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    descriptorSetAI.pNext = nullptr;
+    descriptorSetAI.descriptorPool = m_VkDescriptorPool;
+    descriptorSetAI.descriptorSetCount = descriptorSetLayouts.size();
+    descriptorSetAI.pSetLayouts = descriptorSetLayouts.data();
+
+    std::vector<VkDescriptorSet> descriptorSets;
+    descriptorSets.resize(FRAMES_IN_FLIGHT);
+    VK_CHECK(vkAllocateDescriptorSets(m_VkDevice, &descriptorSetAI, descriptorSets.data()),
+        "Failed to allocate descriptor set");
+
+    for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
+        VkDescriptorImageInfo renderImageInfo {};
+        renderImageInfo.sampler = VK_NULL_HANDLE;
+        renderImageInfo.imageView = m_PerFrameData[i].drawImage.view;
+        renderImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+        VkDescriptorImageInfo rayDirectionImageInfo {};
+        rayDirectionImageInfo.sampler = VK_NULL_HANDLE;
+        rayDirectionImageInfo.imageView = m_PerFrameData[i].rayDirectionImage.view;
+        rayDirectionImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+        std::vector<VkWriteDescriptorSet> writeSets = {
+            {
+             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+             .pNext = nullptr,
+             .dstSet = descriptorSets[i],
+             .dstBinding = 0,
+             .dstArrayElement = 0,
+             .descriptorCount = 1,
+             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+             .pImageInfo = &renderImageInfo,
+             .pBufferInfo = nullptr,
+             .pTexelBufferView = nullptr,
+             },
+            {
+             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+             .pNext = nullptr,
+             .dstSet = descriptorSets[i],
+             .dstBinding = 1,
+             .dstArrayElement = 0,
+             .descriptorCount = 1,
+             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+             .pImageInfo = &rayDirectionImageInfo,
+             .pBufferInfo = nullptr,
+             .pTexelBufferView = nullptr,
+             },
+        };
+
+        vkUpdateDescriptorSets(m_VkDevice, writeSets.size(), writeSets.data(), 0, nullptr);
+
+        setDebugName(m_VkDevice, VK_OBJECT_TYPE_DESCRIPTOR_SET, (uint64_t)descriptorSets[i],
+            "Render descriptor");
+    }
+
+    for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
+        m_PerFrameData[i].renderDescriptorSet = descriptorSets[i];
+    }
+
+    LOG_DEBUG("Created render descriptors");
 }
 
 void Application::destroyDescriptorPool()
@@ -765,10 +1040,78 @@ void Application::render()
             endCmdDebugLabel(commandBuffer);
         }
 
+        {
+            beginCmdDebugLabel(commandBuffer, "Ray generation", { 0.f, 0.f, 1.f, 1.f });
+
+            transitionImage(commandBuffer, currentFrame.rayDirectionImage.image,
+                VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+
+            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_VkSetupPipeline);
+
+            std::vector<VkDescriptorSet> descriptorSets = {
+                currentFrame.setupDescriptorSet,
+            };
+
+            SetupPushConstants setupPushConstant = {
+                .cameraPosition = m_Camera.getPosition(),
+                .cameraFront = m_Camera.getForwardVector(),
+                .cameraRight = m_Camera.getRightVector(),
+                .cameraUp = m_Camera.getUpVector(),
+            };
+
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+                m_VkSetupPipelineLayout, 0, descriptorSets.size(), descriptorSets.data(), 0,
+                nullptr);
+            vkCmdPushConstants(commandBuffer, m_VkSetupPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT,
+                0, sizeof(SetupPushConstants), &setupPushConstant);
+
+            vkCmdDispatch(commandBuffer,
+                std::ceil(currentFrame.rayDirectionImage.extent.width / 8.f),
+                std::ceil(currentFrame.rayDirectionImage.extent.height / 8.f), 1);
+
+            endCmdDebugLabel(commandBuffer);
+        }
+
+        {
+            VkImageMemoryBarrier2 imageBarrier = {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+                .pNext = nullptr,
+                .srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                .srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT,
+                .dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                .dstAccessMask = VK_ACCESS_MEMORY_READ_BIT,
+                .oldLayout = VK_IMAGE_LAYOUT_GENERAL,
+                .newLayout = VK_IMAGE_LAYOUT_GENERAL,
+                .srcQueueFamilyIndex = m_GraphicsQueue.queueFamily,
+                .dstQueueFamilyIndex = m_GraphicsQueue.queueFamily,
+                .image = currentFrame.rayDirectionImage.image,
+                .subresourceRange = {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel = 0,
+                    .levelCount = VK_REMAINING_MIP_LEVELS,
+                    .baseArrayLayer = 0,
+                    .layerCount = VK_REMAINING_MIP_LEVELS,
+                },
+            };
+
+            VkDependencyInfo dependency = {
+                .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+                .pNext = nullptr,
+                .dependencyFlags = 0,
+                .memoryBarrierCount = 0,
+                .pMemoryBarriers = nullptr,
+                .bufferMemoryBarrierCount = 0,
+                .pBufferMemoryBarriers = nullptr,
+                .imageMemoryBarrierCount = 1,
+                .pImageMemoryBarriers = &imageBarrier,
+            };
+
+            vkCmdPipelineBarrier2(commandBuffer, &dependency);
+        }
+
         vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_VkQueryPool,
             m_CurrentFrameIndex * 4 + 2);
-        ASManager::getManager()->render(commandBuffer, m_Camera,
-            currentFrame.drawImageDescriptorSet,
+        ASManager::getManager()->render(commandBuffer, m_Camera, currentFrame.renderDescriptorSet,
             {
                 .width = currentFrame.drawImage.extent.width,
                 .height = currentFrame.drawImage.extent.height,
@@ -955,15 +1298,16 @@ void Application::handleWindow(const Event& event)
         vkDeviceWaitIdle(m_VkDevice);
 
         for (auto& frame : m_PerFrameData) {
-            vkFreeDescriptorSets(m_VkDevice, m_VkDescriptorPool, 1, &frame.drawImageDescriptorSet);
+            vkFreeDescriptorSets(m_VkDevice, m_VkDescriptorPool, 1, &frame.setupDescriptorSet);
+            vkFreeDescriptorSets(m_VkDevice, m_VkDescriptorPool, 1, &frame.renderDescriptorSet);
         }
 
         destroySyncStructures();
-        destroyDrawImages();
+        destroyImages();
         destroySwapchain();
 
         createSwapchain();
-        createDrawImages();
+        createImages();
         createSyncStructures();
         createDescriptors();
     }

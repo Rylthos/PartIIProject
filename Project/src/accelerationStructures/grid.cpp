@@ -12,9 +12,6 @@
 
 struct PushConstants {
     alignas(16) glm::vec3 cameraPosition;
-    alignas(16) glm::vec3 cameraForward;
-    alignas(16) glm::vec3 cameraRight;
-    alignas(16) glm::vec3 cameraUp;
     alignas(16) glm::uvec3 dimensions;
 };
 
@@ -73,21 +70,18 @@ void GridAS::fromLoader(std::unique_ptr<Loader>&& loader)
 }
 
 void GridAS::render(
-    VkCommandBuffer cmd, Camera camera, VkDescriptorSet drawImageSet, VkExtent2D imageSize)
+    VkCommandBuffer cmd, Camera camera, VkDescriptorSet renderSet, VkExtent2D imageSize)
 {
     beginCmdDebugLabel(cmd, "Grid AS render", { 0.0f, 0.0f, 1.0f, 1.0f });
 
     PushConstants pushConstant {
         .cameraPosition = camera.getPosition(),
-        .cameraForward = camera.getForwardVector(),
-        .cameraRight = camera.getRightVector(),
-        .cameraUp = camera.getUpVector(),
         .dimensions = m_Dimensions,
     };
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_RenderPipeline);
     std::vector<VkDescriptorSet> descriptorSets = {
-        drawImageSet,
+        renderSet,
         m_BufferSet,
     };
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_RenderPipelineLayout, 0,
@@ -301,7 +295,7 @@ void GridAS::createRenderPipelineLayout()
     pushConstantRange.size = sizeof(PushConstants);
 
     std::vector<VkDescriptorSetLayout> descriptorsSetLayouts = {
-        p_Info.drawImageDescriptorLayout,
+        p_Info.renderDescriptorLayout,
         m_BufferSetLayout,
     };
 

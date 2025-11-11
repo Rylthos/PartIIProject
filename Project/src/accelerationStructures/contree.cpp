@@ -15,9 +15,6 @@
 
 struct PushConstants {
     alignas(16) glm::vec3 cameraPosition;
-    alignas(16) glm::vec3 cameraForward;
-    alignas(16) glm::vec3 cameraRight;
-    alignas(16) glm::vec3 cameraUp;
     alignas(16) glm::mat4 contreeWorld;
     alignas(16) glm::mat4 contreeWorldInverse;
     alignas(16) glm::mat4 contreeScaleInverse;
@@ -114,14 +111,14 @@ void ContreeAS::fromLoader(std::unique_ptr<Loader>&& loader)
 }
 
 void ContreeAS::render(
-    VkCommandBuffer cmd, Camera camera, VkDescriptorSet drawImageSet, VkExtent2D imageSize)
+    VkCommandBuffer cmd, Camera camera, VkDescriptorSet renderSet, VkExtent2D imageSize)
 {
     beginCmdDebugLabel(cmd, "Contree AS render", { 0.0f, 0.0f, 1.0f, 1.0f });
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_RenderPipeline);
 
     std::vector<VkDescriptorSet> descriptorSets = {
-        drawImageSet,
+        renderSet,
     };
     if (p_FinishedGeneration) {
         descriptorSets.push_back(m_BufferSet);
@@ -141,9 +138,6 @@ void ContreeAS::render(
 
     PushConstants pushConstants = {
         .cameraPosition = camera.getPosition(),
-        .cameraForward = camera.getForwardVector(),
-        .cameraRight = camera.getRightVector(),
-        .cameraUp = camera.getUpVector(),
         .contreeWorld = contreeWorld,
         .contreeWorldInverse = contreeWorldInverse,
         .contreeScaleInverse = contreeScaleInverse,
@@ -307,13 +301,16 @@ void ContreeAS::createDescriptorSet()
 
 void ContreeAS::freeDescriptorSet()
 {
+    if (m_BufferSet == VK_NULL_HANDLE)
+        return;
+
     vkFreeDescriptorSets(p_Info.device, p_Info.descriptorPool, 1, &m_BufferSet);
 }
 
 void ContreeAS::createRenderPipelineLayout()
 {
     std::vector<VkDescriptorSetLayout> descriptorSetLayouts
-        = { p_Info.drawImageDescriptorLayout, m_BufferSetLayout };
+        = { p_Info.renderDescriptorLayout, m_BufferSetLayout };
 
     std::vector<VkPushConstantRange> pushConstantRanges = {
         {

@@ -34,14 +34,9 @@ struct PerFrameData {
     VkFence fence;
 
     Image drawImage;
-    VkDescriptorSet drawImageDescriptorSet;
-};
-
-struct PushConstants {
-    alignas(16) glm::vec3 cameraPosition;
-    alignas(16) glm::vec3 cameraFront;
-    alignas(16) glm::vec3 cameraRight;
-    alignas(16) glm::vec3 cameraUp;
+    Image rayDirectionImage;
+    VkDescriptorSet setupDescriptorSet;
+    VkDescriptorSet renderDescriptorSet;
 };
 
 class Application : public EventDispatcher {
@@ -78,10 +73,11 @@ class Application : public EventDispatcher {
 
     VkDescriptorPool m_VkDescriptorPool;
 
-    VkDescriptorSetLayout m_DrawImageDescriptorLayout;
+    VkDescriptorSetLayout m_SetupDescriptorLayout;
+    VkDescriptorSetLayout m_RenderDescriptorLayout;
 
-    VkPipelineLayout m_VkPipelineLayout;
-    VkPipeline m_VkPipeline;
+    VkPipelineLayout m_VkSetupPipelineLayout;
+    VkPipeline m_VkSetupPipeline;
 
     VkQueryPool m_VkQueryPool;
     double m_PreviousGPUTime = 0.;
@@ -103,8 +99,10 @@ class Application : public EventDispatcher {
     void createSwapchain();
     void destroySwapchain();
 
+    void createImages();
     void createDrawImages();
-    void destroyDrawImages();
+    void createRayDirectionImages();
+    void destroyImages();
 
     void createCommandPools();
     void destroyCommandPools();
@@ -116,9 +114,22 @@ class Application : public EventDispatcher {
     void destroyImGuiStructures();
 
     void createDescriptorPool();
+
     void createDescriptorLayouts();
-    void createDescriptors();
+    void createSetupDescriptorLayout();
+    void createRenderDescriptorLayout();
     void destroyDescriptorLayouts();
+
+    void createSetupPipelineLayout();
+    void destroySetupPipelineLayout();
+
+    void createSetupPipeline();
+    void destroySetupPipeline();
+
+    void createDescriptors();
+    void createSetupDescriptor();
+    void createRenderDescriptor();
+
     void destroyDescriptorPool();
 
     void createQueryPool();

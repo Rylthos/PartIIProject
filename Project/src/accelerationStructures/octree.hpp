@@ -53,7 +53,7 @@ class OctreeAS : public IAccelerationStructure {
 
     void init(ASStructInfo info) override;
     void fromLoader(std::unique_ptr<Loader>&& loader) override;
-    void render(VkCommandBuffer cmd, Camera camera, VkDescriptorSet drawImageSet,
+    void render(VkCommandBuffer cmd, Camera camera, VkDescriptorSet renderSet,
         VkExtent2D imageSize) override;
     void update(float dt) override;
 

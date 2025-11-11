@@ -54,7 +54,7 @@ class ContreeAS : public IAccelerationStructure {
 
     void init(ASStructInfo info) override;
     void fromLoader(std::unique_ptr<Loader>&& loader) override;
-    void render(VkCommandBuffer cmd, Camera camera, VkDescriptorSet drawImageSet,
+    void render(VkCommandBuffer cmd, Camera camera, VkDescriptorSet renderSet,
         VkExtent2D imageSize) override;
     void update(float dt) override;
 
@@ -83,7 +83,7 @@ class ContreeAS : public IAccelerationStructure {
 
   private:
     VkDescriptorSetLayout m_BufferSetLayout;
-    VkDescriptorSet m_BufferSet;
+    VkDescriptorSet m_BufferSet = VK_NULL_HANDLE;
 
     VkPipelineLayout m_RenderPipelineLayout;
     VkPipeline m_RenderPipeline;

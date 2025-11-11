@@ -19,9 +19,6 @@
 
 struct PushConstants {
     alignas(16) glm::vec3 cameraPosition;
-    alignas(16) glm::vec3 cameraForward;
-    alignas(16) glm::vec3 cameraRight;
-    alignas(16) glm::vec3 cameraUp;
     alignas(16) glm::mat4 octreeWorld;
     alignas(16) glm::mat4 octreeWorldInverse;
     alignas(16) glm::mat4 octreeScaleInverse;
@@ -114,7 +111,7 @@ void OctreeAS::fromLoader(std::unique_ptr<Loader>&& loader)
 }
 
 void OctreeAS::render(
-    VkCommandBuffer cmd, Camera camera, VkDescriptorSet drawImageSet, VkExtent2D imageSize)
+    VkCommandBuffer cmd, Camera camera, VkDescriptorSet renderSet, VkExtent2D imageSize)
 {
     beginCmdDebugLabel(cmd, "Octree AS render", { 0.0f, 0.0f, 1.0f, 1.0f });
 
@@ -129,9 +126,6 @@ void OctreeAS::render(
 
     PushConstants pushConstant = {
         .cameraPosition = camera.getPosition(),
-        .cameraForward = camera.getForwardVector(),
-        .cameraRight = camera.getRightVector(),
-        .cameraUp = camera.getUpVector(),
         .octreeWorld = octreeWorld,
         .octreeWorldInverse = octreeWorldInverse,
         .octreeScaleInverse = octreeScaleInverse,
@@ -139,7 +133,7 @@ void OctreeAS::render(
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_RenderPipeline);
     std::vector<VkDescriptorSet> descriptorSets = {
-        drawImageSet,
+        renderSet,
     };
     if (p_FinishedGeneration) {
         descriptorSets.push_back(m_BufferSet);
@@ -308,7 +302,7 @@ void OctreeAS::freeDescriptorSet()
 void OctreeAS::createRenderPipelineLayout()
 {
     std::vector<VkDescriptorSetLayout> descriptorSetLayouts
-        = { p_Info.drawImageDescriptorLayout, m_BufferSetLayout };
+        = { p_Info.renderDescriptorLayout, m_BufferSetLayout };
 
     std::vector<VkPushConstantRange> pushConstantRanges = {
         {

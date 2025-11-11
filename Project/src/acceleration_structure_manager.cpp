@@ -39,11 +39,11 @@ void ASManager::init(ASStructInfo initInfo)
 void ASManager::cleanup() { delete m_CurrentAS.release(); }
 
 void ASManager::render(
-    VkCommandBuffer cmd, Camera camera, VkDescriptorSet drawImageSet, VkExtent2D imageSize)
+    VkCommandBuffer cmd, Camera camera, VkDescriptorSet renderSet, VkExtent2D imageSize)
 {
     assert(m_CurrentAS);
 
-    m_CurrentAS->render(cmd, camera, drawImageSet, imageSize);
+    m_CurrentAS->render(cmd, camera, renderSet, imageSize);
 }
 
 void ASManager::update(float dt)
