@@ -72,6 +72,8 @@ std::array<uint64_t, 2> ContreeNode::getData()
 ContreeAS::ContreeAS() { }
 ContreeAS::~ContreeAS()
 {
+    m_GenerationThread.request_stop();
+
     freeDescriptorSet();
     destroyBuffers();
 
@@ -97,131 +99,16 @@ void ContreeAS::init(ASStructInfo info)
 
 void ContreeAS::fromLoader(std::unique_ptr<Loader>&& loader)
 {
-    freeDescriptorSet();
-    destroyBuffers();
+    m_FinishedGeneration = false;
+    ShaderManager::getInstance()->removeMacro("CONTREE_GENERATION_FINISHED");
 
-    uint64_t currentCode = 0;
-    const glm::uvec3 dimensions = loader->getDimensions();
-    assert((int)log2(dimensions.x) % 2 == 0 && "Contree requires sidelenght to be a power of 4");
+    m_GenerationThread.request_stop();
 
-    uint64_t finalCode = dimensions.x * dimensions.y * dimensions.z;
-
-    const uint32_t maxDepth = 11;
-    uint32_t currentDepth = maxDepth;
-
-    std::array<std::deque<IntermediaryNode>, maxDepth> queues;
-    std::vector<IntermediaryNode> intermediaryNodes;
-
-    m_VoxelCount = 0;
-
-    std::function<IntermediaryNode(const std::optional<Voxel>)> convert
-        = [](const std::optional<Voxel> v) {
-              if (v.has_value()) {
-                  glm::vec3 colour = v.value().colour;
-                  return IntermediaryNode {
-                      .colour = colour,
-                      .visible = true,
-                      .parent = false,
-                      .childMask = 0,
-                  };
-              } else {
-                  return IntermediaryNode {
-                      .visible = false,
-                  };
-              }
-          };
-
-    std::function<std::optional<IntermediaryNode>(const std::deque<IntermediaryNode>&)> allEqual
-        = [](const std::deque<IntermediaryNode>& nodes) {
-              assert(nodes.size() == 64);
-              bool allVisible = nodes.at(0).visible;
-              glm::vec3 colour = nodes.at(0).colour;
-              uint32_t count = 0;
-
-              for (uint32_t i = 0; i < 64; i++) {
-                  if (nodes.at(i).parent || nodes.at(i).visible != allVisible
-                      || nodes.at(i).colour != colour) {
-                      return std::optional<IntermediaryNode> {};
-                  }
-                  count += nodes.at(i).childCount + 1;
-              }
-
-              return std::optional<IntermediaryNode>(IntermediaryNode {
-                  .colour = colour,
-                  .visible = allVisible,
-                  .parent = false,
-                  .childMask = 0,
-                  .childCount = count,
-              });
-          };
-
-    while (currentCode != finalCode) {
-        const auto currentVoxel = loader->getVoxelMorton2(currentCode);
-        currentCode++;
-
-        currentDepth = maxDepth - 1;
-        queues[currentDepth].push_back(convert(currentVoxel));
-
-        while (currentDepth > 0 && queues[currentDepth].size() == 64) {
-            IntermediaryNode node;
-
-            const auto& possibleParentNode = allEqual(queues[currentDepth]);
-
-            if (possibleParentNode.has_value()) {
-                queues[currentDepth - 1].push_back(possibleParentNode.value());
-            } else {
-                uint64_t childMask = 0;
-                uint32_t childCount = 0;
-                for (int8_t i = 63; i >= 0; i--) {
-                    if (queues[currentDepth].at(i).visible) {
-                        childMask |= (1ull << i);
-                        intermediaryNodes.push_back(queues[currentDepth].at(i));
-                        if (!queues[currentDepth].at(i).parent) {
-                            m_VoxelCount += pow(64, 10 - currentDepth);
-                        }
-                        childCount += queues[currentDepth].at(i).childCount + 1;
-                    }
-                }
-
-                IntermediaryNode parent = {
-                    .visible = childMask != 0,
-                    .parent = true,
-                    .childMask = childMask,
-                    .childStartIndex = (uint32_t)(intermediaryNodes.size() - 1),
-                    .childCount = childCount,
-                };
-
-                queues[currentDepth - 1].push_back(parent);
-            }
-            queues[currentDepth].clear();
-            currentDepth--;
-        }
-    }
-    assert(queues[currentDepth].size() == 1);
-    intermediaryNodes.push_back(queues[currentDepth].at(0));
-    if (!queues[currentDepth].at(0).parent && queues[currentDepth].at(0).visible) {
-        m_VoxelCount += pow(64, 10 - currentDepth);
-    }
-
-    m_Nodes.clear();
-    m_Nodes.reserve(intermediaryNodes.size());
-
-    size_t index = intermediaryNodes.size() - 1;
-    for (auto it = intermediaryNodes.rbegin(); it != intermediaryNodes.rend(); it++) {
-        if (it->parent) {
-            glm::vec3 c = it->colour * 255.f;
-            glm::u8vec3 colour = glm::u8vec3(c.r, c.g, c.b);
-            uint32_t targetOffset = index - it->childStartIndex;
-            m_Nodes.push_back(
-                ContreeNode(it->childMask, targetOffset, colour.r, colour.g, colour.b));
-        } else if (it->visible) {
-            m_Nodes.push_back(ContreeNode(it->colour.r, it->colour.g, it->colour.b));
-        }
-        index--;
-    }
-
-    createBuffers();
-    createDescriptorSet();
+    m_Generating = true;
+    m_GenerationThread
+        = std::jthread([this, loader = std::move(loader)](std::stop_token stoken) mutable {
+              generateNodes(stoken, std::move(loader));
+          });
 }
 
 void ContreeAS::render(
@@ -233,8 +120,11 @@ void ContreeAS::render(
 
     std::vector<VkDescriptorSet> descriptorSets = {
         drawImageSet,
-        m_BufferSet,
+        // m_BufferSet,
     };
+    if (m_FinishedGeneration) {
+        descriptorSets.push_back(m_BufferSet);
+    }
 
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_RenderPipelineLayout, 0,
         descriptorSets.size(), descriptorSets.data(), 0, nullptr);
@@ -265,11 +155,24 @@ void ContreeAS::render(
     endCmdDebugLabel(cmd);
 }
 
-void ContreeAS::updateShaders() { ShaderManager::getInstance()->moduleUpdated("contree_AS"); }
+void ContreeAS::update(float dt)
+{
+    if (m_UpdateBuffers) {
+        freeDescriptorSet();
+        destroyBuffers();
 
-uint64_t ContreeAS::getMemoryUsage() { return m_ContreeBuffer.getSize(); }
-uint64_t ContreeAS::getStoredVoxels() { return m_Nodes.size(); }
-uint64_t ContreeAS::getTotalVoxels() { return m_VoxelCount; }
+        ShaderManager::getInstance()->defineMacro("CONTREE_GENERATION_FINISHED");
+        updateShaders();
+
+        createBuffers();
+        createDescriptorSet();
+        m_FinishedGeneration = true;
+        m_UpdateBuffers = false;
+        m_Generating = false;
+    }
+}
+
+void ContreeAS::updateShaders() { ShaderManager::getInstance()->moduleUpdated("contree_AS"); }
 
 void ContreeAS::createDescriptorLayout()
 {
@@ -473,4 +376,153 @@ void ContreeAS::createRenderPipeline()
 void ContreeAS::destroyRenderPipeline()
 {
     vkDestroyPipeline(m_Info.device, m_RenderPipeline, nullptr);
+}
+
+void ContreeAS::generateNodes(std::stop_token stoken, std::unique_ptr<Loader> loader)
+{
+    std::chrono::steady_clock timer;
+
+    auto start = timer.now();
+
+    uint64_t currentCode = 0;
+    const glm::uvec3 dimensions = loader->getDimensions();
+    assert((int)log2(dimensions.x) % 2 == 0 && "Contree requires sidelenght to be a power of 4");
+
+    uint64_t finalCode = dimensions.x * dimensions.y * dimensions.z;
+
+    const uint32_t maxDepth = 11;
+    uint32_t currentDepth = maxDepth;
+
+    std::array<std::deque<IntermediaryNode>, maxDepth> queues;
+    std::vector<IntermediaryNode> intermediaryNodes;
+
+    m_VoxelCount = 0;
+
+    std::function<IntermediaryNode(const std::optional<Voxel>)> convert
+        = [](const std::optional<Voxel> v) {
+              if (v.has_value()) {
+                  glm::vec3 colour = v.value().colour;
+                  return IntermediaryNode {
+                      .colour = colour,
+                      .visible = true,
+                      .parent = false,
+                      .childMask = 0,
+                  };
+              } else {
+                  return IntermediaryNode {
+                      .visible = false,
+                  };
+              }
+          };
+
+    std::function<std::optional<IntermediaryNode>(const std::deque<IntermediaryNode>&)> allEqual
+        = [](const std::deque<IntermediaryNode>& nodes) {
+              assert(nodes.size() == 64);
+              bool allVisible = nodes.at(0).visible;
+              glm::vec3 colour = nodes.at(0).colour;
+              uint32_t count = 0;
+
+              for (uint32_t i = 0; i < 64; i++) {
+                  if (nodes.at(i).parent || nodes.at(i).visible != allVisible
+                      || nodes.at(i).colour != colour) {
+                      return std::optional<IntermediaryNode> {};
+                  }
+                  count += nodes.at(i).childCount + 1;
+              }
+
+              return std::optional<IntermediaryNode>(IntermediaryNode {
+                  .colour = colour,
+                  .visible = allVisible,
+                  .parent = false,
+                  .childMask = 0,
+                  .childCount = count,
+              });
+          };
+
+    while (currentCode != finalCode) {
+        if (stoken.stop_requested())
+            return;
+
+        const auto currentVoxel = loader->getVoxelMorton2(currentCode);
+        currentCode++;
+
+        currentDepth = maxDepth - 1;
+        queues[currentDepth].push_back(convert(currentVoxel));
+
+        auto current = timer.now();
+        std::chrono::duration<float, std::milli> difference = current - start;
+        m_GenerationCompletion = ((float)currentCode / (float)finalCode) * (3. / 4.f);
+        m_GenerationTime = difference.count() / 1000.0f;
+
+        while (currentDepth > 0 && queues[currentDepth].size() == 64) {
+            if (stoken.stop_requested())
+                return;
+
+            IntermediaryNode node;
+
+            const auto& possibleParentNode = allEqual(queues[currentDepth]);
+
+            if (possibleParentNode.has_value()) {
+                queues[currentDepth - 1].push_back(possibleParentNode.value());
+            } else {
+                uint64_t childMask = 0;
+                uint32_t childCount = 0;
+                for (int8_t i = 63; i >= 0; i--) {
+                    if (queues[currentDepth].at(i).visible) {
+                        childMask |= (1ull << i);
+                        intermediaryNodes.push_back(queues[currentDepth].at(i));
+                        if (!queues[currentDepth].at(i).parent) {
+                            m_VoxelCount += pow(64, 10 - currentDepth);
+                        }
+                        childCount += queues[currentDepth].at(i).childCount + 1;
+                    }
+                }
+
+                IntermediaryNode parent = {
+                    .visible = childMask != 0,
+                    .parent = true,
+                    .childMask = childMask,
+                    .childStartIndex = (uint32_t)(intermediaryNodes.size() - 1),
+                    .childCount = childCount,
+                };
+
+                queues[currentDepth - 1].push_back(parent);
+            }
+            queues[currentDepth].clear();
+            currentDepth--;
+        }
+    }
+    assert(queues[currentDepth].size() == 1);
+    intermediaryNodes.push_back(queues[currentDepth].at(0));
+    if (!queues[currentDepth].at(0).parent && queues[currentDepth].at(0).visible) {
+        m_VoxelCount += pow(64, 10 - currentDepth);
+    }
+
+    m_Nodes.clear();
+    m_Nodes.reserve(intermediaryNodes.size());
+
+    size_t index = intermediaryNodes.size() - 1;
+    for (auto it = intermediaryNodes.rbegin(); it != intermediaryNodes.rend(); it++) {
+        if (stoken.stop_requested())
+            return;
+
+        auto current = timer.now();
+        std::chrono::duration<float, std::milli> difference = current - start;
+        m_GenerationCompletion = 0.75
+            + (((intermediaryNodes.size() - index) / (float)intermediaryNodes.size()) * 0.25f);
+        m_GenerationTime = difference.count() / 1000.0f;
+
+        if (it->parent) {
+            glm::vec3 c = it->colour * 255.f;
+            glm::u8vec3 colour = glm::u8vec3(c.r, c.g, c.b);
+            uint32_t targetOffset = index - it->childStartIndex;
+            m_Nodes.push_back(
+                ContreeNode(it->childMask, targetOffset, colour.r, colour.g, colour.b));
+        } else if (it->visible) {
+            m_Nodes.push_back(ContreeNode(it->colour.r, it->colour.g, it->colour.b));
+        }
+        index--;
+    }
+
+    m_UpdateBuffers = true;
 }

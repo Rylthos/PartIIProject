@@ -59,13 +59,13 @@ class OctreeAS : public IAccelerationStructure {
 
     void updateShaders() override;
 
-    uint64_t getMemoryUsage() override;
-    uint64_t getStoredVoxels() override;
-    uint64_t getTotalVoxels() override;
+    uint64_t getMemoryUsage() override { return m_OctreeBuffer.getSize(); }
+    uint64_t getStoredVoxels() override { return m_Nodes.size(); }
+    uint64_t getTotalVoxels() override { return m_VoxelCount; }
 
-    bool isGenerating() override;
-    float getGenerationCompletion() override;
-    float getGenerationTime() override;
+    bool isGenerating() override { return m_Generating; }
+    float getGenerationCompletion() override { return m_GenerationCompletion; }
+    float getGenerationTime() override { return m_GenerationTime; }
 
   private:
     void createDescriptorLayout();

@@ -3,6 +3,7 @@
 #include "accelerationStructure.hpp"
 
 #include "../buffer.hpp"
+#include <algorithm>
 #include <vulkan/vulkan_core.h>
 
 #include <variant>
@@ -55,12 +56,17 @@ class ContreeAS : public IAccelerationStructure {
     void fromLoader(std::unique_ptr<Loader>&& loader) override;
     void render(VkCommandBuffer cmd, Camera camera, VkDescriptorSet drawImageSet,
         VkExtent2D imageSize) override;
+    void update(float dt) override;
 
     void updateShaders() override;
 
-    uint64_t getMemoryUsage() override;
-    uint64_t getStoredVoxels() override;
-    uint64_t getTotalVoxels() override;
+    uint64_t getMemoryUsage() override { return m_ContreeBuffer.getSize(); }
+    uint64_t getStoredVoxels() override { return m_Nodes.size(); }
+    uint64_t getTotalVoxels() override { return m_VoxelCount; }
+
+    bool isGenerating() override { return m_Generating; }
+    float getGenerationCompletion() override { return m_GenerationCompletion; }
+    float getGenerationTime() override { return m_GenerationTime; }
 
   private:
     void createDescriptorLayout();
@@ -78,6 +84,8 @@ class ContreeAS : public IAccelerationStructure {
     void createRenderPipeline();
     void destroyRenderPipeline();
 
+    void generateNodes(std::stop_token stoken, std::unique_ptr<Loader> loader);
+
   private:
     ASStructInfo m_Info;
 
@@ -93,4 +101,12 @@ class ContreeAS : public IAccelerationStructure {
     Buffer m_ContreeBuffer;
 
     uint64_t m_VoxelCount;
+
+    std::jthread m_GenerationThread;
+    bool m_FinishedGeneration = false;
+    bool m_UpdateBuffers = false;
+    bool m_Generating = false;
+
+    float m_GenerationCompletion = 0.f;
+    float m_GenerationTime = 0.f;
 };

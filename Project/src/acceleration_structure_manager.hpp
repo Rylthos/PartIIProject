@@ -57,6 +57,6 @@ class ASManager {
 
     RenderStyle m_CurrentRenderStyle = RenderStyle::NORMAL;
 
-    ASType m_CurrentType = ASType::OCTREE;
+    ASType m_CurrentType = ASType::CONTREE;
     std::unique_ptr<IAccelerationStructure> m_CurrentAS;
 };
