@@ -1,4 +1,4 @@
 target_sources(${PROJECT_NAME} PRIVATE
   "loader.hpp"
-  "equationLoader.hpp" "equationLoader.cpp"
+  "equation_loader.hpp" "equation_loader.cpp"
 )

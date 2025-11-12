@@ -1,4 +1,4 @@
-#include "equationLoader.hpp"
+#include "equation_loader.hpp"
 
 EquationLoader::EquationLoader(glm::uvec3 dimensions, FunctionType function)
     : Loader(dimensions), m_Function(function)

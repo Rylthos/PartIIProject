@@ -1,6 +1,6 @@
 #pragma once
 
-#include "accelerationStructures/accelerationStructure.hpp"
+#include "accelerationStructures/acceleration_structure.hpp"
 
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan.h>

@@ -1,5 +1,5 @@
 #include "acceleration_structure_manager.hpp"
-#include "accelerationStructures/accelerationStructure.hpp"
+#include "accelerationStructures/acceleration_structure.hpp"
 #include "accelerationStructures/contree.hpp"
 #include "accelerationStructures/grid.hpp"
 #include "accelerationStructures/octree.hpp"

@@ -1,6 +1,6 @@
 #include "grid.hpp"
 
-#include "accelerationStructure.hpp"
+#include "acceleration_structure.hpp"
 
 #include <vector>
 #include <vulkan/vulkan_core.h>

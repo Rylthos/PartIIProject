@@ -1,6 +1,6 @@
 #pragma once
 
-#include "accelerationStructure.hpp"
+#include "acceleration_structure.hpp"
 
 #include "../buffer.hpp"
 

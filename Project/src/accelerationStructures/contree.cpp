@@ -8,7 +8,7 @@
 
 #include "../debug_utils.hpp"
 #include "../shader_manager.hpp"
-#include "accelerationStructure.hpp"
+#include "acceleration_structure.hpp"
 #include "slang.h"
 
 #include <deque>

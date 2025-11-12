@@ -12,7 +12,7 @@
 #include "../debug_utils.hpp"
 #include "../logger.hpp"
 #include "../shader_manager.hpp"
-#include "accelerationStructure.hpp"
+#include "acceleration_structure.hpp"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/integer.hpp"
 #include "glm/matrix.hpp"
