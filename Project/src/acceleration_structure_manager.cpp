@@ -8,7 +8,7 @@
 #include "glm/common.hpp"
 #include "logger.hpp"
 
-#include "loaders/equationLoader.hpp"
+#include "loaders/equation_loader.hpp"
 
 #include "imgui.h"
 #include "shader_manager.hpp"
@@ -81,19 +81,55 @@ void ASManager::setAS(ASType type)
     //     glm::uvec3(sideLength), std::function([](glm::uvec3 dimensions, glm::uvec3 index) {
     //         return Voxel { .colour = glm::vec3(index) / glm::vec3(dimensions - 1u) };
     //     }));
+
+    // std::unique_ptr<Loader> loader = std::make_unique<EquationLoader>(
+    //     glm::uvec3(sideLength), std::function([](glm::uvec3 dimensions, glm::uvec3 index) {
+    //         const float radius = sideLength / 2.2f;
+    //         glm::vec3 center = glm::vec3(dimensions) / 2.f;
+    //         const glm::vec3 position = glm::vec3(index) - center;
+    //
+    //         if (glm::length(position) < radius) {
+    //             glm::vec3 normal = glm::normalize(glm::abs(position - center));
+    //             // return std::make_optional(Voxel { .colour = normal });
+    //             return std::make_optional(Voxel { .colour = glm::vec3(1) });
+    //         }
+    //
+    //         return std::optional<Voxel>();
+    //     }));
+
     std::unique_ptr<Loader> loader = std::make_unique<EquationLoader>(
         glm::uvec3(sideLength), std::function([](glm::uvec3 dimensions, glm::uvec3 index) {
-            const float radius = sideLength / 2.2f;
-            glm::vec3 center = glm::vec3(dimensions) / 2.f;
-            const glm::vec3 position = glm::vec3(index) - center;
+            const uint32_t power = 6;
+            const uint32_t iterations = 500;
 
-            if (glm::length(position) < radius) {
-                glm::vec3 normal = glm::normalize(glm::abs(position - center));
-                // return std::make_optional(Voxel { .colour = normal });
-                return std::make_optional(Voxel { .colour = glm::vec3(1) });
+            const glm::vec3 minBound { -1.05f };
+            const glm::vec3 maxBound { 1.05f };
+            glm::dvec3 c
+                = (glm::vec3(index) / glm::vec3(dimensions)) * (maxBound - minBound) + minBound;
+
+            const float bailout = 1.2f;
+
+            glm::dvec3 z = c;
+
+            for (int i = 0; i < iterations; i++) {
+                double r = glm::length(z);
+                double theta = acos(z.z / r);
+                double phi = atan2(z.y, z.x);
+
+                r = pow(r, power);
+                theta *= power;
+                phi *= power;
+
+                z.x = r * sin(theta) * cos(phi);
+                z.y = r * sin(theta) * sin(phi);
+                z.z = r * cos(theta);
+
+                z += c;
+
+                if (glm::length(z) > bailout)
+                    return std::optional<Voxel> {};
             }
-
-            return std::optional<Voxel>();
+            return std::make_optional(Voxel { .colour = glm::vec3(1.f) });
         }));
 
     m_CurrentAS->fromLoader(std::move(loader));
