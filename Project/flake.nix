@@ -24,6 +24,7 @@
 
         buildInputs = with pkgs; [
           shader-slang
+          tracy
         ];
 
         LD_LIBRARY_PATH="${pkgs.vulkan-loader}/lib:${pkgs.vulkan-validation-layers}/lib";

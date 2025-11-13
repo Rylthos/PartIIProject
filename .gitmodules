@@ -20,3 +20,6 @@
 	path = Project/vendor/imgui
 	url = https://github.com/ocornut/imgui.git
 	branch = docking
+[submodule "Project/vendor/tracy"]
+	path = Project/vendor/tracy
+	url = https://github.com/wolfpld/tracy.git

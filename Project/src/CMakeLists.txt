@@ -14,6 +14,7 @@ set (SOURCE_LIST
   "buffer.cpp" "buffer.hpp"
   "voxel.hpp"
   "morton_code.cpp" "morton_code.hpp"
+  "tracing.hpp"
 )
 
 add_compile_definitions(GLM_ENABLE_EXPERIMENTAL)
@@ -39,4 +40,5 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
   glfw
   slang
   ImGui
+  Tracy::TracyClient
 )

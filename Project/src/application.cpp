@@ -6,6 +6,7 @@
 #include "events.hpp"
 #include "ring_buffer.hpp"
 #include "shader_manager.hpp"
+#include "tracing.hpp"
 
 #include "glm/gtx/string_cast.hpp"
 #include "glm/vector_relational.hpp"
@@ -163,6 +164,8 @@ void Application::start()
     auto previous = timer.now();
 
     while (!m_Window.shouldClose()) {
+        TRACE_FRAME_MARK;
+
         m_Window.pollEvents();
 
         auto current = timer.now();

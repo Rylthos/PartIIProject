@@ -57,3 +57,6 @@ add_library(ImGui STATIC
 target_include_directories(ImGui PUBLIC "imgui" "imgui/backends")
 target_compile_definitions(ImGui PRIVATE GLFW_INCLUDE_NONE)
 target_link_libraries(ImGui PRIVATE glfw Vulkan::Vulkan)
+
+# Tracy
+add_subdirectory(tracy)
