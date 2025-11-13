@@ -1,0 +1,7 @@
+Required:
+
+Possible:
+  - Beampass optimization for octree and contree
+  - Move staging buffers to separate function
+    - Only transfer at end of each frame / start of following frame
+    - All transfers at once
