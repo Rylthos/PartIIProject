@@ -1,5 +1,6 @@
 #include "acceleration_structure_manager.hpp"
 #include "accelerationStructures/acceleration_structure.hpp"
+#include "accelerationStructures/brickmap.hpp"
 #include "accelerationStructures/contree.hpp"
 #include "accelerationStructures/grid.hpp"
 #include "accelerationStructures/octree.hpp"
@@ -19,9 +20,10 @@
 #include <vulkan/vulkan_core.h>
 
 static std::map<ASType, const char*> typeToStringMap {
-    { ASType::GRID,    "Grid"    },
-    { ASType::OCTREE,  "Octree"  },
-    { ASType::CONTREE, "Contree" },
+    { ASType::GRID,     "Grid"     },
+    { ASType::OCTREE,   "Octree"   },
+    { ASType::CONTREE,  "Contree"  },
+    { ASType::BRICKMAP, "Brickmap" },
 };
 
 static std::map<RenderStyle, const char*> styleToStringMap {
@@ -70,6 +72,9 @@ void ASManager::setAS(ASType type)
         break;
     case ASType::CONTREE:
         m_CurrentAS = std::make_unique<ContreeAS>();
+        break;
+    case ASType::BRICKMAP:
+        m_CurrentAS = std::make_unique<BrickmapAS>();
         break;
     default:
         assert(false && "Invalid Type provided");
