@@ -4,6 +4,7 @@
 #include "acceleration_structure_manager.hpp"
 #include "debug_utils.hpp"
 #include "events.hpp"
+#include "frame_commands.hpp"
 #include "ring_buffer.hpp"
 #include "shader_manager.hpp"
 #include "tracing.hpp"
@@ -110,6 +111,8 @@ void Application::init()
     initVulkan();
 
     ShaderManager::getInstance()->init(m_VkDevice);
+    FrameCommands::getInstance()->init(
+        m_VkDevice, m_VmaAllocator, m_GraphicsQueue.queue, m_GraphicsQueue.queueFamily);
 
     createSwapchain();
     createImages();
@@ -186,6 +189,7 @@ void Application::cleanup()
     ASManager::getManager()->cleanup();
 
     ShaderManager::getInstance()->cleanup();
+    FrameCommands::getInstance()->cleanup();
 
     destroyQueryPool();
 
@@ -1260,6 +1264,7 @@ void Application::update(float delta)
     m_PreviousFrameTime = delta;
 
     ShaderManager::getInstance()->updateShaders();
+    FrameCommands::getInstance()->commit();
 
     ASManager::getManager()->update(delta);
 

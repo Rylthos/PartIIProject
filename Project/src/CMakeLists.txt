@@ -15,6 +15,7 @@ set (SOURCE_LIST
   "voxel.hpp"
   "morton_code.cpp" "morton_code.hpp"
   "tracing.hpp"
+  "frame_commands.cpp" "frame_commands.hpp"
 )
 
 add_compile_definitions(GLM_ENABLE_EXPERIMENTAL)

@@ -90,7 +90,6 @@ class ContreeAS : public IAccelerationStructure {
 
     std::vector<ContreeNode> m_Nodes;
 
-    Buffer m_StagingBuffer;
     Buffer m_ContreeBuffer;
 
     bool m_UpdateBuffers = false;

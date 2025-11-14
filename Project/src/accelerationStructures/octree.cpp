@@ -10,6 +10,7 @@
 #include <glm/gtx/matrix_operation.hpp>
 
 #include "../debug_utils.hpp"
+#include "../frame_commands.hpp"
 #include "../logger.hpp"
 #include "../shader_manager.hpp"
 #include "acceleration_structure.hpp"
@@ -202,58 +203,25 @@ void OctreeAS::createBuffers()
         VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
     m_OctreeBuffer.setName("Octree node buffer");
 
-    m_StagingBuffer.init(p_Info.device, p_Info.allocator, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_HOST);
-    m_StagingBuffer.setName("Staging buffer");
+    auto bufferIndex = FrameCommands::getInstance()->createStaging(size, [=, this](void* ptr) {
+        uint32_t* data = (uint32_t*)ptr;
+        for (size_t i = 0; i < m_Nodes.size(); i++) {
+            data[i] = m_Nodes[i].getData();
+        }
+    });
 
-    uint32_t* data = reinterpret_cast<uint32_t*>(m_StagingBuffer.mapMemory());
-    for (size_t i = 0; i < m_Nodes.size(); i++) {
-        data[i] = m_Nodes[i].getData();
-    }
-
-    m_StagingBuffer.unmapMemory();
-
-    VkCommandBuffer cmd;
-    VkCommandBufferAllocateInfo commandBufferAI {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-        .pNext = nullptr,
-        .commandPool = p_Info.commandPool,
-        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-        .commandBufferCount = 1,
-    };
-    VK_CHECK(vkAllocateCommandBuffers(p_Info.device, &commandBufferAI, &cmd),
-        "Failed to allocate command buffer");
-
-    VkCommandBufferBeginInfo commandBI {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-        .pNext = nullptr,
-        .flags = 0,
-        .pInheritanceInfo = nullptr,
-    };
-    vkBeginCommandBuffer(cmd, &commandBI);
-
-    m_StagingBuffer.copyToBuffer(cmd, m_OctreeBuffer, size, 0, 0);
-
-    vkEndCommandBuffer(cmd);
-
-    VkSubmitInfo submitInfo {
-        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-        .pNext = nullptr,
-        .commandBufferCount = 1,
-        .pCommandBuffers = &cmd,
-    };
-
-    vkQueueSubmit(p_Info.graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(p_Info.graphicsQueue);
-
-    vkFreeCommandBuffers(p_Info.device, p_Info.commandPool, 1, &cmd);
+    FrameCommands::getInstance()->stagingEval(
+        bufferIndex, [=, this](VkCommandBuffer cmd, FrameCommands::StagingBuffer buffer) {
+            VkBufferCopy region {
+                .srcOffset = buffer.offset,
+                .dstOffset = 0,
+                .size = size,
+            };
+            vkCmdCopyBuffer(cmd, buffer.buffer, m_OctreeBuffer.getBuffer(), 1, &region);
+        });
 }
 
-void OctreeAS::freeBuffers()
-{
-    m_StagingBuffer.cleanup();
-    m_OctreeBuffer.cleanup();
-}
+void OctreeAS::freeBuffers() { m_OctreeBuffer.cleanup(); }
 
 void OctreeAS::createDescriptorSet()
 {

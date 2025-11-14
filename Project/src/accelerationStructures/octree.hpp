@@ -92,7 +92,6 @@ class OctreeAS : public IAccelerationStructure {
 
     std::vector<OctreeNode> m_Nodes;
 
-    Buffer m_StagingBuffer;
     Buffer m_OctreeBuffer;
 
     bool m_UpdateBuffers = false;

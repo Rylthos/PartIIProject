@@ -6,6 +6,7 @@
 #include <vulkan/vulkan_core.h>
 
 #include "../debug_utils.hpp"
+#include "../frame_commands.hpp"
 #include "../logger.hpp"
 #include "../shader_manager.hpp"
 #include "spdlog/spdlog.h"
@@ -151,74 +152,48 @@ void GridAS::createBuffer()
         VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
     m_ColourBuffer.setName("Grid colour buffer");
 
-    m_StagingBuffer.init(p_Info.device, p_Info.allocator, occupancyBufferSize + colourBufferSize,
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,
-        VMA_MEMORY_USAGE_AUTO_PREFER_HOST);
-    m_StagingBuffer.setName("Grid staging buffer");
+    auto bufferIndex = FrameCommands::getInstance()->createStaging(
+        occupancyBufferSize + colourBufferSize, [=, this](void* ptr) {
+            uint8_t* dataOccupancy = (uint8_t*)ptr;
+            float* dataColour = (float*)(dataOccupancy + occupancyBufferSize);
 
-    uint8_t* dataOccupancy = (uint8_t*)m_StagingBuffer.mapMemory();
-    float* dataColour = (float*)(dataOccupancy + occupancyBufferSize);
+            size_t colourIndex = 0;
+            uint16_t current_index = 0;
+            uint8_t current_mask = 0;
+            for (size_t i = 0; i < m_Voxels.size(); i++) {
+                dataColour[colourIndex++] = m_Voxels[i].colour.x;
+                dataColour[colourIndex++] = m_Voxels[i].colour.y;
+                dataColour[colourIndex++] = m_Voxels[i].colour.z;
 
-    size_t colourIndex = 0;
-    uint16_t current_index = 0;
-    uint8_t current_mask = 0;
-    for (size_t i = 0; i < m_Voxels.size(); i++) {
-        dataColour[colourIndex++] = m_Voxels[i].colour.x;
-        dataColour[colourIndex++] = m_Voxels[i].colour.y;
-        dataColour[colourIndex++] = m_Voxels[i].colour.z;
+                if (i / 8 != current_index) {
+                    dataOccupancy[current_index] = current_mask;
+                    current_index = i / 8;
+                    current_mask = 0;
+                }
 
-        if (i / 8 != current_index) {
+                current_mask |= (m_Voxels[i].visible & 1) << (7 - (i % 8));
+            }
             dataOccupancy[current_index] = current_mask;
-            current_index = i / 8;
-            current_mask = 0;
-        }
+        });
 
-        current_mask |= (m_Voxels[i].visible & 1) << (7 - (i % 8));
-    }
-    dataOccupancy[current_index] = current_mask;
+    FrameCommands::getInstance()->stagingEval(
+        bufferIndex, [=, this](VkCommandBuffer cmd, FrameCommands::StagingBuffer buffer) {
+            VkBufferCopy region {
+                .srcOffset = buffer.offset,
+                .dstOffset = 0,
+                .size = occupancyBufferSize,
+            };
 
-    m_StagingBuffer.unmapMemory();
+            vkCmdCopyBuffer(cmd, buffer.buffer, m_OccupancyBuffer.getBuffer(), 1, &region);
 
-    VkCommandBuffer cmd;
-    VkCommandBufferAllocateInfo commandBufferAI {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-        .pNext = nullptr,
-        .commandPool = p_Info.commandPool,
-        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-        .commandBufferCount = 1,
-    };
-    VK_CHECK(vkAllocateCommandBuffers(p_Info.device, &commandBufferAI, &cmd),
-        "Failed to allocate command buffer");
-
-    VkCommandBufferBeginInfo commandBI {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-        .pNext = nullptr,
-        .flags = 0,
-        .pInheritanceInfo = nullptr,
-    };
-    vkBeginCommandBuffer(cmd, &commandBI);
-
-    m_StagingBuffer.copyToBuffer(cmd, m_OccupancyBuffer, occupancyBufferSize, 0, 0);
-    m_StagingBuffer.copyToBuffer(cmd, m_ColourBuffer, colourBufferSize, occupancyBufferSize, 0);
-
-    vkEndCommandBuffer(cmd);
-
-    VkSubmitInfo submitInfo {
-        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-        .pNext = nullptr,
-        .commandBufferCount = 1,
-        .pCommandBuffers = &cmd,
-    };
-
-    vkQueueSubmit(p_Info.graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(p_Info.graphicsQueue);
-
-    vkFreeCommandBuffers(p_Info.device, p_Info.commandPool, 1, &cmd);
+            region.srcOffset = buffer.offset + occupancyBufferSize;
+            region.size = colourBufferSize;
+            vkCmdCopyBuffer(cmd, buffer.buffer, m_ColourBuffer.getBuffer(), 1, &region);
+        });
 }
 
 void GridAS::freeBuffers()
 {
-    m_StagingBuffer.cleanup();
     m_ColourBuffer.cleanup();
     m_OccupancyBuffer.cleanup();
 }
