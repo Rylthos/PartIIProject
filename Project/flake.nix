@@ -1,7 +1,7 @@
 {
   description = "Flake for cpp vulkan development";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/fea37ae1cd8f9903a30d38966ed1ced07b141316";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
   outputs = { self, nixpkgs, ... }:
     let
@@ -17,7 +17,7 @@
           vulkan-tools
           vulkan-tools-lunarg
 
-          glfw-wayland
+          glfw
 
           renderdoc
         ];
@@ -25,6 +25,12 @@
         buildInputs = with pkgs; [
           shader-slang
           tracy
+
+          ninja
+          cmake
+          cmake-language-server
+          clang-tools
+          clang
         ];
 
         LD_LIBRARY_PATH="${pkgs.vulkan-loader}/lib:${pkgs.vulkan-validation-layers}/lib";
@@ -32,7 +38,7 @@
         VK_LAYER_PATH = "${pkgs.vulkan-validation-layers}/share/vulkan/explicit_layer.d";
 
         VulkanHeaders_DIR = "${pkgs.vulkan-headers}";
-        glfw3_DIR = "${pkgs.glfw-wayland}/lib/cmake/glfw3";
+        glfw3_DIR = "${pkgs.glfw}/lib/cmake/glfw3";
 
         CMAKE_INCLUDE_PATH = "${pkgs.vulkan-headers}/include";
         CMAKE_LIBRARY_PATH = "${pkgs.vulkan-loader}/lib";
