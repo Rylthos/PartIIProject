@@ -3,7 +3,19 @@
 #include "acceleration_structure.hpp"
 #include <vulkan/vulkan_core.h>
 
+#include "../buffer.hpp"
+
+#include <vector>
+
 class BrickmapAS : public IAccelerationStructure {
+    using BrickgridPtr = uint32_t; // Highest bit marks loaded
+
+    struct Brickmap {
+        uint32_t colourPtr;
+        uint64_t occupancy[8];
+        std::vector<uint8_t[3]> colour;
+    };
+
   public:
     BrickmapAS();
     ~BrickmapAS();
@@ -41,4 +53,13 @@ class BrickmapAS : public IAccelerationStructure {
 
     VkPipelineLayout m_RenderPipelineLayout;
     VkPipeline m_RenderPipeline;
+
+    Buffer m_BrickgridBuffer;
+    Buffer m_BrickmapsBuffer;
+    Buffer m_ColourBuffer;
+
+    glm::uvec3 m_BrickgridSize;
+
+    std::vector<BrickgridPtr> m_Brickgrid;
+    std::vector<Brickmap> m_Brickmaps;
 };
