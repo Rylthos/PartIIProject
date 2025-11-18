@@ -18,6 +18,8 @@ set (SOURCE_LIST
   "frame_commands.cpp" "frame_commands.hpp"
   "pipeline_layout.cpp" "pipeline_layout.hpp"
   "compute_pipeline.cpp" "compute_pipeline.hpp"
+  "descriptor_layout.cpp" "descriptor_layout.hpp"
+  "descriptor_set.cpp" "descriptor_set.hpp"
 )
 
 add_compile_definitions(GLM_ENABLE_EXPERIMENTAL)

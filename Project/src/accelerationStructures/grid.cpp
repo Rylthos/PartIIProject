@@ -4,6 +4,8 @@
 
 #include "../compute_pipeline.hpp"
 #include "../debug_utils.hpp"
+#include "../descriptor_layout.hpp"
+#include "../descriptor_set.hpp"
 #include "../frame_commands.hpp"
 #include "../logger.hpp"
 #include "../pipeline_layout.hpp"
@@ -97,37 +99,11 @@ void GridAS::updateShaders() { ShaderManager::getInstance()->moduleUpdated("grid
 
 void GridAS::createDescriptorLayouts()
 {
-    std::vector<VkDescriptorSetLayoutBinding> bindings = {
-        {
-         .binding = 0,
-         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-         .descriptorCount = 1,
-         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-         .pImmutableSamplers = VK_NULL_HANDLE,
-         },
-        {
-         .binding = 1,
-         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-         .descriptorCount = 1,
-         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-         .pImmutableSamplers = VK_NULL_HANDLE,
-         }
-    };
-
-    VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCI {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-        .pNext = nullptr,
-        .flags = 0,
-        .bindingCount = static_cast<uint32_t>(bindings.size()),
-        .pBindings = bindings.data(),
-    };
-
-    VK_CHECK(vkCreateDescriptorSetLayout(
-                 p_Info.device, &descriptorSetLayoutCI, nullptr, &m_BufferSetLayout),
-        "Failed to create buffer set layout");
-
-    Debug::setDebugName(p_Info.device, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT,
-        (uint64_t)m_BufferSetLayout, "Grid buffer set layout");
+    m_BufferSetLayout = DescriptorLayoutGenerator::start(p_Info.device)
+                            .addStorageBufferBinding(VK_SHADER_STAGE_COMPUTE_BIT, 0)
+                            .addStorageBufferBinding(VK_SHADER_STAGE_COMPUTE_BIT, 1)
+                            .setDebugName("Grid descriptor set layout")
+                            .build();
 }
 
 void GridAS::destroyDescriptorLayouts()
@@ -198,59 +174,12 @@ void GridAS::freeBuffers()
 
 void GridAS::createDescriptorSets()
 {
-    VkDescriptorSetAllocateInfo descriptorSetAI {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-        .pNext = nullptr,
-        .descriptorPool = p_Info.descriptorPool,
-        .descriptorSetCount = 1,
-        .pSetLayouts = &m_BufferSetLayout,
-    };
-
-    VK_CHECK(vkAllocateDescriptorSets(p_Info.device, &descriptorSetAI, &m_BufferSet),
-        "Failed to allocate descriptor set");
-
-    VkDescriptorBufferInfo occupancyBI {
-        .buffer = m_OccupancyBuffer.getBuffer(),
-        .offset = 0,
-        .range = m_OccupancyBuffer.getSize(),
-    };
-
-    VkDescriptorBufferInfo colourBI {
-        .buffer = m_ColourBuffer.getBuffer(),
-        .offset = 0,
-        .range = m_ColourBuffer.getSize(),
-    };
-
-    std::vector<VkWriteDescriptorSet> writeSets = {
-        {
-         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-         .pNext = nullptr,
-         .dstSet = m_BufferSet,
-         .dstBinding = 0,
-         .dstArrayElement = 0,
-         .descriptorCount = 1,
-         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-         .pImageInfo = nullptr,
-         .pBufferInfo = &occupancyBI,
-         .pTexelBufferView = nullptr,
-         },
-        {
-         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-         .pNext = nullptr,
-         .dstSet = m_BufferSet,
-         .dstBinding = 1,
-         .dstArrayElement = 0,
-         .descriptorCount = 1,
-         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-         .pImageInfo = nullptr,
-         .pBufferInfo = &colourBI,
-         .pTexelBufferView = nullptr,
-         }
-    };
-
-    vkUpdateDescriptorSets(p_Info.device, writeSets.size(), writeSets.data(), 0, nullptr);
-    Debug::setDebugName(p_Info.device, VK_OBJECT_TYPE_DESCRIPTOR_SET, (uint64_t)m_BufferSet,
-        "Grid buffer descriptor set");
+    m_BufferSet
+        = DescriptorSetGenerator::start(p_Info.device, p_Info.descriptorPool, m_BufferSetLayout)
+              .addBufferDescriptor(0, m_OccupancyBuffer)
+              .addBufferDescriptor(1, m_ColourBuffer)
+              .setDebugName("Grid descriptor set")
+              .build();
 }
 
 void GridAS::freeDescriptorSets()

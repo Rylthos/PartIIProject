@@ -14,6 +14,8 @@
 
 #include "../compute_pipeline.hpp"
 #include "../debug_utils.hpp"
+#include "../descriptor_layout.hpp"
+#include "../descriptor_set.hpp"
 #include "../frame_commands.hpp"
 #include "../pipeline_layout.hpp"
 #include "../shader_manager.hpp"
@@ -171,24 +173,10 @@ void OctreeAS::updateShaders() { ShaderManager::getInstance()->moduleUpdated("oc
 
 void OctreeAS::createDescriptorLayout()
 {
-    std::vector<VkDescriptorSetLayoutBinding> bindings = {
-        {
-         .binding = 0,
-         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-         .descriptorCount = 1,
-         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-         .pImmutableSamplers = nullptr,
-         }
-    };
-    VkDescriptorSetLayoutCreateInfo setLayoutCI {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-        .pNext = nullptr,
-        .flags = 0,
-        .bindingCount = static_cast<uint32_t>(bindings.size()),
-        .pBindings = bindings.data(),
-    };
-
-    vkCreateDescriptorSetLayout(p_Info.device, &setLayoutCI, nullptr, &m_BufferSetLayout);
+    m_BufferSetLayout = DescriptorLayoutGenerator::start(p_Info.device)
+                            .addStorageBufferBinding(VK_SHADER_STAGE_COMPUTE_BIT, 0)
+                            .setDebugName("Octree descriptor set layout")
+                            .build();
 }
 
 void OctreeAS::destroyDescriptorLayout()
@@ -226,38 +214,11 @@ void OctreeAS::freeBuffers() { m_OctreeBuffer.cleanup(); }
 
 void OctreeAS::createDescriptorSet()
 {
-    VkDescriptorSetAllocateInfo setAI {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-        .pNext = nullptr,
-        .descriptorPool = p_Info.descriptorPool,
-        .descriptorSetCount = 1,
-        .pSetLayouts = &m_BufferSetLayout,
-    };
-    vkAllocateDescriptorSets(p_Info.device, &setAI, &m_BufferSet);
-
-    VkDescriptorBufferInfo octreeBI {
-        .buffer = m_OctreeBuffer.getBuffer(),
-        .offset = 0,
-        .range = m_OctreeBuffer.getSize(),
-    };
-
-    std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
-        {
-         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-         .pNext = nullptr,
-         .dstSet = m_BufferSet,
-         .dstBinding = 0,
-         .dstArrayElement = 0,
-         .descriptorCount = 1,
-         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-         .pImageInfo = nullptr,
-         .pBufferInfo = &octreeBI,
-         .pTexelBufferView = nullptr,
-         }
-    };
-
-    vkUpdateDescriptorSets(
-        p_Info.device, writeDescriptorSets.size(), writeDescriptorSets.data(), 0, nullptr);
+    m_BufferSet
+        = DescriptorSetGenerator::start(p_Info.device, p_Info.descriptorPool, m_BufferSetLayout)
+              .addBufferDescriptor(0, m_OctreeBuffer)
+              .setDebugName("Octree descriptor set")
+              .build();
 }
 
 void OctreeAS::freeDescriptorSet()

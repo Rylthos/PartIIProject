@@ -4,6 +4,8 @@
 
 #include "../compute_pipeline.hpp"
 #include "../debug_utils.hpp"
+#include "../descriptor_layout.hpp"
+#include "../descriptor_set.hpp"
 #include "../frame_commands.hpp"
 #include "../pipeline_layout.hpp"
 #include "../shader_manager.hpp"
@@ -87,26 +89,12 @@ void BrickmapAS::updateShaders() { ShaderManager::getInstance()->moduleUpdated("
 
 void BrickmapAS::createDescriptorLayout()
 {
-    std::vector<VkDescriptorSetLayoutBinding> bindings = {
-        {
-         .binding = 0,
-         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-         .descriptorCount = 1,
-         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-         .pImmutableSamplers = nullptr,
-         },
-    };
-
-    VkDescriptorSetLayoutCreateInfo setLayoutCI {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-        .pNext = nullptr,
-        .flags = 0,
-        .bindingCount = static_cast<uint32_t>(bindings.size()),
-        .pBindings = bindings.data(),
-    };
-
-    VK_CHECK(vkCreateDescriptorSetLayout(p_Info.device, &setLayoutCI, nullptr, &m_BufferSetLayout),
-        "Failed to create buffer set layout");
+    m_BufferSetLayout = DescriptorLayoutGenerator::start(p_Info.device)
+                            .addStorageBufferBinding(VK_SHADER_STAGE_COMPUTE_BIT, 0)
+                            .addStorageBufferBinding(VK_SHADER_STAGE_COMPUTE_BIT, 1)
+                            .addStorageBufferBinding(VK_SHADER_STAGE_COMPUTE_BIT, 2)
+                            .setDebugName("Brickmap descriptor set layout")
+                            .build();
 }
 
 void BrickmapAS::destroyDescriptorLayout()
@@ -206,74 +194,13 @@ void BrickmapAS::freeBuffers()
 
 void BrickmapAS::createDescriptorSet()
 {
-    VkDescriptorSetAllocateInfo setAI {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-        .pNext = nullptr,
-        .descriptorPool = p_Info.descriptorPool,
-        .descriptorSetCount = 1,
-        .pSetLayouts = &m_BufferSetLayout,
-    };
-    vkAllocateDescriptorSets(p_Info.device, &setAI, &m_BufferSet);
-
-    VkDescriptorBufferInfo gridBI {
-        .buffer = m_BrickgridBuffer.getBuffer(),
-        .offset = 0,
-        .range = m_BrickgridBuffer.getSize(),
-    };
-
-    VkDescriptorBufferInfo mapBI {
-        .buffer = m_BrickmapsBuffer.getBuffer(),
-        .offset = 0,
-        .range = m_BrickmapsBuffer.getSize(),
-    };
-
-    VkDescriptorBufferInfo colourBI {
-        .buffer = m_ColourBuffer.getBuffer(),
-        .offset = 0,
-        .range = m_ColourBuffer.getSize(),
-    };
-
-    std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
-        {
-         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-         .pNext = nullptr,
-         .dstSet = m_BufferSet,
-         .dstBinding = 0,
-         .dstArrayElement = 0,
-         .descriptorCount = 1,
-         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-         .pImageInfo = nullptr,
-         .pBufferInfo = &gridBI,
-         .pTexelBufferView = nullptr,
-         },
-        {
-         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-         .pNext = nullptr,
-         .dstSet = m_BufferSet,
-         .dstBinding = 1,
-         .dstArrayElement = 0,
-         .descriptorCount = 1,
-         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-         .pImageInfo = nullptr,
-         .pBufferInfo = &mapBI,
-         .pTexelBufferView = nullptr,
-         },
-        {
-         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-         .pNext = nullptr,
-         .dstSet = m_BufferSet,
-         .dstBinding = 2,
-         .dstArrayElement = 0,
-         .descriptorCount = 1,
-         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-         .pImageInfo = nullptr,
-         .pBufferInfo = &colourBI,
-         .pTexelBufferView = nullptr,
-         }
-    };
-
-    vkUpdateDescriptorSets(
-        p_Info.device, writeDescriptorSets.size(), writeDescriptorSets.data(), 0, nullptr);
+    m_BufferSet
+        = DescriptorSetGenerator::start(p_Info.device, p_Info.descriptorPool, m_BufferSetLayout)
+              .addBufferDescriptor(0, m_BrickgridBuffer)
+              .addBufferDescriptor(1, m_BrickmapsBuffer)
+              .addBufferDescriptor(2, m_ColourBuffer)
+              .setDebugName("Brickmap descriptor set")
+              .build();
 }
 
 void BrickmapAS::freeDescriptorSet()

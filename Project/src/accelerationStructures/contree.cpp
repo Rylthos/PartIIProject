@@ -11,6 +11,8 @@
 
 #include "../compute_pipeline.hpp"
 #include "../debug_utils.hpp"
+#include "../descriptor_layout.hpp"
+#include "../descriptor_set.hpp"
 #include "../frame_commands.hpp"
 #include "../pipeline_layout.hpp"
 #include "../shader_manager.hpp"
@@ -173,25 +175,10 @@ void ContreeAS::updateShaders() { ShaderManager::getInstance()->moduleUpdated("c
 
 void ContreeAS::createDescriptorLayout()
 {
-    std::vector<VkDescriptorSetLayoutBinding> bindings = {
-        {
-         .binding = 0,
-         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-         .descriptorCount = 1,
-         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-         .pImmutableSamplers = nullptr,
-         },
-    };
-
-    VkDescriptorSetLayoutCreateInfo setLayoutCI {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-        .pNext = nullptr,
-        .flags = 0,
-        .bindingCount = static_cast<uint32_t>(bindings.size()),
-        .pBindings = bindings.data(),
-    };
-
-    vkCreateDescriptorSetLayout(p_Info.device, &setLayoutCI, nullptr, &m_BufferSetLayout);
+    m_BufferSetLayout = DescriptorLayoutGenerator::start(p_Info.device)
+                            .addStorageBufferBinding(VK_SHADER_STAGE_COMPUTE_BIT, 0)
+                            .setDebugName("Contree buffer set layout")
+                            .build();
 }
 
 void ContreeAS::destroyDescriptorLayout()
@@ -231,41 +218,11 @@ void ContreeAS::destroyBuffers() { m_ContreeBuffer.cleanup(); }
 
 void ContreeAS::createDescriptorSet()
 {
-    VkDescriptorSetAllocateInfo setAI {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-        .pNext = nullptr,
-        .descriptorPool = p_Info.descriptorPool,
-        .descriptorSetCount = 1,
-        .pSetLayouts = &m_BufferSetLayout,
-    };
-    vkAllocateDescriptorSets(p_Info.device, &setAI, &m_BufferSet);
-
-    VkDescriptorBufferInfo octreeBI {
-        .buffer = m_ContreeBuffer.getBuffer(),
-        .offset = 0,
-        .range = m_ContreeBuffer.getSize(),
-    };
-
-    std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
-        {
-         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-         .pNext = nullptr,
-         .dstSet = m_BufferSet,
-         .dstBinding = 0,
-         .dstArrayElement = 0,
-         .descriptorCount = 1,
-         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-         .pImageInfo = nullptr,
-         .pBufferInfo = &octreeBI,
-         .pTexelBufferView = nullptr,
-         }
-    };
-
-    vkUpdateDescriptorSets(
-        p_Info.device, writeDescriptorSets.size(), writeDescriptorSets.data(), 0, nullptr);
-
-    Debug::setDebugName(
-        p_Info.device, VK_OBJECT_TYPE_DESCRIPTOR_SET, (uint64_t)m_BufferSet, "Contree buffer set");
+    m_BufferSet
+        = DescriptorSetGenerator::start(p_Info.device, p_Info.descriptorPool, m_BufferSetLayout)
+              .addBufferDescriptor(0, m_ContreeBuffer)
+              .setDebugName("Contree buffer set")
+              .build();
 }
 
 void ContreeAS::freeDescriptorSet()
