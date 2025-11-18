@@ -9,6 +9,7 @@
 #include "../frame_commands.hpp"
 #include "../pipeline_layout.hpp"
 #include "../shader_manager.hpp"
+#include "spdlog/spdlog.h"
 
 struct PushConstants {
     alignas(16) glm::vec3 cameraPosition;
@@ -23,8 +24,10 @@ BrickmapAS::~BrickmapAS()
 {
     destroyRenderPipeline();
     destroyDescriptorLayout();
+
     freeDescriptorSet();
-    destroyDescriptorLayout();
+    destroyRenderPipelineLayout();
+
     freeBuffers();
 
     ShaderManager::getInstance()->removeModule("brickmap_AS");
@@ -35,14 +38,28 @@ void BrickmapAS::init(ASStructInfo info)
     IAccelerationStructure::init(info);
 
     createDescriptorLayout();
-    createBuffers();
-    createDescriptorSet();
+
+    ShaderManager::getInstance()->addModule("brickmap_AS",
+        std::bind(&BrickmapAS::createRenderPipeline, this),
+        std::bind(&BrickmapAS::destroyRenderPipeline, this));
 
     createRenderPipelineLayout();
     createRenderPipeline();
 }
 
-void BrickmapAS::fromLoader(std::unique_ptr<Loader>&& loader) { }
+void BrickmapAS::fromLoader(std::unique_ptr<Loader>&& loader)
+{
+    p_FinishedGeneration = false;
+    ShaderManager::getInstance()->removeMacro("BRICKMAP_FINISHED_GENERATION");
+
+    p_GenerationThread.request_stop();
+
+    p_Generating = true;
+    p_GenerationThread
+        = std::jthread([this, loader = std::move(loader)](std::stop_token stoken) mutable {
+              generate(stoken, std::move(loader));
+          });
+}
 
 void BrickmapAS::render(
     VkCommandBuffer cmd, Camera camera, VkDescriptorSet renderSet, VkExtent2D imageSize)
@@ -83,7 +100,23 @@ void BrickmapAS::render(
     Debug::endCmdDebugLabel(cmd);
 }
 
-void BrickmapAS::update(float dt) { }
+void BrickmapAS::update(float dt)
+{
+    if (m_UpdateBuffers) {
+        freeBuffers();
+        freeDescriptorSet();
+
+        ShaderManager::getInstance()->defineMacro("BRICKMAP_GENERATION_FINISHED");
+        updateShaders();
+
+        createBuffers();
+        createDescriptorSet();
+
+        p_FinishedGeneration = true;
+        m_UpdateBuffers = false;
+        p_Generating = false;
+    }
+}
 
 void BrickmapAS::updateShaders() { ShaderManager::getInstance()->moduleUpdated("brickmap_AS"); }
 
@@ -107,11 +140,15 @@ void BrickmapAS::createBuffers()
     VkDeviceSize gridSize
         = m_BrickgridSize.x * m_BrickgridSize.y * m_BrickgridSize.z * sizeof(BrickgridPtr);
     m_BrickgridBuffer.init(p_Info.device, p_Info.allocator, gridSize,
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, 0, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
+        VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
+    m_BrickgridBuffer.setDebugName("Brickgrid Buffer");
 
     VkDeviceSize brickmapSize = m_Brickmaps.size() * (sizeof(uint64_t) * 8 + sizeof(uint32_t));
     m_BrickmapsBuffer.init(p_Info.device, p_Info.allocator, brickmapSize,
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, 0, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
+        VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
+    m_BrickgridBuffer.setDebugName("Brickmap Buffer");
 
     size_t colourCount = 0;
     for (const auto& brickmap : m_Brickmaps) {
@@ -120,7 +157,9 @@ void BrickmapAS::createBuffers()
 
     VkDeviceSize colourSize = colourCount * sizeof(uint8_t) * 3;
     m_ColourBuffer.init(p_Info.device, p_Info.allocator, colourSize,
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, 0, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
+        VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
+    m_BrickgridBuffer.setDebugName("Colour Buffer");
 
     auto gridBufferIndex
         = FrameCommands::getInstance()->createStaging(gridSize, [=, this](void* ptr) {
@@ -167,8 +206,8 @@ void BrickmapAS::createBuffers()
               for (size_t i = 0; i < m_Brickmaps.size(); i++) {
                   const auto& brickmap = m_Brickmaps[i];
                   for (size_t j = 0; j < brickmap.colour.size(); j++) {
-                      const uint8_t* colour = brickmap.colour.at(j);
-                      memcpy(data + offset + j * 3, colour, sizeof(uint8_t) * 3);
+                      const uint8_t c = brickmap.colour.at(j);
+                      data[offset + j] = c;
                   }
                   offset += brickmap.colour.size() * 3;
               }
@@ -237,4 +276,39 @@ void BrickmapAS::createRenderPipeline()
 void BrickmapAS::destroyRenderPipeline()
 {
     vkDestroyPipeline(p_Info.device, m_RenderPipeline, nullptr);
+}
+
+void BrickmapAS::generate(std::stop_token stoken, std::unique_ptr<Loader> loader)
+{
+    m_BrickgridSize = glm::uvec3(glm::ceil(glm::vec3(loader->getDimensions()) / 8.f));
+
+    size_t totalNodes = m_BrickgridSize.x * m_BrickgridSize.y * m_BrickgridSize.z;
+
+    m_Brickgrid.assign(totalNodes, 0);
+
+    m_Brickgrid[0] = 0x00000003;
+    m_Brickmaps.push_back({
+        .colourPtr = 0,
+        .occupancy = {
+                      0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF,
+                      0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF,
+                      0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF,
+                      0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF,
+                      }
+    });
+
+    for (uint8_t x = 0; x < 8; x++) {
+        for (uint8_t y = 0; y < 8; y++) {
+            for (uint8_t z = 0; z < 8; z++) {
+                uint8_t r = (uint8_t)(255.f * (7.f / x));
+                uint8_t g = (uint8_t)(255.f * (7.f / y));
+                uint8_t b = (uint8_t)(255.f * (7.f / z));
+                m_Brickmaps[0].colour.push_back(r);
+                m_Brickmaps[0].colour.push_back(g);
+                m_Brickmaps[0].colour.push_back(b);
+            }
+        }
+    }
+
+    m_UpdateBuffers = true;
 }

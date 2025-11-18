@@ -1,6 +1,7 @@
 #pragma once
 
 #include "acceleration_structure.hpp"
+#include <stop_token>
 #include <vulkan/vulkan_core.h>
 
 #include "../buffer.hpp"
@@ -13,7 +14,7 @@ class BrickmapAS : public IAccelerationStructure {
     struct Brickmap {
         uint32_t colourPtr;
         uint64_t occupancy[8];
-        std::vector<uint8_t[3]> colour;
+        std::vector<uint8_t> colour;
     };
 
   public:
@@ -47,6 +48,8 @@ class BrickmapAS : public IAccelerationStructure {
     void createRenderPipeline();
     void destroyRenderPipeline();
 
+    void generate(std::stop_token stoken, std::unique_ptr<Loader> loader);
+
   private:
     VkDescriptorSetLayout m_BufferSetLayout;
     VkDescriptorSet m_BufferSet;
@@ -62,4 +65,6 @@ class BrickmapAS : public IAccelerationStructure {
 
     std::vector<BrickgridPtr> m_Brickgrid;
     std::vector<Brickmap> m_Brickmaps;
+
+    bool m_UpdateBuffers = false;
 };
