@@ -61,7 +61,6 @@ void FileWatcher::runThread()
     size_t bufSize = sizeof(inotify_event) + PATH_MAX + 1;
     inotify_event* event = (inotify_event*)malloc(bufSize);
 
-    int fd, watchFD;
     FunctionCallback callback;
 
     while (m_RunThread) {
@@ -79,7 +78,6 @@ void FileWatcher::runThread()
                 if (event->mask & IN_DELETE_SELF) {
                     LOG_DEBUG("Modified {}", fileWatch.first);
                     fileWatch.second.callback(fileWatch.first);
-                    close(fd);
                     removeWatcher(fileWatch.first);
                     addWatcher(fileWatch.first, fileWatch.second.callback);
                 }

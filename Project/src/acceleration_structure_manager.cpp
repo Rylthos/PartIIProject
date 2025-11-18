@@ -94,8 +94,6 @@ void ASManager::setAS(ASType type)
             const glm::vec3 position = glm::vec3(index) - center;
 
             if (glm::length(position) < radius) {
-                glm::vec3 normal = glm::normalize(glm::abs(position - center));
-                // return std::make_optional(Voxel { .colour = normal });
                 return std::make_optional(Voxel { .colour = glm::vec3(1) });
             }
 

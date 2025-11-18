@@ -25,6 +25,10 @@ add_executable(${PROJECT_NAME} ${SOURCE_LIST})
 add_subdirectory(accelerationStructures)
 add_subdirectory(loaders)
 
+target_compile_options(${PROJECT_NAME}
+  PRIVATE -Wall -Wpedantic
+)
+
 if (CMAKE_EXPORT_COMPILE_COMMANDS)
   set(CMAKE_CXX_STANDARD_INCLUDE_DIRECTORIES ${CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES})
   set(CMAKE_C_STANDARD_INCLUDE_DIRECTORIES ${CMAKE_C_IMPLICIT_INCLUDE_DIRECTORIES})

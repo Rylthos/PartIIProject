@@ -2,6 +2,11 @@
 #include <initializer_list>
 #include <vulkan/vulkan_core.h>
 
+static PFN_vkSetDebugUtilsObjectNameEXT pfnSetDebugUtilsObjectName;
+static PFN_vkCmdBeginDebugUtilsLabelEXT pfnCmdBeginDebugUtilsLabel;
+static PFN_vkCmdEndDebugUtilsLabelEXT pfnCmdEndDebugUtilsLabel;
+static PFN_vkCmdInsertDebugUtilsLabelEXT pfnCmdInsertDebugUtilsLabel;
+
 void setupDebugUtils(VkDevice device)
 {
     pfnSetDebugUtilsObjectName = (PFN_vkSetDebugUtilsObjectNameEXT)vkGetDeviceProcAddr(

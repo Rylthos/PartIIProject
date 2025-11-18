@@ -985,8 +985,6 @@ void Application::UI(const Event& event)
     if (ImGui::Begin("Timing")) {
         static RingBuffer<float, 100> previousFrames;
 
-        static float count = 0.0f;
-
         previousFrames.pushBack(m_PreviousGPUTime);
 
         ImGui::Text("FPS                : %3f", 1.0f / (m_PreviousFrameTime));
@@ -1290,9 +1288,7 @@ void Application::handleMouse(const Event& event)
 {
     const MouseEvent& mEvent = static_cast<const MouseEvent&>(event);
 
-    if (mEvent.type() == MouseEventType::MOVE) {
-        const MouseMoveEvent& moveEvent = static_cast<const MouseMoveEvent&>(mEvent);
-    }
+    if (mEvent.type() == MouseEventType::MOVE) { }
 }
 
 void Application::handleWindow(const Event& event)
@@ -1300,8 +1296,6 @@ void Application::handleWindow(const Event& event)
     const WindowEvent& wEvent = static_cast<const WindowEvent&>(event);
 
     if (wEvent.type() == WindowEventType::RESIZE) {
-        const WindowResizeEvent& resizeEvent = static_cast<const WindowResizeEvent&>(wEvent);
-
         LOG_DEBUG("Resizing window");
         vkDeviceWaitIdle(m_VkDevice);
 
