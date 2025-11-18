@@ -16,6 +16,7 @@ set (SOURCE_LIST
   "morton_code.cpp" "morton_code.hpp"
   "tracing.hpp"
   "frame_commands.cpp" "frame_commands.hpp"
+  "pipeline_layout.cpp" "pipeline_layout.hpp"
 )
 
 add_compile_definitions(GLM_ENABLE_EXPERIMENTAL)

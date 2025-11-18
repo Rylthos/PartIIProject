@@ -8,6 +8,7 @@
 #include "../debug_utils.hpp"
 #include "../frame_commands.hpp"
 #include "../logger.hpp"
+#include "../pipeline_layout.hpp"
 #include "../shader_manager.hpp"
 #include "spdlog/spdlog.h"
 
@@ -264,30 +265,12 @@ void GridAS::freeDescriptorSets()
 
 void GridAS::createRenderPipelineLayout()
 {
-    VkPushConstantRange pushConstantRange {};
-    pushConstantRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-    pushConstantRange.offset = 0;
-    pushConstantRange.size = sizeof(PushConstants);
-
-    std::vector<VkDescriptorSetLayout> descriptorsSetLayouts = {
-        p_Info.renderDescriptorLayout,
-        m_BufferSetLayout,
-    };
-
-    VkPipelineLayoutCreateInfo layoutCI {};
-    layoutCI.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    layoutCI.pNext = nullptr;
-    layoutCI.flags = 0;
-    layoutCI.setLayoutCount = descriptorsSetLayouts.size();
-    layoutCI.pSetLayouts = descriptorsSetLayouts.data();
-    layoutCI.pushConstantRangeCount = 1;
-    layoutCI.pPushConstantRanges = &pushConstantRange;
-
-    VK_CHECK(vkCreatePipelineLayout(p_Info.device, &layoutCI, nullptr, &m_RenderPipelineLayout),
-        "Failed to create render pipeline layout");
-
-    Debug::setDebugName(p_Info.device, VK_OBJECT_TYPE_PIPELINE_LAYOUT,
-        (uint64_t)m_RenderPipelineLayout, "Grid render pipeline layout");
+    m_RenderPipelineLayout
+        = PipelineLayoutGenerator::start(p_Info.device)
+              .addDescriptorLayouts({ p_Info.renderDescriptorLayout, m_BufferSetLayout })
+              .addPushConstant(VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(PushConstants))
+              .setDebugName("Grid render pipeline layout")
+              .build();
 }
 
 void GridAS::destroyRenderPipelineLayout()

@@ -2,6 +2,7 @@
 
 #include "../debug_utils.hpp"
 #include "../frame_commands.hpp"
+#include "../pipeline_layout.hpp"
 #include "../shader_manager.hpp"
 #include "acceleration_structure.hpp"
 
@@ -287,32 +288,12 @@ void BrickmapAS::freeDescriptorSet()
 
 void BrickmapAS::createRenderPipelineLayout()
 {
-    std::vector<VkDescriptorSetLayout> descriptorSetLayouts
-        = { p_Info.renderDescriptorLayout, m_BufferSetLayout };
-
-    std::vector<VkPushConstantRange> pushConstantRanges = {
-        {
-         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-         .offset = 0,
-         .size = sizeof(PushConstants),
-         },
-    };
-
-    VkPipelineLayoutCreateInfo layoutCI {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        .pNext = nullptr,
-        .flags = 0,
-        .setLayoutCount = static_cast<uint32_t>(descriptorSetLayouts.size()),
-        .pSetLayouts = descriptorSetLayouts.data(),
-        .pushConstantRangeCount = static_cast<uint32_t>(pushConstantRanges.size()),
-        .pPushConstantRanges = pushConstantRanges.data(),
-    };
-
-    VK_CHECK(vkCreatePipelineLayout(p_Info.device, &layoutCI, nullptr, &m_RenderPipelineLayout),
-        "Failed to create render pipeline layout");
-
-    Debug::setDebugName(p_Info.device, VK_OBJECT_TYPE_PIPELINE_LAYOUT,
-        (uint64_t)m_RenderPipelineLayout, "Octree render pipeline layout");
+    m_RenderPipelineLayout
+        = PipelineLayoutGenerator::start(p_Info.device)
+              .addDescriptorLayouts({ p_Info.renderDescriptorLayout, m_BufferSetLayout })
+              .addPushConstant(VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(PushConstants))
+              .setDebugName("Brickmap render pipeline layout")
+              .build();
 }
 
 void BrickmapAS::destroyRenderPipelineLayout()

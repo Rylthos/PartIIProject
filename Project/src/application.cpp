@@ -5,6 +5,7 @@
 #include "debug_utils.hpp"
 #include "events.hpp"
 #include "frame_commands.hpp"
+#include "pipeline_layout.hpp"
 #include "ring_buffer.hpp"
 #include "shader_manager.hpp"
 #include "tracing.hpp"
@@ -735,31 +736,12 @@ void Application::destroyDescriptorLayouts()
 
 void Application::createSetupPipelineLayout()
 {
-    std::vector<VkDescriptorSetLayout> descriptorSetLayouts = { m_SetupDescriptorLayout };
-
-    std::vector<VkPushConstantRange> pushConstantRanges = {
-        {
-         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-         .offset = 0,
-         .size = sizeof(SetupPushConstants),
-         },
-    };
-
-    VkPipelineLayoutCreateInfo layoutCI {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        .pNext = nullptr,
-        .flags = 0,
-        .setLayoutCount = static_cast<uint32_t>(descriptorSetLayouts.size()),
-        .pSetLayouts = descriptorSetLayouts.data(),
-        .pushConstantRangeCount = static_cast<uint32_t>(pushConstantRanges.size()),
-        .pPushConstantRanges = pushConstantRanges.data(),
-    };
-
-    VK_CHECK(vkCreatePipelineLayout(m_VkDevice, &layoutCI, nullptr, &m_VkSetupPipelineLayout),
-        "Failed to create setup pipeline layout");
-
-    Debug::setDebugName(m_VkDevice, VK_OBJECT_TYPE_PIPELINE_LAYOUT,
-        (uint64_t)m_VkSetupPipelineLayout, "Setup pipeline layout");
+    m_VkSetupPipelineLayout
+        = PipelineLayoutGenerator::start(m_VkDevice)
+              .addDescriptorLayout(m_SetupDescriptorLayout)
+              .addPushConstant(VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(SetupPushConstants))
+              .setDebugName("Setup pipeline layout")
+              .build();
 }
 
 void Application::destroySetupPipelineLayout()
