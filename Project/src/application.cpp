@@ -2,6 +2,7 @@
 
 #include "VkBootstrap.h"
 #include "acceleration_structure_manager.hpp"
+#include "compute_pipeline.hpp"
 #include "debug_utils.hpp"
 #include "events.hpp"
 #include "frame_commands.hpp"
@@ -751,34 +752,10 @@ void Application::destroySetupPipelineLayout()
 
 void Application::createSetupPipeline()
 {
-    VkShaderModule shaderModule = ShaderManager::getInstance()->getShaderModule("ray_generation");
-
-    VkPipelineShaderStageCreateInfo shaderStageCI {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-        .pNext = nullptr,
-        .flags = 0,
-        .stage = VK_SHADER_STAGE_COMPUTE_BIT,
-        .module = shaderModule,
-        .pName = "main",
-        .pSpecializationInfo = nullptr,
-    };
-
-    VkComputePipelineCreateInfo pipelineCI {
-        .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-        .pNext = nullptr,
-        .flags = 0,
-        .stage = shaderStageCI,
-        .layout = m_VkSetupPipelineLayout,
-        .basePipelineHandle = VK_NULL_HANDLE,
-        .basePipelineIndex = 0,
-    };
-
-    VK_CHECK(vkCreateComputePipelines(
-                 m_VkDevice, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &m_VkSetupPipeline),
-        "Failed to create octree render pipeline");
-
-    Debug::setDebugName(
-        m_VkDevice, VK_OBJECT_TYPE_PIPELINE, (uint64_t)m_VkSetupPipeline, "Setup pipeline");
+    m_VkSetupPipeline = ComputePipelineGenerator::start(m_VkDevice, m_VkSetupPipelineLayout)
+                            .setShader("ray_generation")
+                            .setDebugName("Setup pipeline")
+                            .build();
 }
 
 void Application::destroySetupPipeline()

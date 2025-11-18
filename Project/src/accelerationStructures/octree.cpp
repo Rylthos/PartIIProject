@@ -1,23 +1,23 @@
 #include "octree.hpp"
-#include <algorithm>
+
+#include <deque>
 #include <memory>
-#include <queue>
 #include <unistd.h>
 #include <variant>
 #include <vulkan/vulkan_core.h>
 
-#include <glm/glm.hpp>
-#include <glm/gtx/matrix_operation.hpp>
-
-#include "../debug_utils.hpp"
-#include "../frame_commands.hpp"
-#include "../logger.hpp"
-#include "../pipeline_layout.hpp"
-#include "../shader_manager.hpp"
-#include "acceleration_structure.hpp"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/integer.hpp"
 #include "glm/matrix.hpp"
+#include <glm/glm.hpp>
+#include <glm/gtx/matrix_operation.hpp>
+
+#include "../compute_pipeline.hpp"
+#include "../debug_utils.hpp"
+#include "../frame_commands.hpp"
+#include "../pipeline_layout.hpp"
+#include "../shader_manager.hpp"
+#include "acceleration_structure.hpp"
 
 struct PushConstants {
     alignas(16) glm::vec3 cameraPosition;
@@ -285,34 +285,10 @@ void OctreeAS::destroyRenderPipelineLayout()
 
 void OctreeAS::createRenderPipeline()
 {
-    VkShaderModule shaderModule = ShaderManager::getInstance()->getShaderModule("octree_AS");
-
-    VkPipelineShaderStageCreateInfo shaderStageCI {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-        .pNext = nullptr,
-        .flags = 0,
-        .stage = VK_SHADER_STAGE_COMPUTE_BIT,
-        .module = shaderModule,
-        .pName = "main",
-        .pSpecializationInfo = nullptr,
-    };
-
-    VkComputePipelineCreateInfo pipelineCI {
-        .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-        .pNext = nullptr,
-        .flags = 0,
-        .stage = shaderStageCI,
-        .layout = m_RenderPipelineLayout,
-        .basePipelineHandle = VK_NULL_HANDLE,
-        .basePipelineIndex = 0,
-    };
-
-    VK_CHECK(vkCreateComputePipelines(
-                 p_Info.device, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &m_RenderPipeline),
-        "Failed to create octree render pipeline");
-
-    Debug::setDebugName(p_Info.device, VK_OBJECT_TYPE_PIPELINE, (uint64_t)m_RenderPipeline,
-        "Octree render pipeline");
+    m_RenderPipeline = ComputePipelineGenerator::start(p_Info.device, m_RenderPipelineLayout)
+                           .setShader("octree_AS")
+                           .setDebugName("Octree render pipeline")
+                           .build();
 }
 
 void OctreeAS::destroyRenderPipeline()

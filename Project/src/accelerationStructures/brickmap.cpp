@@ -1,14 +1,12 @@
 #include "brickmap.hpp"
 
+#include <vector>
+
+#include "../compute_pipeline.hpp"
 #include "../debug_utils.hpp"
 #include "../frame_commands.hpp"
 #include "../pipeline_layout.hpp"
 #include "../shader_manager.hpp"
-#include "acceleration_structure.hpp"
-
-#include <vector>
-
-#include <vulkan/vulkan_core.h>
 
 struct PushConstants {
     alignas(16) glm::vec3 cameraPosition;
@@ -303,34 +301,10 @@ void BrickmapAS::destroyRenderPipelineLayout()
 
 void BrickmapAS::createRenderPipeline()
 {
-    VkShaderModule shaderModule = ShaderManager::getInstance()->getShaderModule("brickmap_AS");
-
-    VkPipelineShaderStageCreateInfo shaderStageCI {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-        .pNext = nullptr,
-        .flags = 0,
-        .stage = VK_SHADER_STAGE_COMPUTE_BIT,
-        .module = shaderModule,
-        .pName = "main",
-        .pSpecializationInfo = nullptr,
-    };
-
-    VkComputePipelineCreateInfo pipelineCI {
-        .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-        .pNext = nullptr,
-        .flags = 0,
-        .stage = shaderStageCI,
-        .layout = m_RenderPipelineLayout,
-        .basePipelineHandle = VK_NULL_HANDLE,
-        .basePipelineIndex = 0,
-    };
-
-    VK_CHECK(vkCreateComputePipelines(
-                 p_Info.device, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &m_RenderPipeline),
-        "Failed to create brickmap render pipeline");
-
-    Debug::setDebugName(p_Info.device, VK_OBJECT_TYPE_PIPELINE, (uint64_t)m_RenderPipeline,
-        "Brickmap render pipeline");
+    m_RenderPipeline = ComputePipelineGenerator::start(p_Info.device, m_RenderPipelineLayout)
+                           .setShader("brickmap_AS")
+                           .setDebugName("Brickmap render pipeline")
+                           .build();
 }
 
 void BrickmapAS::destroyRenderPipeline()

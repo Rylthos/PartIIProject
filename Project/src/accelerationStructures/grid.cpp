@@ -1,16 +1,13 @@
 #include "grid.hpp"
 
-#include "acceleration_structure.hpp"
-
 #include <vector>
-#include <vulkan/vulkan_core.h>
 
+#include "../compute_pipeline.hpp"
 #include "../debug_utils.hpp"
 #include "../frame_commands.hpp"
 #include "../logger.hpp"
 #include "../pipeline_layout.hpp"
 #include "../shader_manager.hpp"
-#include "spdlog/spdlog.h"
 
 struct PushConstants {
     alignas(16) glm::vec3 cameraPosition;
@@ -280,6 +277,10 @@ void GridAS::destroyRenderPipelineLayout()
 
 void GridAS::createRenderPipeline()
 {
+    m_RenderPipeline = ComputePipelineGenerator::start(p_Info.device, m_RenderPipelineLayout)
+                           .setShader("grid_AS")
+                           .setDebugName("Grid render pipeline")
+                           .build();
     VkShaderModule shaderModule = ShaderManager::getInstance()->getShaderModule("grid_AS");
 
     VkPipelineShaderStageCreateInfo shaderStageCI {

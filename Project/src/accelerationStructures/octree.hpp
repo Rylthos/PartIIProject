@@ -4,7 +4,6 @@
 
 #include "../buffer.hpp"
 
-#include <algorithm>
 #include <chrono>
 #include <variant>
 #include <vulkan/vulkan_core.h>
