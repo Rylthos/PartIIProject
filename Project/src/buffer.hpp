@@ -12,7 +12,7 @@ class Buffer {
     void init(VkDevice device, VmaAllocator allocator, VkDeviceSize size, VkBufferUsageFlags usage,
         VmaAllocationCreateFlags vmaFlags, VmaMemoryUsage memoryUsage);
 
-    void setName(const char* name);
+    void setDebugName(const char* name);
 
     void cleanup();
 

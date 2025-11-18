@@ -7,6 +7,7 @@ static PFN_vkCmdBeginDebugUtilsLabelEXT pfnCmdBeginDebugUtilsLabel;
 static PFN_vkCmdEndDebugUtilsLabelEXT pfnCmdEndDebugUtilsLabel;
 static PFN_vkCmdInsertDebugUtilsLabelEXT pfnCmdInsertDebugUtilsLabel;
 
+namespace Debug {
 void setupDebugUtils(VkDevice device)
 {
     pfnSetDebugUtilsObjectName = (PFN_vkSetDebugUtilsObjectNameEXT)vkGetDeviceProcAddr(
@@ -61,3 +62,4 @@ void insertCmdDebugLabel(VkCommandBuffer cmd, const char* label, std::vector<flo
 }
 
 void endCmdDebugLabel(VkCommandBuffer cmd) { pfnCmdEndDebugUtilsLabel(cmd); }
+}

@@ -46,7 +46,7 @@ void BrickmapAS::fromLoader(std::unique_ptr<Loader>&& loader) { }
 void BrickmapAS::render(
     VkCommandBuffer cmd, Camera camera, VkDescriptorSet renderSet, VkExtent2D imageSize)
 {
-    beginCmdDebugLabel(cmd, "Brickmap AS render", { 0.0f, 0.0f, 1.0f, 1.0f });
+    Debug::beginCmdDebugLabel(cmd, "Brickmap AS render", { 0.0f, 0.0f, 1.0f, 1.0f });
 
     glm::vec3 scale = glm::vec3(10);
 
@@ -79,7 +79,7 @@ void BrickmapAS::render(
 
     vkCmdDispatch(cmd, std::ceil(imageSize.width / 8.f), std::ceil(imageSize.height / 8.f), 1);
 
-    endCmdDebugLabel(cmd);
+    Debug::endCmdDebugLabel(cmd);
 }
 
 void BrickmapAS::update(float dt) { }
@@ -311,8 +311,8 @@ void BrickmapAS::createRenderPipelineLayout()
     VK_CHECK(vkCreatePipelineLayout(p_Info.device, &layoutCI, nullptr, &m_RenderPipelineLayout),
         "Failed to create render pipeline layout");
 
-    setDebugName(p_Info.device, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)m_RenderPipelineLayout,
-        "Octree render pipeline layout");
+    Debug::setDebugName(p_Info.device, VK_OBJECT_TYPE_PIPELINE_LAYOUT,
+        (uint64_t)m_RenderPipelineLayout, "Octree render pipeline layout");
 }
 
 void BrickmapAS::destroyRenderPipelineLayout()
@@ -348,7 +348,7 @@ void BrickmapAS::createRenderPipeline()
                  p_Info.device, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &m_RenderPipeline),
         "Failed to create brickmap render pipeline");
 
-    setDebugName(p_Info.device, VK_OBJECT_TYPE_PIPELINE, (uint64_t)m_RenderPipeline,
+    Debug::setDebugName(p_Info.device, VK_OBJECT_TYPE_PIPELINE, (uint64_t)m_RenderPipeline,
         "Brickmap render pipeline");
 }
 

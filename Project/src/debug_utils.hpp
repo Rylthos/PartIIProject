@@ -4,6 +4,7 @@
 
 #include "logger.hpp"
 
+namespace Debug {
 void setupDebugUtils(VkDevice device);
 
 void setDebugName(VkDevice device, VkObjectType objectType, uint64_t handle, const char* name);
@@ -11,3 +12,4 @@ void setDebugName(VkDevice device, VkObjectType objectType, uint64_t handle, con
 void beginCmdDebugLabel(VkCommandBuffer cmd, const char* label, std::vector<float> colour);
 void insertCmdDebugLabel(VkCommandBuffer cmd, const char* label, std::vector<float> colour);
 void endCmdDebugLabel(VkCommandBuffer cmd);
+}

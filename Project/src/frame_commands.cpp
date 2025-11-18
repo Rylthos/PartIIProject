@@ -29,7 +29,7 @@ void FrameCommands::init(
 
     VK_CHECK(vkCreateCommandPool(m_Device, &commandPoolCI, nullptr, &m_CommandPool),
         "Failed to create command pool");
-    setDebugName(
+    Debug::setDebugName(
         m_Device, VK_OBJECT_TYPE_COMMAND_POOL, (uint64_t)m_CommandPool, "Frame command pool");
 
     VkCommandBufferAllocateInfo commandBufferAI {
@@ -40,7 +40,7 @@ void FrameCommands::init(
         .commandBufferCount = 1,
     };
     vkAllocateCommandBuffers(m_Device, &commandBufferAI, &m_CommandBuffer);
-    setDebugName(
+    Debug::setDebugName(
         m_Device, VK_OBJECT_TYPE_COMMAND_BUFFER, (uint64_t)m_CommandBuffer, "Frame command buffer");
 
     VkFenceCreateInfo fenceCI {
@@ -69,7 +69,7 @@ void FrameCommands::commit()
     stagingBuffer.init(m_Device, m_VmaAllocator, m_RequestedStagingSize,
         VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,
         VMA_MEMORY_USAGE_AUTO_PREFER_HOST);
-    stagingBuffer.setName("Frame staging buffer");
+    stagingBuffer.setDebugName("Frame staging buffer");
 
     std::vector<size_t> offsets;
     offsets.reserve(m_CreateStagingFuncs.size());

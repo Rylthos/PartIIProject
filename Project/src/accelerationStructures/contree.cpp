@@ -114,7 +114,7 @@ void ContreeAS::fromLoader(std::unique_ptr<Loader>&& loader)
 void ContreeAS::render(
     VkCommandBuffer cmd, Camera camera, VkDescriptorSet renderSet, VkExtent2D imageSize)
 {
-    beginCmdDebugLabel(cmd, "Contree AS render", { 0.0f, 0.0f, 1.0f, 1.0f });
+    Debug::beginCmdDebugLabel(cmd, "Contree AS render", { 0.0f, 0.0f, 1.0f, 1.0f });
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_RenderPipeline);
 
@@ -148,7 +148,7 @@ void ContreeAS::render(
 
     vkCmdDispatch(cmd, std::ceil(imageSize.width / 8.f), std::ceil(imageSize.height / 8.f), 1);
 
-    endCmdDebugLabel(cmd);
+    Debug::endCmdDebugLabel(cmd);
 }
 
 void ContreeAS::update(float dt)
@@ -204,7 +204,7 @@ void ContreeAS::createBuffers()
     m_ContreeBuffer.init(p_Info.device, p_Info.allocator, size,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
         VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
-    m_ContreeBuffer.setName("Contree node buffer");
+    m_ContreeBuffer.setDebugName("Contree node buffer");
 
     auto bufferIndex = FrameCommands::getInstance()->createStaging(size, [=, this](void* ptr) {
         uint64_t* data = (uint64_t*)ptr;
@@ -263,7 +263,7 @@ void ContreeAS::createDescriptorSet()
     vkUpdateDescriptorSets(
         p_Info.device, writeDescriptorSets.size(), writeDescriptorSets.data(), 0, nullptr);
 
-    setDebugName(
+    Debug::setDebugName(
         p_Info.device, VK_OBJECT_TYPE_DESCRIPTOR_SET, (uint64_t)m_BufferSet, "Contree buffer set");
 }
 
@@ -301,8 +301,8 @@ void ContreeAS::createRenderPipelineLayout()
     VK_CHECK(vkCreatePipelineLayout(p_Info.device, &layoutCI, nullptr, &m_RenderPipelineLayout),
         "Failed to create render pipeline layout");
 
-    setDebugName(p_Info.device, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)m_RenderPipelineLayout,
-        "Contree render pipeline layout");
+    Debug::setDebugName(p_Info.device, VK_OBJECT_TYPE_PIPELINE_LAYOUT,
+        (uint64_t)m_RenderPipelineLayout, "Contree render pipeline layout");
 }
 
 void ContreeAS::destroyRenderPipelineLayout()
@@ -338,7 +338,7 @@ void ContreeAS::createRenderPipeline()
                  p_Info.device, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &m_RenderPipeline),
         "Failed to create contree render pipeline");
 
-    setDebugName(p_Info.device, VK_OBJECT_TYPE_PIPELINE, (uint64_t)m_RenderPipeline,
+    Debug::setDebugName(p_Info.device, VK_OBJECT_TYPE_PIPELINE, (uint64_t)m_RenderPipeline,
         "Contree render pipeline");
 }
 

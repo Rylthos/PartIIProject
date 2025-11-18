@@ -289,10 +289,10 @@ void Application::initVulkan()
 
     VK_CHECK(vmaCreateAllocator(&allocatorCI, &m_VmaAllocator), "Failed to create allocator");
 
-    setupDebugUtils(m_VkDevice);
+    Debug::setupDebugUtils(m_VkDevice);
 
-    setDebugName(m_VkDevice, VK_OBJECT_TYPE_DEVICE, (uint64_t)m_VkDevice, "Device");
-    setDebugName(
+    Debug::setDebugName(m_VkDevice, VK_OBJECT_TYPE_DEVICE, (uint64_t)m_VkDevice, "Device");
+    Debug::setDebugName(
         m_VkDevice, VK_OBJECT_TYPE_QUEUE, (uint64_t)m_GraphicsQueue.queue, "Graphics queue");
 }
 
@@ -322,7 +322,8 @@ void Application::createSwapchain()
     m_VkSwapchainImages = vkbSwapchain.get_images().value();
     m_VkSwapchainImageViews = vkbSwapchain.get_image_views().value();
 
-    setDebugName(m_VkDevice, VK_OBJECT_TYPE_SWAPCHAIN_KHR, (uint64_t)m_VkSwapchain, "Swapchain");
+    Debug::setDebugName(
+        m_VkDevice, VK_OBJECT_TYPE_SWAPCHAIN_KHR, (uint64_t)m_VkSwapchain, "Swapchain");
 
     LOG_DEBUG("Created swapchain");
 }
@@ -389,15 +390,15 @@ void Application::createDrawImages()
                      nullptr),
             "Failed to allocate draw image");
 
-        setDebugName(m_VkDevice, VK_OBJECT_TYPE_IMAGE, (uint64_t)m_PerFrameData[i].drawImage.image,
-            "Draw image");
+        Debug::setDebugName(m_VkDevice, VK_OBJECT_TYPE_IMAGE,
+            (uint64_t)m_PerFrameData[i].drawImage.image, "Draw image");
 
         imageViewCI.image = m_PerFrameData[i].drawImage.image;
         VK_CHECK(
             vkCreateImageView(m_VkDevice, &imageViewCI, nullptr, &m_PerFrameData[i].drawImage.view),
             "Failed to create image view");
 
-        setDebugName(m_VkDevice, VK_OBJECT_TYPE_IMAGE_VIEW,
+        Debug::setDebugName(m_VkDevice, VK_OBJECT_TYPE_IMAGE_VIEW,
             (uint64_t)m_PerFrameData[i].drawImage.view, "Draw image view");
     }
 
@@ -448,7 +449,7 @@ void Application::createRayDirectionImages()
                      &m_PerFrameData[i].rayDirectionImage.allocation, nullptr),
             "Failed to allocate ray direction image");
 
-        setDebugName(m_VkDevice, VK_OBJECT_TYPE_IMAGE,
+        Debug::setDebugName(m_VkDevice, VK_OBJECT_TYPE_IMAGE,
             (uint64_t)m_PerFrameData[i].rayDirectionImage.image, "Ray direction image");
 
         imageViewCI.image = m_PerFrameData[i].rayDirectionImage.image;
@@ -456,7 +457,7 @@ void Application::createRayDirectionImages()
                      m_VkDevice, &imageViewCI, nullptr, &m_PerFrameData[i].rayDirectionImage.view),
             "Failed to create image view");
 
-        setDebugName(m_VkDevice, VK_OBJECT_TYPE_IMAGE_VIEW,
+        Debug::setDebugName(m_VkDevice, VK_OBJECT_TYPE_IMAGE_VIEW,
             (uint64_t)m_PerFrameData[i].rayDirectionImage.view, "Ray direction image view");
     }
 
@@ -494,7 +495,7 @@ void Application::createCommandPools()
 
     VK_CHECK(vkCreateCommandPool(m_VkDevice, &commandPoolCI, nullptr, &m_GeneralPool),
         "Failed to create command pool");
-    setDebugName(
+    Debug::setDebugName(
         m_VkDevice, VK_OBJECT_TYPE_COMMAND_POOL, (uint64_t)m_GeneralPool, "General command pool");
 
     for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
@@ -507,9 +508,9 @@ void Application::createCommandPools()
                      m_VkDevice, &commandBufferAI, &m_PerFrameData[i].commandBuffer),
             "Failed to allocate command buffer");
 
-        setDebugName(m_VkDevice, VK_OBJECT_TYPE_COMMAND_POOL,
+        Debug::setDebugName(m_VkDevice, VK_OBJECT_TYPE_COMMAND_POOL,
             (uint64_t)m_PerFrameData[i].commandPool, "Per frame command pool");
-        setDebugName(m_VkDevice, VK_OBJECT_TYPE_COMMAND_BUFFER,
+        Debug::setDebugName(m_VkDevice, VK_OBJECT_TYPE_COMMAND_BUFFER,
             (uint64_t)m_PerFrameData[i].commandBuffer, "Per frame command buffer");
     }
 
@@ -537,7 +538,7 @@ void Application::createSyncStructures()
         VK_CHECK(vkCreateFence(m_VkDevice, &fenceCI, nullptr, &m_PerFrameData[i].fence),
             "Failed to create fence");
 
-        setDebugName(
+        Debug::setDebugName(
             m_VkDevice, VK_OBJECT_TYPE_FENCE, (uint64_t)m_PerFrameData[i].fence, "Per frame fence");
     }
 
@@ -555,10 +556,10 @@ void Application::createSyncStructures()
         VK_CHECK(vkCreateSemaphore(m_VkDevice, &semaphoreCI, nullptr, &m_SwapchainSemaphores[i]),
             "Failed to create swapchain semaphore");
 
-        setDebugName(m_VkDevice, VK_OBJECT_TYPE_SEMAPHORE, (uint64_t)m_RenderSemaphores[i],
+        Debug::setDebugName(m_VkDevice, VK_OBJECT_TYPE_SEMAPHORE, (uint64_t)m_RenderSemaphores[i],
             "Per swapchain render semaphore");
-        setDebugName(m_VkDevice, VK_OBJECT_TYPE_SEMAPHORE, (uint64_t)m_SwapchainSemaphores[i],
-            "Per swapchain present semaphore");
+        Debug::setDebugName(m_VkDevice, VK_OBJECT_TYPE_SEMAPHORE,
+            (uint64_t)m_SwapchainSemaphores[i], "Per swapchain present semaphore");
     }
 
     LOG_DEBUG("Created sync structures");
@@ -655,7 +656,7 @@ void Application::createDescriptorPool()
     VK_CHECK(vkCreateDescriptorPool(m_VkDevice, &descriptorPoolCI, nullptr, &m_VkDescriptorPool),
         "Failed to create descriptor pool");
 
-    setDebugName(m_VkDevice, VK_OBJECT_TYPE_DESCRIPTOR_POOL, (uint64_t)m_VkDescriptorPool,
+    Debug::setDebugName(m_VkDevice, VK_OBJECT_TYPE_DESCRIPTOR_POOL, (uint64_t)m_VkDescriptorPool,
         "General descriptor pool");
 
     LOG_DEBUG("Created descriptor pool");
@@ -689,7 +690,7 @@ void Application::createSetupDescriptorLayout()
                  m_VkDevice, &descriptorSetLayoutCI, nullptr, &m_SetupDescriptorLayout),
         "Failed to create compute descriptor set layout");
 
-    setDebugName(m_VkDevice, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT,
+    Debug::setDebugName(m_VkDevice, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT,
         (uint64_t)m_SetupDescriptorLayout, "Setup descriptor layout");
 }
 
@@ -722,7 +723,7 @@ void Application::createRenderDescriptorLayout()
                  m_VkDevice, &descriptorSetLayoutCI, nullptr, &m_RenderDescriptorLayout),
         "Failed to create compute descriptor set layout");
 
-    setDebugName(m_VkDevice, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT,
+    Debug::setDebugName(m_VkDevice, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT,
         (uint64_t)m_RenderDescriptorLayout, "Render descriptor layout");
 }
 
@@ -757,8 +758,8 @@ void Application::createSetupPipelineLayout()
     VK_CHECK(vkCreatePipelineLayout(m_VkDevice, &layoutCI, nullptr, &m_VkSetupPipelineLayout),
         "Failed to create setup pipeline layout");
 
-    setDebugName(m_VkDevice, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)m_VkSetupPipelineLayout,
-        "Setup pipeline layout");
+    Debug::setDebugName(m_VkDevice, VK_OBJECT_TYPE_PIPELINE_LAYOUT,
+        (uint64_t)m_VkSetupPipelineLayout, "Setup pipeline layout");
 }
 
 void Application::destroySetupPipelineLayout()
@@ -794,7 +795,7 @@ void Application::createSetupPipeline()
                  m_VkDevice, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &m_VkSetupPipeline),
         "Failed to create octree render pipeline");
 
-    setDebugName(
+    Debug::setDebugName(
         m_VkDevice, VK_OBJECT_TYPE_PIPELINE, (uint64_t)m_VkSetupPipeline, "Setup pipeline");
 }
 
@@ -851,7 +852,7 @@ void Application::createSetupDescriptor()
 
         vkUpdateDescriptorSets(m_VkDevice, writeSets.size(), writeSets.data(), 0, nullptr);
 
-        setDebugName(m_VkDevice, VK_OBJECT_TYPE_DESCRIPTOR_SET, (uint64_t)descriptorSets[i],
+        Debug::setDebugName(m_VkDevice, VK_OBJECT_TYPE_DESCRIPTOR_SET, (uint64_t)descriptorSets[i],
             "Setup descriptor");
     }
 
@@ -921,7 +922,7 @@ void Application::createRenderDescriptor()
 
         vkUpdateDescriptorSets(m_VkDevice, writeSets.size(), writeSets.data(), 0, nullptr);
 
-        setDebugName(m_VkDevice, VK_OBJECT_TYPE_DESCRIPTOR_SET, (uint64_t)descriptorSets[i],
+        Debug::setDebugName(m_VkDevice, VK_OBJECT_TYPE_DESCRIPTOR_SET, (uint64_t)descriptorSets[i],
             "Render descriptor");
     }
 
@@ -952,7 +953,8 @@ void Application::createQueryPool()
     VK_CHECK(vkCreateQueryPool(m_VkDevice, &queryPoolCI, nullptr, &m_VkQueryPool),
         "Failed to create query pool");
 
-    setDebugName(m_VkDevice, VK_OBJECT_TYPE_QUERY_POOL, (uint64_t)m_VkQueryPool, "Query pool");
+    Debug::setDebugName(
+        m_VkDevice, VK_OBJECT_TYPE_QUERY_POOL, (uint64_t)m_VkQueryPool, "Query pool");
 
     VkPhysicalDeviceProperties deviceProperties;
     vkGetPhysicalDeviceProperties(m_VkPhysicalDevice, &deviceProperties);
@@ -1030,7 +1032,7 @@ void Application::render()
         VK_CHECK(vkBeginCommandBuffer(commandBuffer, &commandBufferBI), "Begin command buffer");
 
         {
-            beginCmdDebugLabel(commandBuffer, "Setup", { 0.f, 1.f, 0.f, 1.f });
+            Debug::beginCmdDebugLabel(commandBuffer, "Setup", { 0.f, 1.f, 0.f, 1.f });
 
             vkCmdResetQueryPool(commandBuffer, m_VkQueryPool, m_CurrentFrameIndex * 4, 4);
 
@@ -1042,11 +1044,11 @@ void Application::render()
             transitionImage(commandBuffer, currentFrame.drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED,
                 VK_IMAGE_LAYOUT_GENERAL);
 
-            endCmdDebugLabel(commandBuffer);
+            Debug::endCmdDebugLabel(commandBuffer);
         }
 
         {
-            beginCmdDebugLabel(commandBuffer, "Ray generation", { 0.f, 0.f, 1.f, 1.f });
+            Debug::beginCmdDebugLabel(commandBuffer, "Ray generation", { 0.f, 0.f, 1.f, 1.f });
 
             transitionImage(commandBuffer, currentFrame.rayDirectionImage.image,
                 VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
@@ -1074,7 +1076,7 @@ void Application::render()
                 std::ceil(currentFrame.rayDirectionImage.extent.width / 8.f),
                 std::ceil(currentFrame.rayDirectionImage.extent.height / 8.f), 1);
 
-            endCmdDebugLabel(commandBuffer);
+            Debug::endCmdDebugLabel(commandBuffer);
         }
 
         {
@@ -1130,7 +1132,7 @@ void Application::render()
         renderImGui(commandBuffer, currentFrame);
 
         {
-            beginCmdDebugLabel(commandBuffer, "Present", { 0.f, 1.f, 0.f, 1.f });
+            Debug::beginCmdDebugLabel(commandBuffer, "Present", { 0.f, 1.f, 0.f, 1.f });
             transitionImage(commandBuffer, currentFrame.drawImage.image,
                 VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
@@ -1141,7 +1143,7 @@ void Application::render()
             transitionImage(commandBuffer, m_VkSwapchainImages[swapchainImageIndex],
                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
-            endCmdDebugLabel(commandBuffer);
+            Debug::endCmdDebugLabel(commandBuffer);
         }
 
         vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_VkQueryPool,
@@ -1245,13 +1247,13 @@ void Application::renderImGui(VkCommandBuffer& commandBuffer, const PerFrameData
     if (!m_RenderImGui)
         return;
 
-    beginCmdDebugLabel(commandBuffer, "Render ImGui", { 1.f, 0.f, 0.f, 1.f });
+    Debug::beginCmdDebugLabel(commandBuffer, "Render ImGui", { 1.f, 0.f, 0.f, 1.f });
 
     vkCmdBeginRendering(commandBuffer, &renderInfo);
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
     vkCmdEndRendering(commandBuffer);
 
-    endCmdDebugLabel(commandBuffer);
+    Debug::endCmdDebugLabel(commandBuffer);
 }
 
 void Application::update(float delta)

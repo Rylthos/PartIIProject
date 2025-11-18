@@ -31,9 +31,9 @@ void Buffer::init(VkDevice device, VmaAllocator allocator, VkDeviceSize size,
         "Failed to create buffer");
 }
 
-void Buffer::setName(const char* name)
+void Buffer::setDebugName(const char* name)
 {
-    setDebugName(m_Device, VK_OBJECT_TYPE_BUFFER, (uint64_t)m_Buffer, name);
+    Debug::setDebugName(m_Device, VK_OBJECT_TYPE_BUFFER, (uint64_t)m_Buffer, name);
 }
 
 void Buffer::cleanup()

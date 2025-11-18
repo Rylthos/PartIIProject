@@ -114,7 +114,7 @@ void OctreeAS::fromLoader(std::unique_ptr<Loader>&& loader)
 void OctreeAS::render(
     VkCommandBuffer cmd, Camera camera, VkDescriptorSet renderSet, VkExtent2D imageSize)
 {
-    beginCmdDebugLabel(cmd, "Octree AS render", { 0.0f, 0.0f, 1.0f, 1.0f });
+    Debug::beginCmdDebugLabel(cmd, "Octree AS render", { 0.0f, 0.0f, 1.0f, 1.0f });
 
     glm::vec3 scale = glm::vec3(10);
 
@@ -146,7 +146,7 @@ void OctreeAS::render(
 
     vkCmdDispatch(cmd, std::ceil(imageSize.width / 8.f), std::ceil(imageSize.height / 8.f), 1);
 
-    endCmdDebugLabel(cmd);
+    Debug::endCmdDebugLabel(cmd);
 }
 
 void OctreeAS::update(float dt)
@@ -201,7 +201,7 @@ void OctreeAS::createBuffers()
     m_OctreeBuffer.init(p_Info.device, p_Info.allocator, size,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
         VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
-    m_OctreeBuffer.setName("Octree node buffer");
+    m_OctreeBuffer.setDebugName("Octree node buffer");
 
     auto bufferIndex = FrameCommands::getInstance()->createStaging(size, [=, this](void* ptr) {
         uint32_t* data = (uint32_t*)ptr;
@@ -293,8 +293,8 @@ void OctreeAS::createRenderPipelineLayout()
     VK_CHECK(vkCreatePipelineLayout(p_Info.device, &layoutCI, nullptr, &m_RenderPipelineLayout),
         "Failed to create render pipeline layout");
 
-    setDebugName(p_Info.device, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)m_RenderPipelineLayout,
-        "Octree render pipeline layout");
+    Debug::setDebugName(p_Info.device, VK_OBJECT_TYPE_PIPELINE_LAYOUT,
+        (uint64_t)m_RenderPipelineLayout, "Octree render pipeline layout");
 }
 
 void OctreeAS::destroyRenderPipelineLayout()
@@ -330,7 +330,7 @@ void OctreeAS::createRenderPipeline()
                  p_Info.device, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &m_RenderPipeline),
         "Failed to create octree render pipeline");
 
-    setDebugName(p_Info.device, VK_OBJECT_TYPE_PIPELINE, (uint64_t)m_RenderPipeline,
+    Debug::setDebugName(p_Info.device, VK_OBJECT_TYPE_PIPELINE, (uint64_t)m_RenderPipeline,
         "Octree render pipeline");
 }
 
