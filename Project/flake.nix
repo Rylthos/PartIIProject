@@ -7,8 +7,11 @@
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
+      llvm = pkgs.llvmPackages_latest;
     in {
       devShells.${system}.default = pkgs.mkShell {
+        stdenv = llvm.stdenv;
+
         nativeBuildInputs = with pkgs; [
           vulkan-headers
           vulkan-loader
@@ -17,31 +20,40 @@
           vulkan-tools
           vulkan-tools-lunarg
 
+          llvm.libllvm
+          llvm.libcxx
+          llvm.clang
+          clang-tools
+          clang
+
+          cmake
+          gnumake
+          ninja
+        ];
+
+        packages = with pkgs; [
           glfw
 
           renderdoc
-        ];
 
-        buildInputs = with pkgs; [
-          shader-slang
           tracy
-
-          ninja
-          cmake
-          cmake-language-server
-          clang-tools
-          clang
         ];
 
-        LD_LIBRARY_PATH="${pkgs.vulkan-loader}/lib:${pkgs.vulkan-validation-layers}/lib";
+        LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [
+          pkgs.vulkan-loader
+          pkgs.vulkan-validation-layers
+        ];
+
         VULKAN_SDK = "${pkgs.vulkan-headers}";
         VK_LAYER_PATH = "${pkgs.vulkan-validation-layers}/share/vulkan/explicit_layer.d";
 
         VulkanHeaders_DIR = "${pkgs.vulkan-headers}";
         glfw3_DIR = "${pkgs.glfw}/lib/cmake/glfw3";
 
-        CMAKE_INCLUDE_PATH = "${pkgs.vulkan-headers}/include";
-        CMAKE_LIBRARY_PATH = "${pkgs.vulkan-loader}/lib";
+        cmakeFlags = [
+          "-DCMAKE_CXX_COMPILER=${pkgs.clang}/bin/clang++"
+          "-DCMAKE_C_COMPILER=${pkgs.clang}/bin/clang"
+        ];
       };
     };
 }
