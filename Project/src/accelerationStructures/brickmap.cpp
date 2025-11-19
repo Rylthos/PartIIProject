@@ -66,20 +66,20 @@ void BrickmapAS::render(
 {
     Debug::beginCmdDebugLabel(cmd, "Brickmap AS render", { 0.0f, 0.0f, 1.0f, 1.0f });
 
-    glm::vec3 scale = glm::vec3(10);
-
-    glm::mat4 brickgridWorld = glm::mat4(1);
-    brickgridWorld = glm::scale(brickgridWorld, scale);
-    brickgridWorld = glm::translate(brickgridWorld, glm::vec3(-1));
-    glm::mat4 brickgridWorldInverse = glm::inverse(brickgridWorld);
-
-    glm::mat4 brickgridScaleInverse = glm::inverse(glm::scale(glm::mat4(1), scale));
-
+    // glm::vec3 scale = glm::vec3(10);
+    //
+    // glm::mat4 brickgridWorld = glm::mat4(1);
+    // brickgridWorld = glm::scale(brickgridWorld, scale);
+    // brickgridWorld = glm::translate(brickgridWorld, glm::vec3(-1));
+    // glm::mat4 brickgridWorldInverse = glm::inverse(brickgridWorld);
+    //
+    // glm::mat4 brickgridScaleInverse = glm::inverse(glm::scale(glm::mat4(1), scale));
+    //
     PushConstants pushConstant = {
         .cameraPosition = camera.getPosition(),
-        .brickgridWorld = brickgridWorld,
-        .brickgridWorldInverse = brickgridWorldInverse,
-        .brickgridScaleInverse = brickgridScaleInverse,
+        .brickgridWorld = glm::mat4(1.f),
+        .brickgridWorldInverse = glm::mat4(1.f),
+        .brickgridScaleInverse = glm::mat4(1.f),
         .brickgridSize = m_BrickgridSize,
     };
 
@@ -148,7 +148,7 @@ void BrickmapAS::createBuffers()
     m_BrickmapsBuffer.init(p_Info.device, p_Info.allocator, brickmapSize,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
         VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
-    m_BrickgridBuffer.setDebugName("Brickmap Buffer");
+    m_BrickmapsBuffer.setDebugName("Brickmap Buffer");
 
     size_t colourCount = 0;
     for (const auto& brickmap : m_Brickmaps) {
@@ -159,7 +159,7 @@ void BrickmapAS::createBuffers()
     m_ColourBuffer.init(p_Info.device, p_Info.allocator, colourSize,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
         VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
-    m_BrickgridBuffer.setDebugName("Colour Buffer");
+    m_ColourBuffer.setDebugName("Colour Buffer");
 
     auto gridBufferIndex
         = FrameCommands::getInstance()->createStaging(gridSize, [=, this](void* ptr) {
@@ -181,8 +181,8 @@ void BrickmapAS::createBuffers()
 
     auto mapBufferIndex
         = FrameCommands::getInstance()->createStaging(brickmapSize, [=, this](void* ptr) {
-              uint32_t* data = (uint32_t*)ptr;
-              const uint32_t nodeSize = 2 * 8 + 1; // Number of uint32_t
+              uint64_t* data = (uint64_t*)ptr;
+              const uint64_t nodeSize = 9; // Number of uint32_t
               for (size_t i = 0; i < m_Brickmaps.size(); i++) {
                   *(data + i * nodeSize) = m_Brickmaps[i].colourPtr;
                   memcpy(data + i * nodeSize + 1, m_Brickmaps[i].occupancy, sizeof(uint64_t) * 8);
@@ -286,16 +286,7 @@ void BrickmapAS::generate(std::stop_token stoken, std::unique_ptr<Loader> loader
 
     m_Brickgrid.assign(totalNodes, 0);
 
-    m_Brickgrid[0] = 0x00000003;
-    m_Brickmaps.push_back({
-        .colourPtr = 0,
-        .occupancy = {
-                      0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF,
-                      0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF,
-                      0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF,
-                      0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF,
-                      }
-    });
+    std::vector<uint8_t> colours;
 
     for (uint8_t x = 0; x < 8; x++) {
         for (uint8_t y = 0; y < 8; y++) {
@@ -303,12 +294,36 @@ void BrickmapAS::generate(std::stop_token stoken, std::unique_ptr<Loader> loader
                 uint8_t r = (uint8_t)(255.f * (7.f / x));
                 uint8_t g = (uint8_t)(255.f * (7.f / y));
                 uint8_t b = (uint8_t)(255.f * (7.f / z));
-                m_Brickmaps[0].colour.push_back(r);
-                m_Brickmaps[0].colour.push_back(g);
-                m_Brickmaps[0].colour.push_back(b);
+                colours.push_back(r);
+                colours.push_back(g);
+                colours.push_back(b);
             }
         }
     }
+
+    for (uint32_t y = 0; y < m_BrickgridSize.y; y++) {
+        for (uint32_t z = 0; z < m_BrickgridSize.z; z++) {
+            for (uint32_t x = 0; x < m_BrickgridSize.x; x++) {
+                uint32_t index
+                    = x + z * m_BrickgridSize.x + y * m_BrickgridSize.x * m_BrickgridSize.z;
+
+                if (x % 2 == 0 && y % 2 == 0 && z % 2 == 0) {
+                    m_Brickgrid[index] = 0x3;
+                }
+            }
+        }
+    }
+
+    m_Brickmaps.push_back({
+            .colourPtr = 0,
+            .occupancy = {
+            0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF,
+            0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF,
+            0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF,
+            0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF,
+            },
+            .colour = colours,
+        });
 
     m_UpdateBuffers = true;
 }

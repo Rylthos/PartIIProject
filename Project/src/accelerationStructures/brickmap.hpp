@@ -12,7 +12,7 @@ class BrickmapAS : public IAccelerationStructure {
     using BrickgridPtr = uint32_t; // Highest bit marks loaded
 
     struct Brickmap {
-        uint32_t colourPtr;
+        uint64_t colourPtr;
         uint64_t occupancy[8];
         std::vector<uint8_t> colour;
     };
