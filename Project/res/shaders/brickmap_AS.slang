@@ -69,26 +69,27 @@ func traverse_brick(in ray: Ray, in brick: Brickmap, in step_dir: int3, in step_
     if (((brick.data[index] >> offset) & 1) != 0) {
       hit.hit = true;
 
-      uint ptr = brick.colourPtr; // Calculate offset into general
+      uint ptr = brick.colourPtr;
+      for (int i = 0; i < index; i++) {
+        ptr += countbits(brick.data[i]);
+      }
+      ptr += countbits(brick.data[index] & ((((uint64_t)1) << (offset)) - 1));
 
-      // uint8_t r = i_Colours[ptr * 3 + 0];
-      // uint8_t g = i_Colours[ptr * 3 + 1];
-      // uint8_t b = i_Colours[ptr * 3 + 2];
-      // hit.colour = float3(float(r) / 255., float(g) / 255., float(b) / 255.);
-      //
-      hit.colour = float3(voxel_pos) / 8.;
+      uint8_t r = i_Colours[ptr * 3 + 0];
+      uint8_t g = i_Colours[ptr * 3 + 1];
+      uint8_t b = i_Colours[ptr * 3 + 2];
+      hit.colour = float3(float(r) / 255., float(g) / 255., float(b) / 255.);
 
-      // TODO: Calculate extra
       return true;
     }
 
-    int3 step_axis = next_dist.xyz <= min(next_dist.yzx, next_dist.zxy);
+    int3 step_axis = next_dist.xyz <= (min(next_dist.yzx, next_dist.zxy));
 
     next_dist +=  step_axis * step_size;
     voxel_pos +=  step_axis * step_dir;
     // normal     = -step_axis * step_dir;
 
-    if (any(voxel_pos < int3(0)) || any(voxel_pos >= entry_pos)) {
+    if (any(voxel_pos < int3(0)) || any(voxel_pos >= brick_size)) {
       return false;
     }
   }

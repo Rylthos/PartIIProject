@@ -288,12 +288,15 @@ void BrickmapAS::generate(std::stop_token stoken, std::unique_ptr<Loader> loader
 
     std::vector<uint8_t> colours;
 
-    for (uint8_t x = 0; x < 8; x++) {
-        for (uint8_t y = 0; y < 8; y++) {
-            for (uint8_t z = 0; z < 8; z++) {
-                uint8_t r = (uint8_t)(255.f * (7.f / x));
-                uint8_t g = (uint8_t)(255.f * (7.f / y));
-                uint8_t b = (uint8_t)(255.f * (7.f / z));
+    for (uint8_t y = 0; y < 8; y++) {
+        for (uint8_t z = 0; z < 8; z++) {
+            for (uint8_t x = 0; x < 8; x++) {
+                if ((x + y + z) % 2 != 0)
+                    continue;
+
+                uint8_t r = (uint8_t)(255.f * (x / 7.f));
+                uint8_t g = (uint8_t)(255.f * (y / 7.f));
+                uint8_t b = (uint8_t)(255.f * (z / 7.f));
                 colours.push_back(r);
                 colours.push_back(g);
                 colours.push_back(b);
@@ -317,10 +320,10 @@ void BrickmapAS::generate(std::stop_token stoken, std::unique_ptr<Loader> loader
     m_Brickmaps.push_back({
             .colourPtr = 0,
             .occupancy = {
-            0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF,
-            0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF,
-            0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF,
-            0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF,
+            0xAA55AA55AA55AA55, 0x55AA55AA55AA55AA,
+            0xAA55AA55AA55AA55, 0x55AA55AA55AA55AA,
+            0xAA55AA55AA55AA55, 0x55AA55AA55AA55AA,
+            0xAA55AA55AA55AA55, 0x55AA55AA55AA55AA,
             },
             .colour = colours,
         });
