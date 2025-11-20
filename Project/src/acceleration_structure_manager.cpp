@@ -81,10 +81,20 @@ void ASManager::setAS(ASType type)
     }
     LOG_INFO("Changed to {}", typeToStringMap[m_CurrentType]);
     m_CurrentAS->init(m_InitInfo);
-    const uint32_t sideLength = 1 << 12;
+    const uint32_t sideLength = 1 << 8;
     // std::unique_ptr<Loader> loader = std::make_unique<EquationLoader>(
     //     glm::uvec3(sideLength), std::function([](glm::uvec3 dimensions, glm::uvec3 index) {
     //         return Voxel { .colour = glm::vec3(index) / glm::vec3(dimensions - 1u) };
+    //     }));
+    //
+    // std::unique_ptr<Loader> loader = std::make_unique<EquationLoader>(
+    //     glm::uvec3(sideLength), std::function([](glm::uvec3 dimensions, glm::uvec3 index) {
+    //         if ((index.x + index.y + index.z) % 2 == 0) {
+    //             return std::make_optional(
+    //                 Voxel { .colour = glm::vec3(index) / glm::vec3(dimensions - 1u) });
+    //         } else {
+    //             return std::optional<Voxel>();
+    //         }
     //     }));
 
     std::unique_ptr<Loader> loader = std::make_unique<EquationLoader>(

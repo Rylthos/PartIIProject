@@ -52,7 +52,7 @@ class BrickmapAS : public IAccelerationStructure {
 
   private:
     VkDescriptorSetLayout m_BufferSetLayout;
-    VkDescriptorSet m_BufferSet;
+    VkDescriptorSet m_BufferSet = VK_NULL_HANDLE;
 
     VkPipelineLayout m_RenderPipelineLayout;
     VkPipeline m_RenderPipeline;

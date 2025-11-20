@@ -144,7 +144,7 @@ void BrickmapAS::createBuffers()
         VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
     m_BrickgridBuffer.setDebugName("Brickgrid Buffer");
 
-    VkDeviceSize brickmapSize = m_Brickmaps.size() * (sizeof(uint64_t) * 8 + sizeof(uint32_t));
+    VkDeviceSize brickmapSize = m_Brickmaps.size() * (sizeof(uint64_t) * 9);
     m_BrickmapsBuffer.init(p_Info.device, p_Info.allocator, brickmapSize,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
         VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
@@ -209,7 +209,7 @@ void BrickmapAS::createBuffers()
                       const uint8_t c = brickmap.colour.at(j);
                       data[offset + j] = c;
                   }
-                  offset += brickmap.colour.size() * 3;
+                  offset += brickmap.colour.size();
               }
           });
 
@@ -280,53 +280,74 @@ void BrickmapAS::destroyRenderPipeline()
 
 void BrickmapAS::generate(std::stop_token stoken, std::unique_ptr<Loader> loader)
 {
+    assert(
+        loader->getDimensions().x % 8 == 0 && "Brickmap require sidelenght to be a multiple of 8");
+
     m_BrickgridSize = glm::uvec3(glm::ceil(glm::vec3(loader->getDimensions()) / 8.f));
 
     size_t totalNodes = m_BrickgridSize.x * m_BrickgridSize.y * m_BrickgridSize.z;
 
-    m_Brickgrid.assign(totalNodes, 0);
+    m_Brickgrid.assign(totalNodes, 0x1);
 
+    size_t index = 0;
+    size_t totalColours = 0;
     std::vector<uint8_t> colours;
+    colours.resize(8 * 8 * 8 * 3);
+    for (uint32_t bY = 0; bY < m_BrickgridSize.y; bY++) {
+        for (uint32_t bZ = 0; bZ < m_BrickgridSize.z; bZ++) {
+            for (uint32_t bX = 0; bX < m_BrickgridSize.x; bX++) {
+                if (stoken.stop_requested())
+                    return;
 
-    for (uint8_t y = 0; y < 8; y++) {
-        for (uint8_t z = 0; z < 8; z++) {
-            for (uint8_t x = 0; x < 8; x++) {
-                if ((x + y + z) % 2 != 0)
-                    continue;
+                glm::ivec3 brickWorld = glm::ivec3(bX, bY, bZ) * 8;
 
-                uint8_t r = (uint8_t)(255.f * (x / 7.f));
-                uint8_t g = (uint8_t)(255.f * (y / 7.f));
-                uint8_t b = (uint8_t)(255.f * (z / 7.f));
-                colours.push_back(r);
-                colours.push_back(g);
-                colours.push_back(b);
-            }
-        }
-    }
+                uint32_t usedColours = 0;
+                uint64_t occupancy[8];
 
-    for (uint32_t y = 0; y < m_BrickgridSize.y; y++) {
-        for (uint32_t z = 0; z < m_BrickgridSize.z; z++) {
-            for (uint32_t x = 0; x < m_BrickgridSize.x; x++) {
-                uint32_t index
-                    = x + z * m_BrickgridSize.x + y * m_BrickgridSize.x * m_BrickgridSize.z;
+                uint64_t colourPtr = totalColours;
 
-                if (x % 2 == 0 && y % 2 == 0 && z % 2 == 0) {
-                    m_Brickgrid[index] = 0x3;
+                p_GenerationCompletion = index / (float)totalNodes;
+
+                for (uint64_t y = 0; y < 8; y++) {
+                    occupancy[y] = 0;
+                    for (uint64_t z = 0; z < 8; z++) {
+                        for (uint64_t x = 0; x < 8; x++) {
+                            glm::ivec3 coordinates = brickWorld + glm::ivec3(x, y, z);
+
+                            auto voxel = loader->getVoxel(coordinates);
+
+                            if (voxel.has_value()) {
+                                occupancy[y] |= ((uint64_t)1) << ((z * 8) + x);
+
+                                glm::vec3 colour = voxel.value().colour;
+
+                                colours[usedColours * 3 + 0] = std::ceil(colour.r * 255);
+                                colours[usedColours * 3 + 1] = std::ceil(colour.g * 255);
+                                colours[usedColours * 3 + 2] = std::ceil(colour.b * 255);
+                                usedColours++;
+                                totalColours++;
+                            }
+                        }
+                    }
                 }
+
+                if (usedColours > 0) {
+                    Brickmap brick;
+                    brick.colourPtr = colourPtr;
+                    memcpy(&brick.occupancy, occupancy, sizeof(uint64_t) * 8);
+                    brick.colour.resize(usedColours * 3);
+                    std::copy(
+                        colours.begin(), colours.begin() + (usedColours * 3), brick.colour.begin());
+
+                    m_Brickmaps.push_back(brick);
+
+                    m_Brickgrid[index] = 0x1 | (m_Brickmaps.size() << 1);
+                }
+
+                index++;
             }
         }
     }
-
-    m_Brickmaps.push_back({
-            .colourPtr = 0,
-            .occupancy = {
-            0xAA55AA55AA55AA55, 0x55AA55AA55AA55AA,
-            0xAA55AA55AA55AA55, 0x55AA55AA55AA55AA,
-            0xAA55AA55AA55AA55, 0x55AA55AA55AA55AA,
-            0xAA55AA55AA55AA55, 0x55AA55AA55AA55AA,
-            },
-            .colour = colours,
-        });
 
     m_UpdateBuffers = true;
 }
