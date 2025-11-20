@@ -58,6 +58,8 @@ func traverse_brick(in ray: Ray, in brick: Brickmap, in step_dir: int3, in step_
 
   float3 next_dist = abs((voxel_pos + max(step_dir, int3(0)) - entry_pos) * ray.inverse_direction);
 
+  float t = starting_t;
+
   for (; steps < STEP_LIMIT; steps++) {
 #ifdef HEATMAP
     hit.intersection_checks++;
@@ -80,14 +82,19 @@ func traverse_brick(in ray: Ray, in brick: Brickmap, in step_dir: int3, in step_
       uint8_t b = i_Colours[ptr * 3 + 2];
       hit.colour = float3(float(r) / 255., float(g) / 255., float(b) / 255.);
 
+      hit.hit_position = ray.calculate(t);
+
       return true;
     }
 
     int3 step_axis = next_dist.xyz <= (min(next_dist.yzx, next_dist.zxy));
 
+    t = starting_t + dot(next_dist, step_axis) / 8;
+
     next_dist +=  step_axis * step_size;
     voxel_pos +=  step_axis * step_dir;
-    // normal     = -step_axis * step_dir;
+    hit.normal = -step_axis * step_dir;
+
 
     if (any(voxel_pos < int3(0)) || any(voxel_pos >= brick_size)) {
       return false;
@@ -119,6 +126,8 @@ func traverse(in ray_original: Ray) -> HitRecord {
   float3 next_dist = abs((voxel_pos + max(step_dir, int3(0)) - entry_pos) * ray.inverse_direction);
   float3 step_size = ray.inverse_direction * step_dir;
 
+  hit.normal = calculateNormal(entry_pos, min_bound, max_bound);;
+
   for (int i = 0; i < STEP_LIMIT; i++) {
 #ifdef HEATMAP
     hit.intersection_checks++;
@@ -143,6 +152,7 @@ func traverse(in ray_original: Ray) -> HitRecord {
 
     next_dist +=  step_axis * step_size;
     voxel_pos +=  step_axis * step_dir;
+    hit.normal = -step_axis * step_dir;
 
     if (any(voxel_pos < int3(0)) || any(voxel_pos >= push_constants.brickgrid_dimensions)) {
       break;
@@ -183,8 +193,8 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
   o_Image[pixelCoord] = float4(mix, 1.);
 #else
   if (hit.hit) {
-    o_Image[pixelCoord] = float4(hit.colour, 1);
-    // o_Image[pixelCoord] = float4(calculateColour(hit, float3(5, 5, 0), float3(0.8)), 1);
+    // o_Image[pixelCoord] = float4(abs(hit.normal), 1);
+    o_Image[pixelCoord] = float4(calculateColour(hit, float3(5, 5, 0), float3(0.8)), 1);
   } else {
     o_Image[pixelCoord] = float4(0.2);
   }
