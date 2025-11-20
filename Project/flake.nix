@@ -20,6 +20,8 @@
           vulkan-tools
           vulkan-tools-lunarg
 
+          shader-slang
+
           llvm.libllvm
           llvm.libcxx
           llvm.clang
