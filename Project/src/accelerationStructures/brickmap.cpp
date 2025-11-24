@@ -22,10 +22,10 @@ struct PushConstants {
 BrickmapAS::BrickmapAS() { }
 BrickmapAS::~BrickmapAS()
 {
-    destroyRenderPipeline();
+    freeDescriptorSet();
     destroyDescriptorLayout();
 
-    freeDescriptorSet();
+    destroyRenderPipeline();
     destroyRenderPipelineLayout();
 
     freeBuffers();
@@ -283,6 +283,9 @@ void BrickmapAS::generate(std::stop_token stoken, std::unique_ptr<Loader> loader
     assert(
         loader->getDimensions().x % 8 == 0 && "Brickmap require sidelenght to be a multiple of 8");
 
+    std::chrono::steady_clock timer;
+    auto start = timer.now();
+
     m_BrickgridSize = glm::uvec3(glm::ceil(glm::vec3(loader->getDimensions()) / 8.f));
 
     size_t totalNodes = m_BrickgridSize.x * m_BrickgridSize.y * m_BrickgridSize.z;
@@ -306,7 +309,12 @@ void BrickmapAS::generate(std::stop_token stoken, std::unique_ptr<Loader> loader
 
                 uint64_t colourPtr = totalColours;
 
-                p_GenerationCompletion = index / (float)totalNodes;
+                {
+                    p_GenerationCompletion = (index + 1) / (float)totalNodes;
+                    auto current = timer.now();
+                    std::chrono::duration<float, std::milli> difference = current - start;
+                    p_GenerationTime = difference.count() / 1000.0f;
+                }
 
                 for (uint64_t y = 0; y < 8; y++) {
                     occupancy[y] = 0;
@@ -348,6 +356,10 @@ void BrickmapAS::generate(std::stop_token stoken, std::unique_ptr<Loader> loader
             }
         }
     }
+
+    auto end = timer.now();
+    std::chrono::duration<float, std::milli> difference = end - start;
+    p_GenerationTime = difference.count() / 1000.0f;
 
     m_UpdateBuffers = true;
 }

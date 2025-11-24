@@ -337,7 +337,7 @@ void OctreeAS::generateNodes(std::stop_token stoken, std::unique_ptr<Loader> loa
         auto current = timer.now();
 
         std::chrono::duration<float, std::milli> difference = current - start;
-        p_GenerationCompletion = ((float)current_code / (float)final_code) * (3. / 4.f);
+        p_GenerationCompletion = ((float)current_code / (float)final_code);
         p_GenerationTime = difference.count() / 1000.0f;
 
         while (current_depth > 0 && queues[current_depth].size() == 8) {
@@ -397,7 +397,6 @@ void OctreeAS::generateNodes(std::stop_token stoken, std::unique_ptr<Loader> loa
     writeChildrenNodes(stoken, intermediaryNodes, intermediaryNodes.size() - 1, timer, start);
 
     auto end = timer.now();
-
     std::chrono::duration<float, std::milli> difference = end - start;
 
     p_GenerationTime = difference.count() / 1000.0f;
@@ -439,11 +438,6 @@ void OctreeAS::writeChildrenNodes(std::stop_token stoken,
 
         currentOffset += childNode.childCount + 1;
     }
-
-    auto current = clock.now();
-    std::chrono::duration<float, std::milli> difference = current - startTime;
-    p_GenerationTime = difference.count() / 1000.0f;
-    p_GenerationCompletion = 0.75 + ((nodes.size() - index) / (float)nodes.size()) * 0.25f;
 
     uint8_t currentFarPointer = 0;
     for (uint8_t i = 0; i < childrenCount; i++) {

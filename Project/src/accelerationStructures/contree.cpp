@@ -334,7 +334,7 @@ void ContreeAS::generateNodes(std::stop_token stoken, std::unique_ptr<Loader> lo
 
         auto current = timer.now();
         std::chrono::duration<float, std::milli> difference = current - start;
-        p_GenerationCompletion = ((float)currentCode / (float)finalCode) * (3. / 4.f);
+        p_GenerationCompletion = ((float)currentCode / (float)finalCode);
         p_GenerationTime = difference.count() / 1000.0f;
 
         while (currentDepth > 0 && queues[currentDepth].size() == 64) {
@@ -389,12 +389,6 @@ void ContreeAS::generateNodes(std::stop_token stoken, std::unique_ptr<Loader> lo
         if (stoken.stop_requested())
             return;
 
-        auto current = timer.now();
-        std::chrono::duration<float, std::milli> difference = current - start;
-        p_GenerationCompletion = 0.75
-            + (((intermediaryNodes.size() - index) / (float)intermediaryNodes.size()) * 0.25f);
-        p_GenerationTime = difference.count() / 1000.0f;
-
         if (it->parent) {
             glm::vec3 c = it->colour * 255.f;
             glm::u8vec3 colour = glm::u8vec3(c.r, c.g, c.b);
@@ -406,6 +400,10 @@ void ContreeAS::generateNodes(std::stop_token stoken, std::unique_ptr<Loader> lo
         }
         index--;
     }
+
+    auto end = timer.now();
+    std::chrono::duration<float, std::milli> difference = end - start;
+    p_GenerationTime = difference.count() / 1000.0f;
 
     m_UpdateBuffers = true;
 }
