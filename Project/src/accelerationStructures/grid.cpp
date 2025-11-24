@@ -39,9 +39,12 @@ void GridAS::init(ASStructInfo info)
     createDescriptorLayouts();
 
     createRenderPipelineLayout();
+
+    ShaderManager::getInstance()->removeMacro("GRID_GENERATION_FINISHED");
     ShaderManager::getInstance()->addModule("grid_AS",
         std::bind(&GridAS::createRenderPipeline, this),
         std::bind(&GridAS::destroyRenderPipeline, this));
+
     createRenderPipeline();
 }
 
@@ -50,6 +53,7 @@ void GridAS::fromLoader(std::unique_ptr<Loader>&& loader)
     p_FinishedGeneration = false;
 
     ShaderManager::getInstance()->removeMacro("GRID_GENERATION_FINISHED");
+    updateShaders();
 
     p_GenerationThread.request_stop();
 

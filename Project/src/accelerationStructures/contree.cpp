@@ -94,6 +94,7 @@ void ContreeAS::init(ASStructInfo info)
     createDescriptorLayout();
     createRenderPipelineLayout();
 
+    ShaderManager::getInstance()->removeMacro("CONTREE_GENERATION_FINISHED");
     ShaderManager::getInstance()->addModule("contree_AS",
         std::bind(&ContreeAS::createRenderPipeline, this),
         std::bind(&ContreeAS::destroyRenderPipeline, this));
@@ -103,7 +104,9 @@ void ContreeAS::init(ASStructInfo info)
 void ContreeAS::fromLoader(std::unique_ptr<Loader>&& loader)
 {
     p_FinishedGeneration = false;
+
     ShaderManager::getInstance()->removeMacro("CONTREE_GENERATION_FINISHED");
+    updateShaders();
 
     p_GenerationThread.request_stop();
 
