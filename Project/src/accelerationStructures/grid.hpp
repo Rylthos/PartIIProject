@@ -25,6 +25,7 @@ class GridAS : public IAccelerationStructure {
     void fromLoader(std::unique_ptr<Loader>&& loader) override;
     void render(VkCommandBuffer cmd, Camera camera, VkDescriptorSet renderSet,
         VkExtent2D imageSize) override;
+    void update(float dt) override;
 
     void updateShaders() override;
 
@@ -51,6 +52,8 @@ class GridAS : public IAccelerationStructure {
     void createRenderPipeline();
     void destroyRenderPipeline();
 
+    void generate(std::stop_token stoken, std::unique_ptr<Loader>&& loader);
+
   private:
     std::vector<GridVoxel> m_Voxels;
     glm::uvec3 m_Dimensions;
@@ -63,4 +66,6 @@ class GridAS : public IAccelerationStructure {
 
     VkPipeline m_RenderPipeline;
     VkPipelineLayout m_RenderPipelineLayout;
+
+    bool m_UpdateBuffers = false;
 };

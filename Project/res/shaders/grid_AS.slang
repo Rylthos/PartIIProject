@@ -101,7 +101,10 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
 
   Ray ray = Ray(push_constants.camera_position, i_RayDirectionImage[pixelCoord].xyz);
 
-  HitRecord hit = traverse(ray);
+  HitRecord hit;
+#ifdef GRID_GENERATION_FINISHED
+  hit = traverse(ray);
+#endif
 
 #ifdef CYCLES
   uint64_t end_cycles = clockARB();

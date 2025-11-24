@@ -1,6 +1,7 @@
 #include "grid.hpp"
 
 #include <vector>
+#include <vulkan/vulkan_core.h>
 
 #include "../compute_pipeline.hpp"
 #include "../debug_utils.hpp"
@@ -46,28 +47,17 @@ void GridAS::init(ASStructInfo info)
 
 void GridAS::fromLoader(std::unique_ptr<Loader>&& loader)
 {
-    freeBuffers();
-    freeDescriptorSets();
+    p_FinishedGeneration = false;
 
-    m_Dimensions = loader->getDimensions();
+    ShaderManager::getInstance()->removeMacro("GRID_GENERATION_FINISHED");
 
-    m_Voxels.resize(m_Dimensions.x * m_Dimensions.y * m_Dimensions.z);
-    for (size_t z = 0; z < m_Dimensions.z; z++) {
-        for (size_t y = 0; y < m_Dimensions.y; y++) {
-            for (size_t x = 0; x < m_Dimensions.x; x++) {
-                size_t index = x + y * m_Dimensions.x + z * m_Dimensions.x * m_Dimensions.y;
-                auto v = loader->getVoxel({ x, y, z });
+    p_GenerationThread.request_stop();
 
-                m_Voxels[index] = GridVoxel {
-                    .visible = v.has_value(),
-                    .colour = v.has_value() ? v.value().colour : glm::vec3 { 0, 0, 0 },
-                };
-            }
-        }
-    }
-
-    createBuffer();
-    createDescriptorSets();
+    p_Generating = true;
+    p_GenerationThread
+        = std::jthread([this, loader = std::move(loader)](std::stop_token stoken) mutable {
+              generate(stoken, std::move(loader));
+          });
 }
 
 void GridAS::render(
@@ -83,8 +73,11 @@ void GridAS::render(
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_RenderPipeline);
     std::vector<VkDescriptorSet> descriptorSets = {
         renderSet,
-        m_BufferSet,
     };
+    if (p_FinishedGeneration) {
+        descriptorSets.push_back(m_BufferSet);
+    }
+
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_RenderPipelineLayout, 0,
         descriptorSets.size(), descriptorSets.data(), 0, nullptr);
     vkCmdPushConstants(cmd, m_RenderPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
@@ -93,6 +86,23 @@ void GridAS::render(
     vkCmdDispatch(cmd, std::ceil(imageSize.width / 8.f), std::ceil(imageSize.height / 8.f), 1);
 
     Debug::endCmdDebugLabel(cmd);
+}
+
+void GridAS::update(float dt)
+{
+    if (m_UpdateBuffers) {
+        freeBuffers();
+        freeDescriptorSets();
+
+        ShaderManager::getInstance()->defineMacro("GRID_GENERATION_FINISHED");
+        updateShaders();
+
+        createBuffer();
+        createDescriptorSets();
+        p_FinishedGeneration = true;
+        m_UpdateBuffers = false;
+        p_Generating = false;
+    }
 }
 
 void GridAS::updateShaders() { ShaderManager::getInstance()->moduleUpdated("grid_AS"); }
@@ -210,37 +220,52 @@ void GridAS::createRenderPipeline()
                            .setShader("grid_AS")
                            .setDebugName("Grid render pipeline")
                            .build();
-    VkShaderModule shaderModule = ShaderManager::getInstance()->getShaderModule("grid_AS");
-
-    VkPipelineShaderStageCreateInfo shaderStageCI {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-        .pNext = nullptr,
-        .flags = 0,
-        .stage = VK_SHADER_STAGE_COMPUTE_BIT,
-        .module = shaderModule,
-        .pName = "main",
-        .pSpecializationInfo = nullptr,
-    };
-
-    VkComputePipelineCreateInfo pipelineCI {
-        .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-        .pNext = nullptr,
-        .flags = 0,
-        .stage = shaderStageCI,
-        .layout = m_RenderPipelineLayout,
-        .basePipelineHandle = VK_NULL_HANDLE,
-        .basePipelineIndex = 0,
-    };
-
-    VK_CHECK(vkCreateComputePipelines(
-                 p_Info.device, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &m_RenderPipeline),
-        "Failed to create Grid render pipeline");
-
-    Debug::setDebugName(
-        p_Info.device, VK_OBJECT_TYPE_PIPELINE, (uint64_t)m_RenderPipeline, "Grid render pipeline");
 }
 
 void GridAS::destroyRenderPipeline()
 {
     vkDestroyPipeline(p_Info.device, m_RenderPipeline, nullptr);
+}
+
+void GridAS::generate(std::stop_token stoken, std::unique_ptr<Loader>&& loader)
+{
+    std::chrono::steady_clock timer;
+    auto start = timer.now();
+
+    m_Dimensions = loader->getDimensions();
+
+    const size_t totalNodes = m_Dimensions.x * m_Dimensions.y * m_Dimensions.z;
+
+    m_Voxels.resize(m_Dimensions.x * m_Dimensions.y * m_Dimensions.z);
+    for (size_t z = 0; z < m_Dimensions.z; z++) {
+        for (size_t y = 0; y < m_Dimensions.y; y++) {
+            for (size_t x = 0; x < m_Dimensions.x; x++) {
+                if (stoken.stop_requested())
+                    return;
+
+                size_t index = x + y * m_Dimensions.x + z * m_Dimensions.x * m_Dimensions.y;
+
+                {
+                    p_GenerationCompletion = (index + 1) / (float)totalNodes;
+
+                    auto current = timer.now();
+                    std::chrono::duration<float, std::milli> difference = current - start;
+                    p_GenerationTime = difference.count() / 1000.0f;
+                }
+
+                auto v = loader->getVoxel({ x, y, z });
+
+                m_Voxels[index] = GridVoxel {
+                    .visible = v.has_value(),
+                    .colour = v.has_value() ? v.value().colour : glm::vec3 { 0, 0, 0 },
+                };
+            }
+        }
+    }
+
+    auto end = timer.now();
+    std::chrono::duration<float, std::milli> difference = end - start;
+    p_GenerationTime = difference.count() / 1000.0f;
+
+    m_UpdateBuffers = true;
 }
