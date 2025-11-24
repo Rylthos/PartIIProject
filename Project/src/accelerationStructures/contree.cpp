@@ -268,8 +268,7 @@ void ContreeAS::generateNodes(std::stop_token stoken, std::unique_ptr<Loader> lo
     auto start = timer.now();
 
     uint64_t currentCode = 0;
-    const glm::uvec3 dimensions = loader->getDimensions();
-    assert((int)log2(dimensions.x) % 2 == 0 && "Contree requires sidelenght to be a power of 4");
+    const glm::uvec3 dimensions = loader->getDimensionsDiv4();
 
     uint64_t finalCode = dimensions.x * dimensions.y * dimensions.z;
 

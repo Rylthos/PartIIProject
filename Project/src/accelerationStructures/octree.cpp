@@ -264,7 +264,7 @@ void OctreeAS::generateNodes(std::stop_token stoken, std::unique_ptr<Loader> loa
     auto start = timer.now();
 
     uint64_t current_code = 0;
-    const glm::uvec3 dimensions = loader->getDimensions();
+    const glm::uvec3 dimensions = loader->getDimensionsDiv2();
     uint64_t final_code = dimensions.x * dimensions.y * dimensions.z;
 
     const uint32_t max_depth = 23;

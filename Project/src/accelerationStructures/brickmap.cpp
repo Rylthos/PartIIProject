@@ -280,13 +280,12 @@ void BrickmapAS::destroyRenderPipeline()
 
 void BrickmapAS::generate(std::stop_token stoken, std::unique_ptr<Loader> loader)
 {
-    assert(
-        loader->getDimensions().x % 8 == 0 && "Brickmap require sidelenght to be a multiple of 8");
-
     std::chrono::steady_clock timer;
     auto start = timer.now();
 
-    m_BrickgridSize = glm::uvec3(glm::ceil(glm::vec3(loader->getDimensions()) / 8.f));
+    glm::uvec3 dimensions = loader->getDimensionsDiv8();
+
+    m_BrickgridSize = glm::uvec3(glm::ceil(glm::vec3(dimensions) / 8.f));
 
     size_t totalNodes = m_BrickgridSize.x * m_BrickgridSize.y * m_BrickgridSize.z;
 
