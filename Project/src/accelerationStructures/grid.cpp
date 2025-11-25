@@ -127,7 +127,8 @@ void GridAS::destroyDescriptorLayouts()
 
 void GridAS::createBuffer()
 {
-    VkDeviceSize occupancyBufferSize = std::ceil(m_Voxels.size() / 8.); // Convert to bytes
+    VkDeviceSize occupancyBufferSize
+        = std::ceil(m_Voxels.size() / 32.) * sizeof(uint32_t); // Convert to bytes
     VkDeviceSize colourBufferSize = sizeof(glm::vec3) * m_Voxels.size();
 
     m_OccupancyBuffer.init(p_Info.device, p_Info.allocator, occupancyBufferSize,
@@ -140,32 +141,30 @@ void GridAS::createBuffer()
         VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
     m_ColourBuffer.setDebugName("Grid colour buffer");
 
-    auto bufferIndex = FrameCommands::getInstance()->createStaging(
-        occupancyBufferSize + colourBufferSize, [=, this](void* ptr) {
-            uint8_t* dataOccupancy = (uint8_t*)ptr;
-            float* dataColour = (float*)(dataOccupancy + occupancyBufferSize);
+    auto occupancyIndex
+        = FrameCommands::getInstance()->createStaging(occupancyBufferSize, [=, this](void* ptr) {
+              uint32_t* dataOccupancy = (uint32_t*)ptr;
 
-            size_t colourIndex = 0;
-            uint16_t current_index = 0;
-            uint8_t current_mask = 0;
-            for (size_t i = 0; i < m_Voxels.size(); i++) {
-                dataColour[colourIndex++] = m_Voxels[i].colour.x;
-                dataColour[colourIndex++] = m_Voxels[i].colour.y;
-                dataColour[colourIndex++] = m_Voxels[i].colour.z;
+              uint32_t current_index = 0;
+              uint32_t current_mask = 0;
+              for (size_t i = 0; i < m_Voxels.size(); i++) {
+                  // dataColour[i * 3 + 0] = m_Voxels[i].colour.x;
+                  // dataColour[i * 3 + 1] = m_Voxels[i].colour.y;
+                  // dataColour[i * 3 + 2] = m_Voxels[i].colour.z;
+                  //
+                  if ((i / 32) != current_index) {
+                      dataOccupancy[current_index] = current_mask;
+                      current_index = i / 32;
+                      current_mask = 0;
+                  }
 
-                if (i / 8 != current_index) {
-                    dataOccupancy[current_index] = current_mask;
-                    current_index = i / 8;
-                    current_mask = 0;
-                }
-
-                current_mask |= (m_Voxels[i].visible & 1) << (7 - (i % 8));
-            }
-            dataOccupancy[current_index] = current_mask;
-        });
+                  current_mask |= (m_Voxels[i].visible & 1) << (i % 32);
+              }
+              dataOccupancy[current_index] = current_mask;
+          });
 
     FrameCommands::getInstance()->stagingEval(
-        bufferIndex, [=, this](VkCommandBuffer cmd, FrameCommands::StagingBuffer buffer) {
+        occupancyIndex, [=, this](VkCommandBuffer cmd, FrameCommands::StagingBuffer buffer) {
             VkBufferCopy region {
                 .srcOffset = buffer.offset,
                 .dstOffset = 0,
@@ -173,9 +172,26 @@ void GridAS::createBuffer()
             };
 
             vkCmdCopyBuffer(cmd, buffer.buffer, m_OccupancyBuffer.getBuffer(), 1, &region);
+        });
 
-            region.srcOffset = buffer.offset + occupancyBufferSize;
-            region.size = colourBufferSize;
+    auto colourIndex
+        = FrameCommands::getInstance()->createStaging(colourBufferSize, [=, this](void* ptr) {
+              float* data = (float*)ptr;
+              for (size_t i = 0; i < m_Voxels.size(); i++) {
+                  data[i * 3 + 0] = m_Voxels.at(i).colour.r;
+                  data[i * 3 + 1] = m_Voxels.at(i).colour.g;
+                  data[i * 3 + 2] = m_Voxels.at(i).colour.b;
+              }
+          });
+
+    FrameCommands::getInstance()->stagingEval(
+        colourIndex, [=, this](VkCommandBuffer cmd, FrameCommands::StagingBuffer buffer) {
+            VkBufferCopy region {
+                .srcOffset = buffer.offset,
+                .dstOffset = 0,
+                .size = colourBufferSize,
+            };
+
             vkCmdCopyBuffer(cmd, buffer.buffer, m_ColourBuffer.getBuffer(), 1, &region);
         });
 }
