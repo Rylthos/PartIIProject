@@ -3,6 +3,9 @@
 #include "acceleration_structure.hpp"
 #include <vulkan/vulkan_core.h>
 
+#include "../generators/common.hpp"
+#include "../generators/grid.hpp"
+
 #include <array>
 
 #include "../buffer.hpp"
@@ -12,11 +15,6 @@
 #include <glm/glm.hpp>
 
 class GridAS : public IAccelerationStructure {
-    struct GridVoxel {
-        bool visible;
-        glm::vec3 colour;
-    };
-
   public:
     GridAS();
     ~GridAS();
@@ -52,10 +50,8 @@ class GridAS : public IAccelerationStructure {
     void createRenderPipeline();
     void destroyRenderPipeline();
 
-    void generate(std::stop_token stoken, std::unique_ptr<Loader>&& loader);
-
   private:
-    std::vector<GridVoxel> m_Voxels;
+    std::vector<Generators::GridVoxel> m_Voxels;
     glm::uvec3 m_Dimensions;
 
     Buffer m_OccupancyBuffer;

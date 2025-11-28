@@ -29,6 +29,7 @@ add_executable(${PROJECT_NAME} ${SOURCE_LIST})
 
 add_subdirectory(accelerationStructures)
 add_subdirectory(loaders)
+add_subdirectory(generators)
 
 target_compile_options(${PROJECT_NAME}
   PRIVATE -Wall -Wpedantic

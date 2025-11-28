@@ -60,7 +60,8 @@ void GridAS::fromLoader(std::unique_ptr<Loader>&& loader)
     p_Generating = true;
     p_GenerationThread
         = std::jthread([this, loader = std::move(loader)](std::stop_token stoken) mutable {
-              generate(stoken, std::move(loader));
+              m_Voxels = Generators::generateGrid(
+                  stoken, std::move(loader), p_GenerationInfo, m_Dimensions, m_UpdateBuffers);
           });
 }
 
@@ -245,47 +246,4 @@ void GridAS::createRenderPipeline()
 void GridAS::destroyRenderPipeline()
 {
     vkDestroyPipeline(p_Info.device, m_RenderPipeline, nullptr);
-}
-
-void GridAS::generate(std::stop_token stoken, std::unique_ptr<Loader>&& loader)
-{
-    std::chrono::steady_clock timer;
-    auto start = timer.now();
-
-    m_Dimensions = loader->getDimensions();
-
-    const size_t totalNodes = m_Dimensions.x * m_Dimensions.y * m_Dimensions.z;
-
-    m_Voxels.resize(m_Dimensions.x * m_Dimensions.y * m_Dimensions.z);
-    for (size_t z = 0; z < m_Dimensions.z; z++) {
-        for (size_t y = 0; y < m_Dimensions.y; y++) {
-            for (size_t x = 0; x < m_Dimensions.x; x++) {
-                if (stoken.stop_requested())
-                    return;
-
-                size_t index = x + y * m_Dimensions.x + z * m_Dimensions.x * m_Dimensions.y;
-
-                {
-                    p_GenerationCompletion = (index + 1) / (float)totalNodes;
-
-                    auto current = timer.now();
-                    std::chrono::duration<float, std::milli> difference = current - start;
-                    p_GenerationTime = difference.count() / 1000.0f;
-                }
-
-                auto v = loader->getVoxel({ x, y, z });
-
-                m_Voxels[index] = GridVoxel {
-                    .visible = v.has_value(),
-                    .colour = v.has_value() ? v.value().colour : glm::vec3 { 0, 0, 0 },
-                };
-            }
-        }
-    }
-
-    auto end = timer.now();
-    std::chrono::duration<float, std::milli> difference = end - start;
-    p_GenerationTime = difference.count() / 1000.0f;
-
-    m_UpdateBuffers = true;
 }

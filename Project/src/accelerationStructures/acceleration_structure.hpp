@@ -5,6 +5,8 @@
 
 #include <vulkan/vulkan_core.h>
 
+#include "../generators/common.hpp"
+
 #include "../camera.hpp"
 #include "../loaders/loader.hpp"
 
@@ -53,6 +55,8 @@ class IAccelerationStructure {
 
     float p_GenerationCompletion = 0.f;
     float p_GenerationTime = 0.f;
+
+    Generators::GenerationInfo p_GenerationInfo;
 
   private:
 };
