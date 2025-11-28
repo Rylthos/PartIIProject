@@ -40,8 +40,8 @@ class IAccelerationStructure {
     virtual uint64_t getNodes() = 0;
 
     virtual bool isGenerating() { return p_Generating; }
-    virtual float getGenerationCompletion() { return p_GenerationCompletion; }
-    virtual float getGenerationTime() { return p_GenerationTime; }
+    virtual float getGenerationCompletion() { return p_GenerationInfo.completionPercent; }
+    virtual float getGenerationTime() { return p_GenerationInfo.generationTime; }
 
   protected:
     ASStructInfo p_Info;
@@ -52,9 +52,6 @@ class IAccelerationStructure {
     bool p_FinishedGeneration = false;
     bool p_UpdateBuffers = false;
     bool p_Generating = false;
-
-    float p_GenerationCompletion = 0.f;
-    float p_GenerationTime = 0.f;
 
     Generators::GenerationInfo p_GenerationInfo;
 
