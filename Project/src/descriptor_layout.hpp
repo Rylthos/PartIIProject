@@ -14,6 +14,7 @@ class DescriptorLayoutGenerator {
         uint32_t binding, uint32_t descriptorCount);
 
     DescriptorLayoutGenerator& addStorageBufferBinding(VkShaderStageFlags flags, uint32_t binding);
+    DescriptorLayoutGenerator& addStorageImageBinding(VkShaderStageFlags flags, uint32_t binding);
 
     DescriptorLayoutGenerator& setDebugName(const char* name);
 

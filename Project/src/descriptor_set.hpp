@@ -6,6 +6,7 @@
 #include <vulkan/vulkan_core.h>
 
 #include "buffer.hpp"
+#include "image.hpp"
 
 class DescriptorSetGenerator {
     struct BufferDescriptor {
@@ -15,12 +16,21 @@ class DescriptorSetGenerator {
         VkDescriptorType types;
     };
 
+    struct ImageDescriptor {
+        Image& image;
+        VkImageLayout layout;
+        uint32_t binding;
+        VkDescriptorType types;
+    };
+
   public:
     static DescriptorSetGenerator start(
         VkDevice device, VkDescriptorPool pool, VkDescriptorSetLayout layout);
 
     DescriptorSetGenerator& addBufferDescriptor(
         uint32_t binding, Buffer& buffer, uint32_t offset = 0);
+    DescriptorSetGenerator& addImageDescriptor(
+        uint32_t binding, Image& image, VkImageLayout layout);
 
     DescriptorSetGenerator& setDebugName(const char* name);
 
@@ -38,6 +48,7 @@ class DescriptorSetGenerator {
     VkDescriptorSetLayout m_Layout;
 
     std::vector<BufferDescriptor> m_Buffers;
+    std::vector<ImageDescriptor> m_Images;
 
     std::optional<std::string> m_DebugName;
 };

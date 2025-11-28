@@ -26,6 +26,11 @@ DescriptorLayoutGenerator& DescriptorLayoutGenerator::addStorageBufferBinding(
 {
     return addBinding(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, flags, binding, 1);
 }
+DescriptorLayoutGenerator& DescriptorLayoutGenerator::addStorageImageBinding(
+    VkShaderStageFlags flags, uint32_t binding)
+{
+    return addBinding(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, flags, binding, 1);
+}
 
 DescriptorLayoutGenerator& DescriptorLayoutGenerator::setDebugName(const char* name)
 {

@@ -13,7 +13,6 @@ DescriptorSetGenerator DescriptorSetGenerator::start(
 DescriptorSetGenerator& DescriptorSetGenerator::addBufferDescriptor(
     uint32_t binding, Buffer& buffer, uint32_t offset)
 {
-
     m_Buffers.push_back({
         .buffer = buffer,
         .binding = binding,
@@ -21,18 +20,17 @@ DescriptorSetGenerator& DescriptorSetGenerator::addBufferDescriptor(
         .types = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
     });
 
-    // m_WriteDescriptors.push_back(VkWriteDescriptorSet {
-    //     .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-    //     .pNext = nullptr,
-    //     .dstSet = VK_NULL_HANDLE,
-    //     .dstBinding = binding,
-    //     .dstArrayElement = 0,
-    //     .descriptorCount = 1,
-    //     .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-    //     .pImageInfo = nullptr,
-    //     .pBufferInfo = 0,
-    //     .pTexelBufferView = nullptr,
-    // });
+    return *this;
+}
+
+DescriptorSetGenerator& DescriptorSetGenerator::addImageDescriptor(
+    uint32_t binding, Image& image, VkImageLayout layout)
+{
+    m_Images.push_back({
+        .image = image,
+        .binding = binding,
+        .types = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+    });
 
     return *this;
 }
@@ -80,6 +78,30 @@ VkDescriptorSet DescriptorSetGenerator::build()
             .descriptorType = buffer.types,
             .pImageInfo = nullptr,
             .pBufferInfo = &bufferInfos.at(bufferInfos.size() - 1),
+            .pTexelBufferView = nullptr,
+        });
+    }
+
+    std::vector<VkDescriptorImageInfo> imageInfos;
+    imageInfos.resize(m_Buffers.size());
+
+    for (auto& image : m_Images) {
+        imageInfos.push_back({
+            .sampler = VK_NULL_HANDLE,
+            .imageView = image.image.getImageView(),
+            .imageLayout = image.layout,
+        });
+
+        writeDescriptors.push_back({
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .pNext = nullptr,
+            .dstSet = set,
+            .dstBinding = image.binding,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = image.types,
+            .pImageInfo = &imageInfos.at(imageInfos.size() - 1),
+            .pBufferInfo = nullptr,
             .pTexelBufferView = nullptr,
         });
     }
