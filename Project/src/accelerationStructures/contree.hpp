@@ -85,6 +85,8 @@ class ContreeAS : public IAccelerationStructure {
     VkDescriptorSetLayout m_BufferSetLayout;
     VkDescriptorSet m_BufferSet = VK_NULL_HANDLE;
 
+    glm::uvec3 m_Dimensions;
+
     VkPipelineLayout m_RenderPipelineLayout;
     VkPipeline m_RenderPipeline;
 

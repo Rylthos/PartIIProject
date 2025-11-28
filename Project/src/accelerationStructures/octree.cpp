@@ -124,14 +124,12 @@ void OctreeAS::render(
 {
     Debug::beginCmdDebugLabel(cmd, "Octree AS render", { 0.0f, 0.0f, 1.0f, 1.0f });
 
-    glm::vec3 scale = glm::vec3(10);
-
     glm::mat4 octreeWorld = glm::mat4(1);
-    octreeWorld = glm::scale(octreeWorld, scale);
+    octreeWorld = glm::scale(octreeWorld, glm::vec3(m_Dimensions));
     octreeWorld = glm::translate(octreeWorld, glm::vec3(-1));
     glm::mat4 octreeWorldInverse = glm::inverse(octreeWorld);
 
-    glm::mat4 octreeScaleInverse = glm::inverse(glm::scale(glm::mat4(1), scale));
+    glm::mat4 octreeScaleInverse = glm::inverse(glm::scale(glm::mat4(1), glm::vec3(m_Dimensions)));
 
     PushConstants pushConstant = {
         .cameraPosition = camera.getPosition(),
@@ -266,11 +264,12 @@ void OctreeAS::generateNodes(std::stop_token stoken, std::unique_ptr<Loader> loa
 {
     std::chrono::steady_clock timer;
 
+    m_Dimensions = loader->getDimensionsDiv2();
+
     auto start = timer.now();
 
     uint64_t current_code = 0;
-    const glm::uvec3 dimensions = loader->getDimensionsDiv2();
-    uint64_t final_code = dimensions.x * dimensions.y * dimensions.z;
+    uint64_t final_code = m_Dimensions.x * m_Dimensions.y * m_Dimensions.z;
 
     const uint32_t max_depth = 23;
     uint32_t current_depth = max_depth - 1;

@@ -6,9 +6,6 @@
 
 struct PushConstants {
   float3 camera_position;
-  float4x4 brickgrid_world;
-  float4x4 brickgrid_world_inverse;
-  float4x4 brickgrid_scale_inverse;
   uint3 brickgrid_dimensions;
 };
 
@@ -106,7 +103,7 @@ func traverse_brick(in ray: Ray, in brick: Brickmap, in step_dir: int3, in step_
 
 func traverse(in ray_original: Ray) -> HitRecord {
   const float3 min_bound = float3(0);
-  const float3 max_bound = float3(push_constants.brickgrid_dimensions);
+  const float3 max_bound = float3(push_constants.brickgrid_dimensions * 8);
 
   Ray ray = ray_original;
 

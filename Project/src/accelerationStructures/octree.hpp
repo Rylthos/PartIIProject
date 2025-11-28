@@ -89,6 +89,8 @@ class OctreeAS : public IAccelerationStructure {
     VkPipelineLayout m_RenderPipelineLayout;
     VkPipeline m_RenderPipeline;
 
+    glm::uvec3 m_Dimensions;
+
     std::vector<OctreeNode> m_Nodes;
 
     Buffer m_OctreeBuffer;

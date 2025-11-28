@@ -134,14 +134,12 @@ void ContreeAS::render(
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_RenderPipelineLayout, 0,
         descriptorSets.size(), descriptorSets.data(), 0, nullptr);
 
-    glm::vec3 scale = glm::vec3(10);
-
     glm::mat4 contreeWorld = glm::mat4(1);
-    contreeWorld = glm::scale(contreeWorld, scale);
+    contreeWorld = glm::scale(contreeWorld, glm::vec3(m_Dimensions));
     contreeWorld = glm::translate(contreeWorld, glm::vec3(-1));
     glm::mat4 contreeWorldInverse = glm::inverse(contreeWorld);
 
-    glm::mat4 contreeScaleInverse = glm::inverse(glm::scale(glm::mat4(1), scale));
+    glm::mat4 contreeScaleInverse = glm::inverse(glm::scale(glm::mat4(1), glm::vec3(m_Dimensions)));
 
     PushConstants pushConstants = {
         .cameraPosition = camera.getPosition(),
@@ -268,12 +266,13 @@ void ContreeAS::generateNodes(std::stop_token stoken, std::unique_ptr<Loader> lo
 {
     std::chrono::steady_clock timer;
 
+    m_Dimensions = loader->getDimensionsDiv4();
+
     auto start = timer.now();
 
     uint64_t currentCode = 0;
-    const glm::uvec3 dimensions = loader->getDimensionsDiv4();
 
-    uint64_t finalCode = dimensions.x * dimensions.y * dimensions.z;
+    uint64_t finalCode = m_Dimensions.x * m_Dimensions.y * m_Dimensions.z;
 
     const uint32_t maxDepth = 11;
     uint32_t currentDepth = maxDepth;

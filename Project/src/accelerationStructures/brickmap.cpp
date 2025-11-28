@@ -13,9 +13,6 @@
 
 struct PushConstants {
     alignas(16) glm::vec3 cameraPosition;
-    alignas(16) glm::mat4 brickgridWorld;
-    alignas(16) glm::mat4 brickgridWorldInverse;
-    alignas(16) glm::mat4 brickgridScaleInverse;
     alignas(16) glm::uvec3 brickgridSize;
 };
 
@@ -69,20 +66,8 @@ void BrickmapAS::render(
 {
     Debug::beginCmdDebugLabel(cmd, "Brickmap AS render", { 0.0f, 0.0f, 1.0f, 1.0f });
 
-    // glm::vec3 scale = glm::vec3(10);
-    //
-    // glm::mat4 brickgridWorld = glm::mat4(1);
-    // brickgridWorld = glm::scale(brickgridWorld, scale);
-    // brickgridWorld = glm::translate(brickgridWorld, glm::vec3(-1));
-    // glm::mat4 brickgridWorldInverse = glm::inverse(brickgridWorld);
-    //
-    // glm::mat4 brickgridScaleInverse = glm::inverse(glm::scale(glm::mat4(1), scale));
-    //
     PushConstants pushConstant = {
         .cameraPosition = camera.getPosition(),
-        .brickgridWorld = glm::mat4(1.f),
-        .brickgridWorldInverse = glm::mat4(1.f),
-        .brickgridScaleInverse = glm::mat4(1.f),
         .brickgridSize = m_BrickgridSize,
     };
 
