@@ -42,14 +42,10 @@ StructuredBuffer<Brickmap> i_Brickmap;
 [[vk::binding(2, 1)]]
 StructuredBuffer<uint8_t> i_Colours;
 
-// Assume brickmap are 1 unit squared
-
 func traverse_brick(in ray: Ray, in brick: Brickmap, in step_dir: int3, in step_size: float3, in starting_t: float, in min_bound: float3, inout steps: int, inout hit: HitRecord) -> bool {
-  const float3 max_bound = min_bound + float3(1);
-
   const int3 brick_size = int3(8);
 
-  float3 entry_pos = (ray.calculate(starting_t) - min_bound) * brick_size;
+  float3 entry_pos = ray.calculate(starting_t) - min_bound * 8;
 
   int3 voxel_pos = int3(clamp(floor(entry_pos), int3(0), int3(brick_size - 1)));
 
@@ -86,7 +82,7 @@ func traverse_brick(in ray: Ray, in brick: Brickmap, in step_dir: int3, in step_
 
     int3 step_axis = next_dist.xyz <= (min(next_dist.yzx, next_dist.zxy));
 
-    t = starting_t + dot(next_dist, step_axis) / 8;
+    t = starting_t + dot(next_dist, step_axis);
 
     next_dist +=  step_axis * step_size;
     voxel_pos +=  step_axis * step_dir;
@@ -103,7 +99,7 @@ func traverse_brick(in ray: Ray, in brick: Brickmap, in step_dir: int3, in step_
 
 func traverse(in ray_original: Ray) -> HitRecord {
   const float3 min_bound = float3(0);
-  const float3 max_bound = float3(push_constants.brickgrid_dimensions);
+  const float3 max_bound = float3(push_constants.brickgrid_dimensions * 8);
 
   Ray ray = ray_original;
 
@@ -115,7 +111,7 @@ func traverse(in ray_original: Ray) -> HitRecord {
 
   float t = boundingTMin;
 
-  float3 entry_pos = ray.calculate(t + EPS);
+  float3 entry_pos = ray.calculate(t + EPS) / 8;
 
   int3 voxel_pos = clamp(int3(floor(entry_pos)), int3(0), int3(push_constants.brickgrid_dimensions));
 
@@ -145,7 +141,7 @@ func traverse(in ray_original: Ray) -> HitRecord {
 
     int3 step_axis = next_dist.xyz <= (min(next_dist.yzx, next_dist.zxy));
 
-    t = boundingTMin + dot(next_dist, step_axis);
+    t = boundingTMin + dot(next_dist, step_axis) * 8;
 
     next_dist +=  step_axis * step_size;
     voxel_pos +=  step_axis * step_dir;
@@ -190,7 +186,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
   o_Image[pixelCoord] = float4(mix, 1.);
 #else
   if (hit.hit) {
-    // o_Image[pixelCoord] = float4(abs(hit.normal), 1);
+    // o_Image[pixelCoord] = float4(hit.colour, 1);
     o_Image[pixelCoord] = float4(calculateColour(hit, float3(5, 5, 0), float3(0.8)), 1);
   } else {
     o_Image[pixelCoord] = float4(0.2);
