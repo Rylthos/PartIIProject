@@ -44,8 +44,6 @@ class TextureAS : public IAccelerationStructure {
     void createRenderPipeline();
     void destroyRenderPipeline();
 
-    void generate(std::stop_token stoken, std::unique_ptr<Loader>&& loader);
-
   private:
     std::vector<GridVoxel> m_Voxels;
     glm::uvec3 m_Dimensions;
