@@ -14,6 +14,7 @@ enum class ASType : uint8_t {
     OCTREE = 1,
     CONTREE = 2,
     BRICKMAP = 3,
+    TEXTURE = 4,
     MAX_TYPE,
 };
 
@@ -58,6 +59,6 @@ class ASManager {
 
     RenderStyle m_CurrentRenderStyle = RenderStyle::NORMAL;
 
-    ASType m_CurrentType = ASType::BRICKMAP;
+    ASType m_CurrentType = ASType::TEXTURE;
     std::unique_ptr<IAccelerationStructure> m_CurrentAS;
 };

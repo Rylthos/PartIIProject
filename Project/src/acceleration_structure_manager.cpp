@@ -4,6 +4,7 @@
 #include "accelerationStructures/contree.hpp"
 #include "accelerationStructures/grid.hpp"
 #include "accelerationStructures/octree.hpp"
+#include "accelerationStructures/texture.hpp"
 
 #include "events.hpp"
 #include "glm/common.hpp"
@@ -24,6 +25,7 @@ static std::map<ASType, const char*> typeToStringMap {
     { ASType::OCTREE,   "Octree"   },
     { ASType::CONTREE,  "Contree"  },
     { ASType::BRICKMAP, "Brickmap" },
+    { ASType::TEXTURE,  "Texture"  },
 };
 
 static std::map<RenderStyle, const char*> styleToStringMap {
@@ -76,12 +78,15 @@ void ASManager::setAS(ASType type)
     case ASType::BRICKMAP:
         m_CurrentAS = std::make_unique<BrickmapAS>();
         break;
+    case ASType::TEXTURE:
+        m_CurrentAS = std::make_unique<TextureAS>();
+        break;
     default:
         assert(false && "Invalid Type provided");
     }
     LOG_INFO("Changed to {}", typeToStringMap[m_CurrentType]);
     m_CurrentAS->init(m_InitInfo);
-    const uint32_t sideLength = 1 << 8;
+    uint32_t sideLength = 90;
     // std::unique_ptr<Loader> loader = std::make_unique<EquationLoader>(
     //     glm::uvec3(sideLength), std::function([](glm::uvec3 dimensions, glm::uvec3 index) {
     //         return Voxel { .colour = glm::vec3(index) / glm::vec3(dimensions - 1u) };
@@ -97,8 +102,8 @@ void ASManager::setAS(ASType type)
     //         }
     //     }));
 
-    std::unique_ptr<Loader> loader = std::make_unique<EquationLoader>(
-        glm::uvec3(sideLength), std::function([](glm::uvec3 dimensions, glm::uvec3 index) {
+    std::unique_ptr<Loader> loader = std::make_unique<EquationLoader>(glm::uvec3(sideLength),
+        std::function([sideLength](glm::uvec3 dimensions, glm::uvec3 index) {
             const float radius = sideLength / 2.2f;
             glm::vec3 center = glm::vec3(dimensions) / 2.f;
             const glm::vec3 position = glm::vec3(index) - center;
@@ -110,6 +115,7 @@ void ASManager::setAS(ASType type)
             return std::optional<Voxel>();
         }));
 
+    // sideLength = 60;
     // std::unique_ptr<Loader> loader = std::make_unique<EquationLoader>(
     //     glm::uvec3(sideLength), std::function([](glm::uvec3 dimensions, glm::uvec3 index) {
     //         const uint32_t power = 6;
