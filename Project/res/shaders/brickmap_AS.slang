@@ -103,7 +103,7 @@ func traverse_brick(in ray: Ray, in brick: Brickmap, in step_dir: int3, in step_
 
 func traverse(in ray_original: Ray) -> HitRecord {
   const float3 min_bound = float3(0);
-  const float3 max_bound = float3(push_constants.brickgrid_dimensions * 8);
+  const float3 max_bound = float3(push_constants.brickgrid_dimensions);
 
   Ray ray = ray_original;
 
@@ -115,7 +115,7 @@ func traverse(in ray_original: Ray) -> HitRecord {
 
   float t = boundingTMin;
 
-  float3 entry_pos = ray.calculate(t + EPS) / 1;
+  float3 entry_pos = ray.calculate(t + EPS);
 
   int3 voxel_pos = clamp(int3(floor(entry_pos)), int3(0), int3(push_constants.brickgrid_dimensions));
 

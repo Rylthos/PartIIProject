@@ -271,8 +271,7 @@ void BrickmapAS::generate(std::stop_token stoken, std::unique_ptr<Loader> loader
     std::chrono::steady_clock timer;
     auto start = timer.now();
 
-    glm::uvec3 dimensions = loader->getDimensionsDiv8();
-
+    glm::uvec3 dimensions = loader->getDimensions();
     m_BrickgridSize = glm::uvec3(glm::ceil(glm::vec3(dimensions) / 8.f));
 
     size_t totalNodes = m_BrickgridSize.x * m_BrickgridSize.y * m_BrickgridSize.z;
