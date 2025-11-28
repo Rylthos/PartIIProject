@@ -46,6 +46,9 @@ std::vector<GridVoxel> generateGrid(std::stop_token stoken, std::unique_ptr<Load
 
     finished = true;
 
+    info.voxelCount = voxels.size();
+    info.nodes = voxels.size();
+
     return voxels;
 }
 }

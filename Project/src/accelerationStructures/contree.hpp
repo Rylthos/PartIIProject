@@ -21,7 +21,6 @@ class ContreeAS : public IAccelerationStructure {
     void updateShaders() override;
 
     uint64_t getMemoryUsage() override { return m_ContreeBuffer.getSize(); }
-    uint64_t getNodes() override { return m_Nodes.size(); }
 
   private:
     void createDescriptorLayout();

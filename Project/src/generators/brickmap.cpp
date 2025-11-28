@@ -18,6 +18,8 @@ std::pair<std::vector<BrickgridPtr>, std::vector<Brickmap>> generateBrickmap(std
 
     brickgrid.assign(totalNodes, 0x1);
 
+    info.voxelCount = 0;
+
     size_t index = 0;
     size_t totalColours = 0;
     std::vector<uint8_t> colours;
@@ -76,6 +78,8 @@ std::pair<std::vector<BrickgridPtr>, std::vector<Brickmap>> generateBrickmap(std
                     brickmaps.push_back(brick);
 
                     brickgrid[index] = 0x1 | (brickmaps.size() << 1);
+
+                    info.voxelCount += 8 * 8 * 8;
                 }
 
                 index++;
@@ -86,6 +90,8 @@ std::pair<std::vector<BrickgridPtr>, std::vector<Brickmap>> generateBrickmap(std
     auto end = timer.now();
     std::chrono::duration<float, std::milli> difference = end - start;
     info.generationTime = difference.count() / 1000.0f;
+
+    info.nodes = brickgrid.size() + brickmaps.size();
 
     finished = true;
 

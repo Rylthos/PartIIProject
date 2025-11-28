@@ -25,8 +25,6 @@ class TextureAS : public IAccelerationStructure {
     {
         return m_Dimensions.x * m_Dimensions.y * m_Dimensions.z * 4 * sizeof(uint8_t);
     }
-    uint64_t getNodes() override { return m_Voxels.size(); }
-    uint64_t getTotalVoxels() override { return m_Voxels.size(); }
 
   private:
     void createDescriptorLayouts();

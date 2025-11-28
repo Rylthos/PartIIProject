@@ -183,7 +183,7 @@ std::vector<OctreeNode> generateOctree(std::stop_token stoken, std::unique_ptr<L
 
     std::vector<OctreeNode> nodes;
 
-    // p_VoxelCount = 0;
+    info.voxelCount = 0;
 
     while (current_code != final_code) {
         if (stoken.stop_requested())
@@ -220,7 +220,7 @@ std::vector<OctreeNode> generateOctree(std::stop_token stoken, std::unique_ptr<L
                         intermediaryNodes.push_back(queues[current_depth].at(i));
                         if (!queues[current_depth].at(i).parent
                             && queues[current_depth].at(i).visible) {
-                            // p_VoxelCount += pow(8, 22 - current_depth);
+                            info.voxelCount += pow(8, 22 - current_depth);
                         }
                         childCount += queues[current_depth].at(i).childCount + 1;
                     }
@@ -244,7 +244,7 @@ std::vector<OctreeNode> generateOctree(std::stop_token stoken, std::unique_ptr<L
     assert(queues[current_depth].size() == 1);
     intermediaryNodes.push_back(queues[current_depth].at(0));
     if (!queues[current_depth].at(0).parent && queues[current_depth].at(0).visible) {
-        // p_VoxelCount += pow(8, 22 - current_depth);
+        info.voxelCount += pow(8, 22 - current_depth);
     }
 
     nodes.reserve(intermediaryNodes.size());
@@ -262,6 +262,8 @@ std::vector<OctreeNode> generateOctree(std::stop_token stoken, std::unique_ptr<L
 
     info.generationTime = difference.count() / 1000.0f;
     info.completionPercent = 1.f;
+
+    info.nodes = nodes.size();
 
     finished = true;
 

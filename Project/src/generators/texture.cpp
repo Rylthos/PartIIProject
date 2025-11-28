@@ -48,6 +48,9 @@ std::vector<TextureVoxel> generateTexture(std::stop_token stoken, std::unique_pt
     std::chrono::duration<float, std::milli> difference = end - start;
     info.generationTime = difference.count() / 1000.0f;
 
+    info.voxelCount = totalNodes;
+    info.nodes = totalNodes;
+
     finished = true;
 
     return voxels;

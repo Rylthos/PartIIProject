@@ -25,7 +25,6 @@ class OctreeAS : public IAccelerationStructure {
     void updateShaders() override;
 
     uint64_t getMemoryUsage() override { return m_OctreeBuffer.getSize(); }
-    uint64_t getNodes() override { return m_Nodes.size(); }
 
   private:
     void createDescriptorLayout();

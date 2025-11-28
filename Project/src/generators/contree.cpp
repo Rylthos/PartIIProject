@@ -122,7 +122,7 @@ std::vector<ContreeNode> generateContree(std::stop_token stoken, std::unique_ptr
 
     std::vector<ContreeNode> nodes;
 
-    // p_VoxelCount = 0;
+    info.voxelCount = 0;
 
     while (currentCode != finalCode) {
         if (stoken.stop_requested())
@@ -157,7 +157,7 @@ std::vector<ContreeNode> generateContree(std::stop_token stoken, std::unique_ptr
                         childMask |= (1ull << i);
                         intermediaryNodes.push_back(queues[currentDepth].at(i));
                         if (!queues[currentDepth].at(i).parent) {
-                            // p_VoxelCount += pow(64, 10 - currentDepth);
+                            info.voxelCount += pow(64, 10 - currentDepth);
                         }
                         childCount += queues[currentDepth].at(i).childCount + 1;
                     }
@@ -180,7 +180,7 @@ std::vector<ContreeNode> generateContree(std::stop_token stoken, std::unique_ptr
     assert(queues[currentDepth].size() == 1);
     intermediaryNodes.push_back(queues[currentDepth].at(0));
     if (!queues[currentDepth].at(0).parent && queues[currentDepth].at(0).visible) {
-        // p_VoxelCount += pow(64, 10 - currentDepth);
+        info.voxelCount += pow(64, 10 - currentDepth);
     }
 
     nodes.reserve(intermediaryNodes.size());
@@ -204,6 +204,9 @@ std::vector<ContreeNode> generateContree(std::stop_token stoken, std::unique_ptr
     auto end = timer.now();
     std::chrono::duration<float, std::milli> difference = end - start;
     info.generationTime = difference.count() / 1000.0f;
+    info.completionPercent = 1.f;
+
+    info.nodes = nodes.size();
 
     finished = true;
 

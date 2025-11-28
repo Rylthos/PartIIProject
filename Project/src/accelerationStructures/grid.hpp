@@ -31,8 +31,6 @@ class GridAS : public IAccelerationStructure {
     {
         return m_OccupancyBuffer.getSize() + m_ColourBuffer.getSize();
     }
-    uint64_t getNodes() override { return m_Voxels.size(); }
-    uint64_t getTotalVoxels() override { return m_Voxels.size(); }
 
   private:
     void createDescriptorLayouts();

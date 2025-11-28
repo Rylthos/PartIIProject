@@ -23,8 +23,10 @@ class BrickmapAS : public IAccelerationStructure {
 
     void updateShaders() override;
 
-    uint64_t getMemoryUsage() override { return 0; }
-    uint64_t getNodes() override { return 0; }
+    uint64_t getMemoryUsage() override
+    {
+        return m_BrickgridBuffer.getSize() + m_BrickmapsBuffer.getSize() + m_ColourBuffer.getSize();
+    }
 
   private:
     void createDescriptorLayout();

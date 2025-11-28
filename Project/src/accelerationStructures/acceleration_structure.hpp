@@ -36,8 +36,8 @@ class IAccelerationStructure {
     virtual void updateShaders() { }
 
     virtual uint64_t getMemoryUsage() = 0;
-    virtual uint64_t getTotalVoxels() { return p_VoxelCount; }
-    virtual uint64_t getNodes() = 0;
+    virtual uint64_t getTotalVoxels() { return p_GenerationInfo.voxelCount; }
+    virtual uint64_t getNodes() { return p_GenerationInfo.nodes; }
 
     virtual bool isGenerating() { return p_Generating; }
     virtual float getGenerationCompletion() { return p_GenerationInfo.completionPercent; }
@@ -46,14 +46,10 @@ class IAccelerationStructure {
   protected:
     ASStructInfo p_Info;
 
-    uint64_t p_VoxelCount = 0;
-
     std::jthread p_GenerationThread;
     bool p_FinishedGeneration = false;
     bool p_UpdateBuffers = false;
     bool p_Generating = false;
 
     Generators::GenerationInfo p_GenerationInfo;
-
-  private:
 };
