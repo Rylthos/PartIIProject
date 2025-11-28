@@ -8,43 +8,9 @@
 #include <variant>
 #include <vulkan/vulkan_core.h>
 
-class OctreeNode {
-  public:
-    OctreeNode(uint32_t offset);
-    OctreeNode(uint8_t childMask, uint32_t offset);
-    OctreeNode(uint8_t r, uint8_t g, uint8_t b);
-
-    uint32_t getData();
-
-  private:
-    enum OctreeFlags : uint8_t { // 2 bits
-        OCTREE_FLAG_EMPTY = 0x00,
-        OCTREE_FLAG_SOLID = 0x01,
-    };
-
-    struct NodeType {
-        OctreeFlags flags;
-        uint32_t childMask : 8;
-        uint32_t offset    : 22;
-    };
-    struct LeafType {
-        OctreeFlags flags;
-        uint32_t r : 8;
-        uint32_t g : 8;
-        uint32_t b : 8;
-    };
-    std::variant<NodeType, LeafType, uint32_t> m_CurrentType;
-};
+#include "../generators/octree.hpp"
 
 class OctreeAS : public IAccelerationStructure {
-    struct IntermediaryNode {
-        glm::u8vec3 colour;
-        bool visible;
-        bool parent;
-        uint8_t childMask;
-        uint32_t childStartIndex = 0;
-        uint32_t childCount = 0;
-    };
 
   public:
     OctreeAS();
@@ -77,11 +43,6 @@ class OctreeAS : public IAccelerationStructure {
     void createRenderPipeline();
     void destroyRenderPipeline();
 
-    void generateNodes(std::stop_token stoken, std::unique_ptr<Loader> loader);
-    void writeChildrenNodes(std::stop_token stoken, const std::vector<IntermediaryNode>& nodes,
-        size_t index, std::chrono::steady_clock clock,
-        const std::chrono::steady_clock::time_point startTime);
-
   private:
     VkDescriptorSetLayout m_BufferSetLayout;
     VkDescriptorSet m_BufferSet = VK_NULL_HANDLE;
@@ -91,7 +52,7 @@ class OctreeAS : public IAccelerationStructure {
 
     glm::uvec3 m_Dimensions;
 
-    std::vector<OctreeNode> m_Nodes;
+    std::vector<Generators::OctreeNode> m_Nodes;
 
     Buffer m_OctreeBuffer;
 
