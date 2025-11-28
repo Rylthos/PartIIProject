@@ -4,6 +4,7 @@
 #include "vulkan/vulkan.h"
 
 #include "camera.hpp"
+#include "image.hpp"
 #include "logger.hpp"
 #include "window.hpp"
 
@@ -17,14 +18,6 @@ struct Sphere {
 struct Queue {
     VkQueue queue;
     uint32_t queueFamily;
-};
-
-struct Image {
-    VkImage image;
-    VkImageView view;
-    VkFormat format;
-    VkExtent3D extent;
-    VmaAllocation allocation;
 };
 
 struct PerFrameData {

@@ -20,6 +20,7 @@ set (SOURCE_LIST
   "compute_pipeline.cpp" "compute_pipeline.hpp"
   "descriptor_layout.cpp" "descriptor_layout.hpp"
   "descriptor_set.cpp" "descriptor_set.hpp"
+  "image.cpp" "image.hpp"
 )
 
 add_compile_definitions(GLM_ENABLE_EXPERIMENTAL)

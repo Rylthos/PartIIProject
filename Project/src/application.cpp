@@ -36,74 +36,6 @@ struct SetupPushConstants {
     alignas(16) glm::vec3 cameraUp;
 };
 
-void transitionImage(VkCommandBuffer commandBuffer, VkImage target, VkImageLayout currentLayout,
-    VkImageLayout targetLayout)
-{
-    VkImageMemoryBarrier2 imageBarrier {};
-    imageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-    imageBarrier.pNext = nullptr;
-    imageBarrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-    imageBarrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
-    imageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-    imageBarrier.dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT;
-    imageBarrier.oldLayout = currentLayout;
-    imageBarrier.newLayout = targetLayout;
-    imageBarrier.image = target;
-    imageBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    imageBarrier.subresourceRange.baseMipLevel = 0;
-    imageBarrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
-    imageBarrier.subresourceRange.baseArrayLayer = 0;
-    imageBarrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
-
-    VkDependencyInfo dependencyInfo {};
-    dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-    dependencyInfo.pNext = nullptr;
-    dependencyInfo.dependencyFlags = 0;
-    dependencyInfo.memoryBarrierCount = 0;
-    dependencyInfo.pMemoryBarriers = nullptr;
-    dependencyInfo.bufferMemoryBarrierCount = 0;
-    dependencyInfo.pBufferMemoryBarriers = nullptr;
-    dependencyInfo.imageMemoryBarrierCount = 1;
-    dependencyInfo.pImageMemoryBarriers = &imageBarrier;
-
-    vkCmdPipelineBarrier2(commandBuffer, &dependencyInfo);
-}
-
-void copyImageToImage(
-    VkCommandBuffer command, VkImage src, VkImage dst, VkExtent3D srcSize, VkExtent3D dstSize)
-{
-    VkImageBlit2 blitRegion {};
-    blitRegion.sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2;
-    blitRegion.pNext = nullptr;
-    blitRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    blitRegion.srcSubresource.mipLevel = 0;
-    blitRegion.srcSubresource.baseArrayLayer = 0;
-    blitRegion.srcSubresource.layerCount = 1;
-    blitRegion.srcOffsets[1].x = srcSize.width;
-    blitRegion.srcOffsets[1].y = srcSize.height;
-    blitRegion.srcOffsets[1].z = srcSize.depth;
-    blitRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    blitRegion.dstSubresource.mipLevel = 0;
-    blitRegion.dstSubresource.baseArrayLayer = 0;
-    blitRegion.dstSubresource.layerCount = 1;
-    blitRegion.dstOffsets[1].x = dstSize.width;
-    blitRegion.dstOffsets[1].y = dstSize.height;
-    blitRegion.dstOffsets[1].z = dstSize.depth;
-
-    VkBlitImageInfo2 blitInfo {};
-    blitInfo.sType = VK_STRUCTURE_TYPE_BLIT_IMAGE_INFO_2;
-    blitInfo.pNext = nullptr;
-    blitInfo.srcImage = src;
-    blitInfo.srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-    blitInfo.dstImage = dst;
-    blitInfo.dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-    blitInfo.regionCount = 1;
-    blitInfo.pRegions = &blitRegion;
-    blitInfo.filter = VK_FILTER_LINEAR;
-
-    vkCmdBlitImage2(command, &blitInfo);
-}
-
 void Application::init()
 {
     using namespace std::placeholders;
@@ -352,56 +284,15 @@ void Application::createDrawImages()
     VkExtent3D extent = { m_Window.getWindowSize().x, m_Window.getWindowSize().y, 1 };
     VkFormat format = VK_FORMAT_R16G16B16A16_SFLOAT;
 
-    VkImageCreateInfo drawImageCI {};
-    drawImageCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    drawImageCI.flags = 0;
-    drawImageCI.imageType = VK_IMAGE_TYPE_2D;
-    drawImageCI.format = format;
-    drawImageCI.extent = extent;
-    drawImageCI.mipLevels = 1;
-    drawImageCI.arrayLayers = 1;
-    drawImageCI.samples = VK_SAMPLE_COUNT_1_BIT;
-    drawImageCI.tiling = VK_IMAGE_TILING_OPTIMAL;
-    drawImageCI.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT
-        | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    drawImageCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-    VmaAllocationCreateInfo allocationCI {};
-    allocationCI.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
-    allocationCI.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-
-    VkImageViewCreateInfo imageViewCI {};
-    imageViewCI.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    imageViewCI.pNext = nullptr;
-    imageViewCI.flags = 0;
-    imageViewCI.image = VK_NULL_HANDLE;
-    imageViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    imageViewCI.format = format;
-    imageViewCI.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    imageViewCI.subresourceRange.baseMipLevel = 0;
-    imageViewCI.subresourceRange.levelCount = 1;
-    imageViewCI.subresourceRange.baseArrayLayer = 0;
-    imageViewCI.subresourceRange.layerCount = 1;
-
     for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
-        m_PerFrameData[i].drawImage.format = format;
-        m_PerFrameData[i].drawImage.extent = extent;
+        m_PerFrameData[i].drawImage.init(m_VkDevice, m_VmaAllocator, m_GraphicsQueue.queueFamily,
+            extent, format, VK_IMAGE_TYPE_2D,
+            VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT
+                | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+        m_PerFrameData[i].drawImage.setDebugName("Draw image");
 
-        VK_CHECK(vmaCreateImage(m_VmaAllocator, &drawImageCI, &allocationCI,
-                     &m_PerFrameData[i].drawImage.image, &m_PerFrameData[i].drawImage.allocation,
-                     nullptr),
-            "Failed to allocate draw image");
-
-        Debug::setDebugName(m_VkDevice, VK_OBJECT_TYPE_IMAGE,
-            (uint64_t)m_PerFrameData[i].drawImage.image, "Draw image");
-
-        imageViewCI.image = m_PerFrameData[i].drawImage.image;
-        VK_CHECK(
-            vkCreateImageView(m_VkDevice, &imageViewCI, nullptr, &m_PerFrameData[i].drawImage.view),
-            "Failed to create image view");
-
-        Debug::setDebugName(m_VkDevice, VK_OBJECT_TYPE_IMAGE_VIEW,
-            (uint64_t)m_PerFrameData[i].drawImage.view, "Draw image view");
+        m_PerFrameData[i].drawImage.createView(VK_IMAGE_VIEW_TYPE_2D);
+        m_PerFrameData[i].drawImage.setDebugNameView("Draw image view");
     }
 
     LOG_DEBUG("Created draw images");
@@ -412,55 +303,15 @@ void Application::createRayDirectionImages()
     VkExtent3D extent = { m_Window.getWindowSize().x, m_Window.getWindowSize().y, 1 };
     VkFormat format = VK_FORMAT_R16G16B16A16_SFLOAT;
 
-    VkImageCreateInfo drawImageCI {};
-    drawImageCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    drawImageCI.flags = 0;
-    drawImageCI.imageType = VK_IMAGE_TYPE_2D;
-    drawImageCI.format = format;
-    drawImageCI.extent = extent;
-    drawImageCI.mipLevels = 1;
-    drawImageCI.arrayLayers = 1;
-    drawImageCI.samples = VK_SAMPLE_COUNT_1_BIT;
-    drawImageCI.tiling = VK_IMAGE_TILING_OPTIMAL;
-    drawImageCI.usage = VK_IMAGE_USAGE_STORAGE_BIT;
-    drawImageCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-    VmaAllocationCreateInfo allocationCI {};
-    allocationCI.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
-    allocationCI.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-
-    VkImageViewCreateInfo imageViewCI {};
-    imageViewCI.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    imageViewCI.pNext = nullptr;
-    imageViewCI.flags = 0;
-    imageViewCI.image = VK_NULL_HANDLE;
-    imageViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    imageViewCI.format = format;
-    imageViewCI.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    imageViewCI.subresourceRange.baseMipLevel = 0;
-    imageViewCI.subresourceRange.levelCount = 1;
-    imageViewCI.subresourceRange.baseArrayLayer = 0;
-    imageViewCI.subresourceRange.layerCount = 1;
-
     for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
-        m_PerFrameData[i].rayDirectionImage.format = format;
-        m_PerFrameData[i].rayDirectionImage.extent = extent;
+        m_PerFrameData[i].rayDirectionImage.init(m_VkDevice, m_VmaAllocator,
+            m_GraphicsQueue.queueFamily, extent, format, VK_IMAGE_TYPE_2D,
+            VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT
+                | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+        m_PerFrameData[i].rayDirectionImage.setDebugName("Ray direction image");
 
-        VK_CHECK(vmaCreateImage(m_VmaAllocator, &drawImageCI, &allocationCI,
-                     &m_PerFrameData[i].rayDirectionImage.image,
-                     &m_PerFrameData[i].rayDirectionImage.allocation, nullptr),
-            "Failed to allocate ray direction image");
-
-        Debug::setDebugName(m_VkDevice, VK_OBJECT_TYPE_IMAGE,
-            (uint64_t)m_PerFrameData[i].rayDirectionImage.image, "Ray direction image");
-
-        imageViewCI.image = m_PerFrameData[i].rayDirectionImage.image;
-        VK_CHECK(vkCreateImageView(
-                     m_VkDevice, &imageViewCI, nullptr, &m_PerFrameData[i].rayDirectionImage.view),
-            "Failed to create image view");
-
-        Debug::setDebugName(m_VkDevice, VK_OBJECT_TYPE_IMAGE_VIEW,
-            (uint64_t)m_PerFrameData[i].rayDirectionImage.view, "Ray direction image view");
+        m_PerFrameData[i].rayDirectionImage.createView(VK_IMAGE_VIEW_TYPE_2D);
+        m_PerFrameData[i].rayDirectionImage.setDebugNameView("Ray direction image view");
     }
 
     LOG_DEBUG("Created ray direction images");
@@ -469,13 +320,8 @@ void Application::createRayDirectionImages()
 void Application::destroyImages()
 {
     for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
-        vkDestroyImageView(m_VkDevice, m_PerFrameData[i].drawImage.view, nullptr);
-        vmaDestroyImage(m_VmaAllocator, m_PerFrameData[i].drawImage.image,
-            m_PerFrameData[i].drawImage.allocation);
-
-        vkDestroyImageView(m_VkDevice, m_PerFrameData[i].rayDirectionImage.view, nullptr);
-        vmaDestroyImage(m_VmaAllocator, m_PerFrameData[i].rayDirectionImage.image,
-            m_PerFrameData[i].rayDirectionImage.allocation);
+        m_PerFrameData[i].drawImage.cleanup();
+        m_PerFrameData[i].rayDirectionImage.cleanup();
     }
 
     LOG_DEBUG("Destroyed images");
@@ -597,12 +443,16 @@ void Application::createImGuiStructures()
 
     ImGui_ImplGlfw_InitForVulkan(m_Window.getWindow(), true);
 
+    std::vector<VkFormat> formats = {
+        m_PerFrameData[0].drawImage.getFormat(),
+    };
+
     VkPipelineRenderingCreateInfo pipelineCI {};
     pipelineCI.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
     pipelineCI.pNext = nullptr;
     pipelineCI.viewMask = 0;
-    pipelineCI.colorAttachmentCount = 1;
-    pipelineCI.pColorAttachmentFormats = &m_PerFrameData[0].drawImage.format;
+    pipelineCI.colorAttachmentCount = formats.size();
+    pipelineCI.pColorAttachmentFormats = formats.data();
     pipelineCI.depthAttachmentFormat = VK_FORMAT_UNDEFINED;
     pipelineCI.stencilAttachmentFormat = VK_FORMAT_UNDEFINED;
 
@@ -791,7 +641,7 @@ void Application::createSetupDescriptor()
     for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
         VkDescriptorImageInfo imageInfo {};
         imageInfo.sampler = VK_NULL_HANDLE;
-        imageInfo.imageView = m_PerFrameData[i].rayDirectionImage.view;
+        imageInfo.imageView = m_PerFrameData[i].rayDirectionImage.getImageView();
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
         std::vector<VkWriteDescriptorSet> writeSets = {
@@ -844,12 +694,12 @@ void Application::createRenderDescriptor()
     for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
         VkDescriptorImageInfo renderImageInfo {};
         renderImageInfo.sampler = VK_NULL_HANDLE;
-        renderImageInfo.imageView = m_PerFrameData[i].drawImage.view;
+        renderImageInfo.imageView = m_PerFrameData[i].drawImage.getImageView();
         renderImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
         VkDescriptorImageInfo rayDirectionImageInfo {};
         rayDirectionImageInfo.sampler = VK_NULL_HANDLE;
-        rayDirectionImageInfo.imageView = m_PerFrameData[i].rayDirectionImage.view;
+        rayDirectionImageInfo.imageView = m_PerFrameData[i].rayDirectionImage.getImageView();
         rayDirectionImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
         std::vector<VkWriteDescriptorSet> writeSets = {
@@ -998,10 +848,10 @@ void Application::render()
             vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, m_VkQueryPool,
                 m_CurrentFrameIndex * 4);
 
-            transitionImage(commandBuffer, m_VkSwapchainImages[swapchainImageIndex],
+            Image::transition(commandBuffer, m_VkSwapchainImages[swapchainImageIndex],
                 VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-            transitionImage(commandBuffer, currentFrame.drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED,
-                VK_IMAGE_LAYOUT_GENERAL);
+            currentFrame.drawImage.transition(
+                commandBuffer, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
             Debug::endCmdDebugLabel(commandBuffer);
         }
@@ -1009,8 +859,8 @@ void Application::render()
         {
             Debug::beginCmdDebugLabel(commandBuffer, "Ray generation", { 0.f, 0.f, 1.f, 1.f });
 
-            transitionImage(commandBuffer, currentFrame.rayDirectionImage.image,
-                VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+            currentFrame.rayDirectionImage.transition(
+                commandBuffer, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
             vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_VkSetupPipeline);
 
@@ -1032,8 +882,8 @@ void Application::render()
                 0, sizeof(SetupPushConstants), &setupPushConstant);
 
             vkCmdDispatch(commandBuffer,
-                std::ceil(currentFrame.rayDirectionImage.extent.width / 8.f),
-                std::ceil(currentFrame.rayDirectionImage.extent.height / 8.f), 1);
+                std::ceil(currentFrame.rayDirectionImage.getExtent().width / 8.f),
+                std::ceil(currentFrame.rayDirectionImage.getExtent().height / 8.f), 1);
 
             Debug::endCmdDebugLabel(commandBuffer);
         }
@@ -1050,7 +900,7 @@ void Application::render()
                 .newLayout = VK_IMAGE_LAYOUT_GENERAL,
                 .srcQueueFamilyIndex = m_GraphicsQueue.queueFamily,
                 .dstQueueFamilyIndex = m_GraphicsQueue.queueFamily,
-                .image = currentFrame.rayDirectionImage.image,
+                .image = currentFrame.rayDirectionImage.getImage(),
                 .subresourceRange = {
                     .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
                     .baseMipLevel = 0,
@@ -1079,27 +929,27 @@ void Application::render()
             m_CurrentFrameIndex * 4 + 2);
         ASManager::getManager()->render(commandBuffer, m_Camera, currentFrame.renderDescriptorSet,
             {
-                .width = currentFrame.drawImage.extent.width,
-                .height = currentFrame.drawImage.extent.height,
+                .width = currentFrame.drawImage.getExtent().width,
+                .height = currentFrame.drawImage.getExtent().height,
             });
         vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_VkQueryPool,
             m_CurrentFrameIndex * 4 + 3);
 
-        transitionImage(commandBuffer, currentFrame.drawImage.image, VK_IMAGE_LAYOUT_GENERAL,
-            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        currentFrame.drawImage.transition(
+            commandBuffer, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
         renderImGui(commandBuffer, currentFrame);
 
         {
             Debug::beginCmdDebugLabel(commandBuffer, "Present", { 0.f, 1.f, 0.f, 1.f });
-            transitionImage(commandBuffer, currentFrame.drawImage.image,
+            currentFrame.drawImage.transition(commandBuffer,
                 VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
-            copyImageToImage(commandBuffer, currentFrame.drawImage.image,
-                m_VkSwapchainImages[swapchainImageIndex], currentFrame.drawImage.extent,
+            currentFrame.drawImage.copyToImage(commandBuffer,
+                m_VkSwapchainImages[swapchainImageIndex], currentFrame.drawImage.getExtent(),
                 m_VkSwapchainImageExtent);
 
-            transitionImage(commandBuffer, m_VkSwapchainImages[swapchainImageIndex],
+            Image::transition(commandBuffer, m_VkSwapchainImages[swapchainImageIndex],
                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
             Debug::endCmdDebugLabel(commandBuffer);
@@ -1180,7 +1030,7 @@ void Application::renderImGui(VkCommandBuffer& commandBuffer, const PerFrameData
     VkRenderingAttachmentInfo colourAI {};
     colourAI.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
     colourAI.pNext = nullptr;
-    colourAI.imageView = currentFrame.drawImage.view;
+    colourAI.imageView = currentFrame.drawImage.getImageView();
     colourAI.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     colourAI.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
     colourAI.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -1192,8 +1042,8 @@ void Application::renderImGui(VkCommandBuffer& commandBuffer, const PerFrameData
     renderInfo.renderArea = VkRect2D {
         { 0, 0 },
         VkExtent2D {
-         .width = currentFrame.drawImage.extent.width,
-         .height = currentFrame.drawImage.extent.height,
+         .width = currentFrame.drawImage.getExtent().width,
+         .height = currentFrame.drawImage.getExtent().height,
          },
     };
     renderInfo.layerCount = 1;
