@@ -5,17 +5,11 @@
 #include <vulkan/vulkan_core.h>
 
 #include "../buffer.hpp"
+#include "../generators/brickmap.hpp"
 
 #include <vector>
 
 class BrickmapAS : public IAccelerationStructure {
-    using BrickgridPtr = uint32_t; // Highest bit marks loaded
-
-    struct Brickmap {
-        uint64_t colourPtr;
-        uint64_t occupancy[8];
-        std::vector<uint8_t> colour;
-    };
 
   public:
     BrickmapAS();
@@ -48,8 +42,6 @@ class BrickmapAS : public IAccelerationStructure {
     void createRenderPipeline();
     void destroyRenderPipeline();
 
-    void generate(std::stop_token stoken, std::unique_ptr<Loader> loader);
-
   private:
     VkDescriptorSetLayout m_BufferSetLayout;
     VkDescriptorSet m_BufferSet = VK_NULL_HANDLE;
@@ -63,8 +55,8 @@ class BrickmapAS : public IAccelerationStructure {
 
     glm::uvec3 m_BrickgridSize;
 
-    std::vector<BrickgridPtr> m_Brickgrid;
-    std::vector<Brickmap> m_Brickmaps;
+    std::vector<Generators::BrickgridPtr> m_Brickgrid;
+    std::vector<Generators::Brickmap> m_Brickmaps;
 
     bool m_UpdateBuffers = false;
 };

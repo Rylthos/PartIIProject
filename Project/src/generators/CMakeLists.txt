@@ -3,5 +3,6 @@ target_sources(${PROJECT_NAME} PRIVATE
   "texture.cpp" "texture.hpp"
   "octree.cpp" "octree.hpp"
   "contree.cpp" "contree.hpp"
+  "brickmap.cpp" "brickmap.hpp"
   "common.hpp"
 )

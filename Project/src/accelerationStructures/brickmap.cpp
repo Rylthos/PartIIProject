@@ -57,7 +57,8 @@ void BrickmapAS::fromLoader(std::unique_ptr<Loader>&& loader)
     p_Generating = true;
     p_GenerationThread
         = std::jthread([this, loader = std::move(loader)](std::stop_token stoken) mutable {
-              generate(stoken, std::move(loader));
+              std::tie(m_Brickgrid, m_Brickmaps) = Generators::generateBrickmap(
+                  stoken, std::move(loader), p_GenerationInfo, m_BrickgridSize, m_UpdateBuffers);
           });
 }
 
@@ -125,8 +126,8 @@ void BrickmapAS::destroyDescriptorLayout()
 
 void BrickmapAS::createBuffers()
 {
-    VkDeviceSize gridSize
-        = m_BrickgridSize.x * m_BrickgridSize.y * m_BrickgridSize.z * sizeof(BrickgridPtr);
+    VkDeviceSize gridSize = m_BrickgridSize.x * m_BrickgridSize.y * m_BrickgridSize.z
+        * sizeof(Generators::BrickgridPtr);
     m_BrickgridBuffer.init(p_Info.device, p_Info.allocator, gridSize,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
         VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
@@ -151,7 +152,7 @@ void BrickmapAS::createBuffers()
 
     auto gridBufferIndex
         = FrameCommands::getInstance()->createStaging(gridSize, [=, this](void* ptr) {
-              BrickgridPtr* data = (BrickgridPtr*)ptr;
+              Generators::BrickgridPtr* data = (Generators::BrickgridPtr*)ptr;
               for (size_t i = 0; i < m_Brickgrid.size(); i++) {
                   data[i] = m_Brickgrid[i];
               }
@@ -264,88 +265,4 @@ void BrickmapAS::createRenderPipeline()
 void BrickmapAS::destroyRenderPipeline()
 {
     vkDestroyPipeline(p_Info.device, m_RenderPipeline, nullptr);
-}
-
-void BrickmapAS::generate(std::stop_token stoken, std::unique_ptr<Loader> loader)
-{
-    std::chrono::steady_clock timer;
-    auto start = timer.now();
-
-    glm::uvec3 dimensions = loader->getDimensions();
-    m_BrickgridSize = glm::uvec3(glm::ceil(glm::vec3(dimensions) / 8.f));
-
-    size_t totalNodes = m_BrickgridSize.x * m_BrickgridSize.y * m_BrickgridSize.z;
-
-    m_Brickgrid.assign(totalNodes, 0x1);
-
-    size_t index = 0;
-    size_t totalColours = 0;
-    std::vector<uint8_t> colours;
-    colours.resize(8 * 8 * 8 * 3);
-    for (uint32_t bY = 0; bY < m_BrickgridSize.y; bY++) {
-        for (uint32_t bZ = 0; bZ < m_BrickgridSize.z; bZ++) {
-            for (uint32_t bX = 0; bX < m_BrickgridSize.x; bX++) {
-                if (stoken.stop_requested())
-                    return;
-
-                glm::ivec3 brickWorld = glm::ivec3(bX, bY, bZ) * 8;
-
-                uint32_t usedColours = 0;
-                uint64_t occupancy[8];
-
-                uint64_t colourPtr = totalColours;
-
-                {
-                    p_GenerationCompletion = (index + 1) / (float)totalNodes;
-                    auto current = timer.now();
-                    std::chrono::duration<float, std::milli> difference = current - start;
-                    p_GenerationTime = difference.count() / 1000.0f;
-                }
-
-                for (uint64_t y = 0; y < 8; y++) {
-                    occupancy[y] = 0;
-                    for (uint64_t z = 0; z < 8; z++) {
-                        for (uint64_t x = 0; x < 8; x++) {
-                            glm::ivec3 coordinates = brickWorld + glm::ivec3(x, y, z);
-
-                            auto voxel = loader->getVoxel(coordinates);
-
-                            if (voxel.has_value()) {
-                                occupancy[y] |= ((uint64_t)1) << ((z * 8) + x);
-
-                                glm::vec3 colour = voxel.value().colour;
-
-                                colours[usedColours * 3 + 0] = std::ceil(colour.r * 255);
-                                colours[usedColours * 3 + 1] = std::ceil(colour.g * 255);
-                                colours[usedColours * 3 + 2] = std::ceil(colour.b * 255);
-                                usedColours++;
-                                totalColours++;
-                            }
-                        }
-                    }
-                }
-
-                if (usedColours > 0) {
-                    Brickmap brick;
-                    brick.colourPtr = colourPtr;
-                    memcpy(&brick.occupancy, occupancy, sizeof(uint64_t) * 8);
-                    brick.colour.resize(usedColours * 3);
-                    std::copy(
-                        colours.begin(), colours.begin() + (usedColours * 3), brick.colour.begin());
-
-                    m_Brickmaps.push_back(brick);
-
-                    m_Brickgrid[index] = 0x1 | (m_Brickmaps.size() << 1);
-                }
-
-                index++;
-            }
-        }
-    }
-
-    auto end = timer.now();
-    std::chrono::duration<float, std::milli> difference = end - start;
-    p_GenerationTime = difference.count() / 1000.0f;
-
-    m_UpdateBuffers = true;
 }
