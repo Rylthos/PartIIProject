@@ -13,6 +13,9 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
   add_compile_definitions(DEBUG)
 endif()
 
-add_subdirectory(vendor)
+add_compile_definitions(GLM_ENABLE_EXPERIMENTAL)
 
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+
+add_subdirectory(vendor)
 add_subdirectory(src)

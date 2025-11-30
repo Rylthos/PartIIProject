@@ -1,8 +1,11 @@
-target_sources(${PROJECT_NAME} PRIVATE
-  "grid.cpp" "grid.hpp"
-  "texture.cpp" "texture.hpp"
-  "octree.cpp" "octree.hpp"
-  "contree.cpp" "contree.hpp"
-  "brickmap.cpp" "brickmap.hpp"
-  "common.hpp"
+add_library(generators STATIC)
+
+add_subdirectory(generators)
+
+target_include_directories(generators PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
+target_compile_options(generators PRIVATE -Wall -Wextra -Wpedantic)
+
+target_link_libraries(generators PUBLIC
+  glm::glm
+  loaders
 )

@@ -15,6 +15,7 @@ add_subdirectory(vk-bootstrap)
 
 # VMA
 add_subdirectory(VMA)
+target_compile_options(VulkanMemoryAllocator INTERFACE -Wno-nullability-extension -Wno-nullability-completeness -Wno-unused-private-field)
 
 # spdlog
 add_subdirectory(spdlog)
