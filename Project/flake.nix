@@ -10,8 +10,6 @@
       llvm = pkgs.llvmPackages_latest;
     in {
       devShells.${system}.default = pkgs.mkShell {
-        stdenv = llvm.stdenv;
-
         nativeBuildInputs = with pkgs; [
           vulkan-headers
           vulkan-loader
@@ -22,11 +20,10 @@
 
           shader-slang
 
-          llvm.libllvm
-          llvm.libcxx
-          llvm.clang
+          # llvm.libllvm
+          # llvm.libcxx
           clang-tools
-          clang
+          llvm.clang
 
           cmake
           gnumake
@@ -52,10 +49,10 @@
         VulkanHeaders_DIR = "${pkgs.vulkan-headers}";
         glfw3_DIR = "${pkgs.glfw}/lib/cmake/glfw3";
 
-        cmakeFlags = [
-          "-DCMAKE_CXX_COMPILER=${pkgs.clang}/bin/clang++"
-          "-DCMAKE_C_COMPILER=${pkgs.clang}/bin/clang"
-        ];
+        shellHook = ''
+          export CMAKE_C_COMPILER=clang
+          export CMAKE_CXX_COMPILER=clang++
+        '';
       };
     };
 }
