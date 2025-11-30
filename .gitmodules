@@ -23,3 +23,6 @@
 [submodule "Project/vendor/tracy"]
 	path = Project/vendor/tracy
 	url = https://github.com/wolfpld/tracy.git
+[submodule "Project/vendor/CLI11"]
+	path = Project/vendor/CLI11
+	url = https://github.com/CLIUtils/CLI11.git

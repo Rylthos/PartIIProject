@@ -4,3 +4,5 @@ add_subdirectory(logger)
 add_subdirectory(loaders)
 add_subdirectory(generators)
 add_subdirectory(renderer)
+
+add_subdirectory(voxelizer)

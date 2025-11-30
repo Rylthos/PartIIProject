@@ -1,0 +1,28 @@
+#include <CLI/CLI.hpp>
+
+#include "parser.hpp"
+
+#include <optional>
+
+int main(int argc, char** argv)
+{
+    CLI::App app { "Convert Meshes into Voxel formats" };
+    argv = app.ensure_utf8(argv);
+
+    ParserArgs args;
+
+    app.add_option("filename", args.filename, "The file to parse");
+
+    app.add_flag("-a", args.flag_all, "Enable all generators. Equivalent to -gtocb");
+    app.add_flag("-g", args.flag_grid, "Enable grid generator");
+    app.add_flag("-t", args.flag_texture, "Enable texture generator");
+    app.add_flag("-o", args.flag_octree, "Enable octree generator");
+    app.add_flag("-c", args.flag_contree, "Enable contree generator");
+    app.add_flag("-b", args.flag_brickmap, "Enable brickmap generator");
+
+    CLI11_PARSE(app, argc, argv);
+
+    Parser parser(args);
+
+    return 0;
+}

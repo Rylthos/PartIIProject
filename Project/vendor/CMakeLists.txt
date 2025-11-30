@@ -61,3 +61,6 @@ target_link_libraries(ImGui PRIVATE glfw Vulkan::Vulkan)
 
 # Tracy
 add_subdirectory(tracy)
+
+# Lyra
+add_subdirectory(CLI11)
