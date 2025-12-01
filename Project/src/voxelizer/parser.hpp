@@ -35,6 +35,8 @@ class Parser {
 
     void parseMesh();
 
+    void generateStructures();
+
   private:
     ParserArgs m_Args;
 

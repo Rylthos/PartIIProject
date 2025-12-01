@@ -1,9 +1,14 @@
 #include "parser.hpp"
 
+#include "loaders/sparse_loader.hpp"
+
+#include "generators/grid.hpp"
+
 #include <glm/gtx/string_cast.hpp>
 
 #include <cstring>
 #include <fstream>
+#include <memory>
 #include <vector>
 
 std::vector<std::string> split(std::string str, std::string delim)
@@ -27,6 +32,7 @@ Parser::Parser(ParserArgs args) : m_Args(args)
 {
     parseFile();
     parseMesh();
+    generateStructures();
 }
 
 void Parser::parseFile()
@@ -170,5 +176,24 @@ void Parser::parseMesh()
                 }
             }
         }
+    }
+}
+
+void Parser::generateStructures()
+{
+    if (m_Args.flag_all || m_Args.flag_grid) {
+        std::unique_ptr<Loader> loader = std::make_unique<SparseLoader>(m_Dimensions, m_Voxels);
+        Generators::GenerationInfo info;
+        glm::uvec3 dimensions;
+        bool finished;
+        auto thread = std::jthread([&, loader = std::move(loader)](std::stop_token stoken) mutable {
+            auto voxels
+                = Generators::generateGrid(stoken, std::move(loader), info, dimensions, finished);
+
+            printf("%s\n", glm::to_string(dimensions).c_str());
+            printf("Time: %f\n", info.generationTime);
+        });
+
+        thread.join();
     }
 }
