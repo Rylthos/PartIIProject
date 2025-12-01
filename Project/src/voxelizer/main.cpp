@@ -12,6 +12,7 @@ int main(int argc, char** argv)
     ParserArgs args;
 
     app.add_option("filename", args.filename, "The file to parse");
+    app.add_option("-r,--resolution", args.voxels_per_unit, "Number of voxels per unit");
 
     app.add_flag("-a", args.flag_all, "Enable all generators. Equivalent to -gtocb");
     app.add_flag("-g", args.flag_grid, "Enable grid generator");

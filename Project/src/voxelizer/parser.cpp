@@ -135,3 +135,40 @@ void Parser::parseObj(std::filesystem::path filepath)
         }
     }
 }
+
+void Parser::parseMesh()
+{
+    glm::vec3 minBound(10000000);
+    glm::vec3 maxBound(-10000000);
+
+    for (size_t i = 0; i < m_Triangles.size(); i++) {
+        for (size_t j = 0; j < 3; j++) {
+            maxBound = glm::max(maxBound, m_Triangles[i].positions[j]);
+            minBound = glm::min(minBound, m_Triangles[i].positions[j]);
+        }
+    }
+
+    m_Dimensions = glm::ceil((maxBound - minBound) * m_Args.voxels_per_unit);
+
+    for (auto t : m_Triangles) {
+        glm::vec3 triangleMin = glm::floor(
+            (glm::min(t.positions[0], glm::min(t.positions[1], t.positions[2]) - minBound))
+            * m_Args.voxels_per_unit);
+        glm::vec3 triangleMax = glm::ceil(
+            (glm::max(t.positions[0], glm::max(t.positions[1], t.positions[2]) - minBound))
+            * m_Args.voxels_per_unit);
+
+        for (int z = triangleMin.z; z < triangleMax.z; z++) {
+            for (int y = triangleMin.y; y < triangleMax.y; y++) {
+                for (int x = triangleMin.x; x < triangleMax.x; x++) {
+                    glm::vec3 cubeMin = glm::vec3(x, y, z) / m_Args.voxels_per_unit;
+
+                    // Bad detection
+                    // TODO: Actually implement the code
+                    glm::ivec3 index = glm::ivec3(x, y, z);
+                    m_Voxels[index] = glm::vec3(1);
+                }
+            }
+        }
+    }
+}

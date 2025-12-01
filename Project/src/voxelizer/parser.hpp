@@ -5,6 +5,8 @@
 #include <string>
 
 #include <glm/glm.hpp>
+#include <glm/gtx/hash.hpp>
+#include <unordered_map>
 
 struct ParserArgs {
     std::string filename = "";
@@ -14,6 +16,7 @@ struct ParserArgs {
     bool flag_octree = false;
     bool flag_contree = false;
     bool flag_brickmap = false;
+    float voxels_per_unit = 1.f;
 };
 
 struct Triangle {
@@ -30,9 +33,13 @@ class Parser {
   private:
     void parseObj(std::filesystem::path filepath);
 
+    void parseMesh();
+
   private:
     ParserArgs m_Args;
 
-    std::map<glm::ivec3, glm::vec3> m_Voxels;
+    glm::uvec3 m_Dimensions;
+
+    std::unordered_map<glm::ivec3, glm::vec3> m_Voxels;
     std::vector<Triangle> m_Triangles;
 };

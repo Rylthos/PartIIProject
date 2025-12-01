@@ -16,6 +16,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif()
 
 target_link_libraries(Voxelizer PRIVATE
+  loaders
   CLI11::CLI11
   glm::glm
 )
