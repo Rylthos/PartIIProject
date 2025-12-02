@@ -4,6 +4,8 @@
 
 #include "logger/logger.hpp"
 
+#include "serializers/grid.hpp"
+
 #include "../compute_pipeline.hpp"
 #include "../debug_utils.hpp"
 #include "../descriptor_layout.hpp"
@@ -65,6 +67,13 @@ void GridAS::fromLoader(std::unique_ptr<Loader>&& loader)
               m_Voxels = Generators::generateGrid(
                   stoken, std::move(loader), p_GenerationInfo, m_Dimensions, m_UpdateBuffers);
           });
+}
+
+void GridAS::fromFile(std::filesystem::path path)
+{
+    std::tie(m_Dimensions, m_Voxels) = Serializers::loadGrid(path);
+
+    m_UpdateBuffers = true;
 }
 
 void GridAS::render(

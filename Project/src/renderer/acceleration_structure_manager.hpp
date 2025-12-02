@@ -59,6 +59,6 @@ class ASManager {
 
     RenderStyle m_CurrentRenderStyle = RenderStyle::NORMAL;
 
-    ASType m_CurrentType = ASType::TEXTURE;
+    ASType m_CurrentType = ASType::GRID;
     std::unique_ptr<IAccelerationStructure> m_CurrentAS;
 };

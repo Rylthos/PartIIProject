@@ -41,6 +41,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
   logger
   generators
   events
+  serializers
 
   glm::glm
   Vulkan::UtilityHeaders

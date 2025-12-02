@@ -156,7 +156,8 @@ void ASManager::setAS(ASType type)
     //         return std::make_optional(glm::vec3 { glm::vec3(1.f) });
     //     }));
 
-    m_CurrentAS->fromLoader(std::move(loader));
+    // m_CurrentAS->fromLoader(std::move(loader));
+    m_CurrentAS->fromFile("res/structures/suzanne/");
 }
 
 void ASManager::updateShaders()
