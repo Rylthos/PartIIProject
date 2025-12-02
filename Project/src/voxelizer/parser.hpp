@@ -10,6 +10,8 @@
 
 struct ParserArgs {
     std::string filename = "";
+    std::string output = "";
+    std::string name = "";
     bool flag_all = false;
     bool flag_grid = false;
     bool flag_texture = false;

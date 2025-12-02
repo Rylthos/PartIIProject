@@ -18,6 +18,7 @@ endif()
 target_link_libraries(Voxelizer PRIVATE
   loaders
   generators
+  serializers
 
   CLI11::CLI11
   glm::glm

@@ -4,6 +4,8 @@
 
 #include "generators/grid.hpp"
 
+#include "serializers/grid.hpp"
+
 #include <glm/gtx/string_cast.hpp>
 
 #include <cstring>
@@ -181,6 +183,13 @@ void Parser::parseMesh()
 
 void Parser::generateStructures()
 {
+    std::filesystem::path outputDirectory = m_Args.output;
+    std::string outputName = m_Args.name;
+
+    if (outputName.length() == 0) {
+        outputName = std::filesystem::path(m_Args.filename).filename();
+    }
+
     if (m_Args.flag_all || m_Args.flag_grid) {
         std::unique_ptr<Loader> loader = std::make_unique<SparseLoader>(m_Dimensions, m_Voxels);
         Generators::GenerationInfo info;
@@ -192,6 +201,8 @@ void Parser::generateStructures()
 
             printf("%s\n", glm::to_string(dimensions).c_str());
             printf("Time: %f\n", info.generationTime);
+
+            Serializers::storeGrid(outputDirectory, outputName, dimensions, voxels);
         });
 
         thread.join();
