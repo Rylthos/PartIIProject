@@ -6,6 +6,7 @@
 
 #include "serializers/grid.hpp"
 
+#include <filesystem>
 #include <glm/gtx/string_cast.hpp>
 
 #include <cstring>
@@ -75,7 +76,7 @@ void Parser::parseObj(std::filesystem::path filepath)
                 vertex[index++] = std::atof(v.c_str());
             }
 
-            vertices.push_back(glm::vec3(vertex.x, vertex.y, vertex.z));
+            vertices.push_back(glm::vec3(vertex.x, vertex.z, vertex.y));
         } else if (code == "vt") { // Vertex Textures
             glm::vec3 tex = { 0., 0., 0. };
 
@@ -156,15 +157,18 @@ void Parser::parseMesh()
         }
     }
 
-    m_Dimensions = glm::ceil((maxBound - minBound) * m_Args.voxels_per_unit);
+    m_Dimensions = glm::max(
+        glm::uvec3(glm::ceil((maxBound - minBound) * m_Args.voxels_per_unit)), glm::uvec3(1));
 
     for (auto t : m_Triangles) {
         glm::vec3 triangleMin = glm::floor(
-            (glm::min(t.positions[0], glm::min(t.positions[1], t.positions[2]) - minBound))
+            (glm::min(t.positions[0], glm::min(t.positions[1], t.positions[2])) - minBound)
             * m_Args.voxels_per_unit);
-        glm::vec3 triangleMax = glm::ceil(
-            (glm::max(t.positions[0], glm::max(t.positions[1], t.positions[2]) - minBound))
-            * m_Args.voxels_per_unit);
+        glm::vec3 triangleMax = glm::max(
+            glm::ceil(
+                (glm::max(t.positions[0], glm::max(t.positions[1], t.positions[2])) - minBound)
+                * m_Args.voxels_per_unit),
+            glm::vec3(1));
 
         for (int z = triangleMin.z; z < triangleMax.z; z++) {
             for (int y = triangleMin.y; y < triangleMax.y; y++) {
@@ -188,6 +192,11 @@ void Parser::generateStructures()
 
     if (outputName.length() == 0) {
         outputName = std::filesystem::path(m_Args.filename).filename();
+    }
+
+    printf("Output directory: %s\n", (outputDirectory / outputName).string().c_str());
+    if (!std::filesystem::exists(outputDirectory / outputName)) {
+        std::filesystem::create_directory(outputDirectory / outputName);
     }
 
     if (m_Args.flag_all || m_Args.flag_grid) {
