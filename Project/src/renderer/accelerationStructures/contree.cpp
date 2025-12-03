@@ -5,6 +5,8 @@
 
 #include <vulkan/vulkan_core.h>
 
+#include "serializers/contree.hpp"
+
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtx/matrix_operation.hpp>
@@ -69,6 +71,32 @@ void ContreeAS::fromLoader(std::unique_ptr<Loader>&& loader)
               m_Nodes = Generators::generateContree(
                   stoken, std::move(loader), p_GenerationInfo, m_Dimensions, m_UpdateBuffers);
           });
+}
+
+void ContreeAS::fromFile(std::filesystem::path path)
+{
+    p_FileThread.request_stop();
+    p_FileThread = std::jthread([this, path](std::stop_token stoken) {
+        p_Loading = true;
+        Serializers::SerialInfo info;
+        auto data = Serializers::loadContree(path);
+
+        if (!data.has_value()) {
+            return;
+        }
+
+        std::tie(info, m_Nodes) = data.value();
+
+        m_Dimensions = info.dimensions;
+
+        p_GenerationInfo.voxelCount = info.voxels;
+        p_GenerationInfo.nodes = info.nodes;
+        p_GenerationInfo.generationTime = 0;
+        p_GenerationInfo.completionPercent = 1;
+
+        m_UpdateBuffers = true;
+        p_Loading = false;
+    });
 }
 
 void ContreeAS::render(

@@ -1,12 +1,15 @@
 #include "parser.hpp"
 
 #include "generators/common.hpp"
+#include "generators/contree.hpp"
 #include "generators/octree.hpp"
 #include "loaders/sparse_loader.hpp"
 
 #include "generators/grid.hpp"
 
 #include "pgbar/details/core/Core.hpp"
+
+#include "serializers/contree.hpp"
 #include "serializers/grid.hpp"
 #include "serializers/octree.hpp"
 
@@ -261,6 +264,17 @@ void Parser::generateStructures()
                 stoken, std::move(loader), info[OCTREE], dimensions, finished[OCTREE]);
 
             Serializers::storeOctree(outputDirectory, outputName, dimensions, nodes, info[OCTREE]);
+        });
+    }
+
+    if (m_ValidStructures[CONTREE]) {
+        threads[CONTREE] = std::jthread([&](std::stop_token stoken) {
+            std::unique_ptr<Loader> loader = std::make_unique<SparseLoader>(m_Dimensions, m_Voxels);
+            glm::uvec3 dimensions;
+            auto nodes = Generators::generateContree(
+                stoken, std::move(loader), info[CONTREE], dimensions, finished[CONTREE]);
+
+            Serializers::storeContree(outputDirectory, outputName, dimensions, nodes, info[OCTREE]);
         });
     }
 

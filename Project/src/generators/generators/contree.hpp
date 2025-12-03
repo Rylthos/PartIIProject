@@ -14,8 +14,9 @@ class ContreeNode {
   public:
     ContreeNode(uint64_t childMask, uint32_t offset, uint8_t r, uint8_t g, uint8_t b);
     ContreeNode(float r, float g, float b);
+    ContreeNode(uint64_t high, uint64_t low);
 
-    std::array<uint64_t, 2> getData();
+    std::array<uint64_t, 2> getData() const;
 
   private:
     enum ContreeFlags : uint8_t {
@@ -37,7 +38,7 @@ class ContreeNode {
         uint32_t g;
         uint32_t b;
     };
-    std::variant<NodeType, LeafType> m_CurrentType;
+    std::variant<NodeType, LeafType, std::pair<uint64_t, uint64_t>> m_CurrentType;
 };
 
 std::vector<ContreeNode> generateContree(std::stop_token stoken, std::unique_ptr<Loader>&& loader,

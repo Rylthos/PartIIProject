@@ -37,7 +37,9 @@ ContreeNode::ContreeNode(float r, float g, float b)
     };
 }
 
-std::array<uint64_t, 2> ContreeNode::getData()
+ContreeNode::ContreeNode(uint64_t high, uint64_t low) { m_CurrentType = std::make_pair(high, low); }
+
+std::array<uint64_t, 2> ContreeNode::getData() const
 {
     std::array<uint64_t, 2> data;
     if (const NodeType* node = std::get_if<NodeType>(&m_CurrentType)) {
@@ -55,6 +57,8 @@ std::array<uint64_t, 2> ContreeNode::getData()
 
         data[0] = flags | r;
         data[1] = g | b;
+    } else if (const auto* pair = std::get_if<std::pair<uint64_t, uint64_t>>(&m_CurrentType)) {
+        std::tie(data[0], data[1]) = *pair;
     }
 
     return data;
