@@ -14,13 +14,13 @@ std::vector<GridVoxel> generateGrid(std::stop_token stoken, std::unique_ptr<Load
     std::vector<GridVoxel> voxels;
 
     voxels.resize(dimensions.x * dimensions.y * dimensions.z);
-    for (size_t z = 0; z < dimensions.z; z++) {
-        for (size_t y = 0; y < dimensions.y; y++) {
+    for (size_t y = 0; y < dimensions.y; y++) {
+        for (size_t z = 0; z < dimensions.z; z++) {
             for (size_t x = 0; x < dimensions.x; x++) {
                 if (stoken.stop_requested())
                     return voxels;
 
-                size_t index = x + y * dimensions.x + z * dimensions.x * dimensions.y;
+                size_t index = x + z * dimensions.x + y * dimensions.x * dimensions.z;
 
                 {
                     info.completionPercent = (index + 1) / (float)totalNodes;

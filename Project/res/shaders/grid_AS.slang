@@ -57,7 +57,7 @@ func traverse(in ray : Ray) -> HitRecord {
   hit.intersection_checks += 1;
 #endif
 
-    uint index = voxel_pos.x + voxel_pos.y * push_constants.dimensions.x + voxel_pos.z * push_constants.dimensions.x * push_constants.dimensions.y;
+    uint index = voxel_pos.x + voxel_pos.z * push_constants.dimensions.x + voxel_pos.y * push_constants.dimensions.x * push_constants.dimensions.z;
     uint array_index = index / 32;
     uint bit_index = index % 32;
 
