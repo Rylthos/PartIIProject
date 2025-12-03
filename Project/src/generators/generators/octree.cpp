@@ -168,7 +168,7 @@ std::vector<OctreeNode> generateOctree(std::stop_token stoken, std::unique_ptr<L
 {
     std::chrono::steady_clock timer;
 
-    dimensions = loader->getDimensionsDiv2();
+    dimensions = Loader::cubeDimensions(loader->getDimensionsDiv2());
 
     auto start = timer.now();
 

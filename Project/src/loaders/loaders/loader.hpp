@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cmath>
 #include <optional>
 
 #include "logger/logger.hpp"
@@ -37,6 +38,12 @@ class Loader {
     }
 
     glm::uvec3 getDimensions() const { return p_Dimensions; }
+    static glm::uvec3 cubeDimensions(glm::uvec3 dimensions)
+    {
+        uint32_t maxValue = (dimensions.y > dimensions.z ? dimensions.y : dimensions.z);
+        maxValue = dimensions.x > maxValue ? dimensions.x : maxValue;
+        return glm::uvec3(maxValue);
+    }
 
     glm::uvec3 getDimensionsDiv2() const { return getDimensionsDivN(2); }
     glm::uvec3 getDimensionsDiv4() const { return getDimensionsDivN(4); }

@@ -106,7 +106,7 @@ std::vector<ContreeNode> generateContree(std::stop_token stoken, std::unique_ptr
 {
     std::chrono::steady_clock timer;
 
-    dimensions = loader->getDimensionsDiv4();
+    dimensions = Loader::cubeDimensions(loader->getDimensionsDiv4());
 
     auto start = timer.now();
 
