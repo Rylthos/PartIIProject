@@ -16,6 +16,7 @@ set (SOURCE_LIST
   "descriptor_layout.cpp" "descriptor_layout.hpp"
   "descriptor_set.cpp" "descriptor_set.hpp"
   "image.cpp" "image.hpp"
+  "scene_manager.cpp" "scene_manager.hpp"
 )
 
 add_compile_definitions(GLM_ENABLE_EXPERIMENTAL)

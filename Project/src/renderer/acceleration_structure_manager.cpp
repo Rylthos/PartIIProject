@@ -89,75 +89,19 @@ void ASManager::setAS(ASType type)
     default:
         assert(false && "Invalid Type provided");
     }
-    LOG_INFO("Changed to {}", typeToStringMap[m_CurrentType]);
     m_CurrentAS->init(m_InitInfo);
-    uint32_t sideLength = 90;
-    // std::unique_ptr<Loader> loader = std::make_unique<EquationLoader>(
-    //     glm::uvec3(sideLength), std::function([](glm::uvec3 dimensions, glm::uvec3 index) {
-    //         return glm::vec3 { glm::vec3(index) / glm::vec3(dimensions - 1u) };
-    //     }));
-    //
-    // std::unique_ptr<Loader> loader = std::make_unique<EquationLoader>(
-    //     glm::uvec3(sideLength), std::function([](glm::uvec3 dimensions, glm::uvec3 index) {
-    //         if ((index.x + index.y + index.z) % 2 == 0) {
-    //             return std::make_optional(
-    //                 glm::vec3 { glm::vec3(index) / glm::vec3(dimensions - 1u) });
-    //         } else {
-    //             return std::optional<glm::vec3>();
-    //         }
-    //     }));
+    LOG_INFO("Changed to {}", typeToStringMap[m_CurrentType]);
+}
 
-    std::unique_ptr<Loader> loader = std::make_unique<EquationLoader>(glm::uvec3(sideLength),
-        std::function([sideLength](glm::uvec3 dimensions, glm::uvec3 index) {
-            const float radius = sideLength / 2.2f;
-            glm::vec3 center = glm::vec3(dimensions) / 2.f;
-            const glm::vec3 position = glm::vec3(index) - center;
-
-            if (glm::length(position) < radius) {
-                return std::make_optional(glm::vec3 { glm::vec3(1) });
-            }
-
-            return std::optional<glm::vec3>();
-        }));
-
-    // sideLength = 60;
-    // std::unique_ptr<Loader> loader = std::make_unique<EquationLoader>(
-    //     glm::uvec3(sideLength), std::function([](glm::uvec3 dimensions, glm::uvec3 index) {
-    //         const uint32_t power = 6;
-    //         const uint32_t iterations = 500;
-    //
-    //         const glm::vec3 minBound { -1.05f };
-    //         const glm::vec3 maxBound { 1.05f };
-    //         glm::dvec3 c
-    //             = (glm::vec3(index) / glm::vec3(dimensions)) * (maxBound - minBound) + minBound;
-    //
-    //         const float bailout = 1.2f;
-    //
-    //         glm::dvec3 z = c;
-    //
-    //         for (int i = 0; i < iterations; i++) {
-    //             double r = glm::length(z);
-    //             double theta = acos(z.z / r);
-    //             double phi = atan2(z.y, z.x);
-    //
-    //             r = pow(r, power);
-    //             theta *= power;
-    //             phi *= power;
-    //
-    //             z.x = r * sin(theta) * cos(phi);
-    //             z.y = r * sin(theta) * sin(phi);
-    //             z.z = r * cos(theta);
-    //
-    //             z += c;
-    //
-    //             if (glm::length(z) > bailout)
-    //                 return std::optional<glm::vec3> {};
-    //         }
-    //         return std::make_optional(glm::vec3 { glm::vec3(1.f) });
-    //     }));
-
-    // m_CurrentAS->fromLoader(std::move(loader));
-    m_CurrentAS->fromFile("res/structures/bunny/");
+void ASManager::loadAS(
+    std::filesystem::path path, bool validStructures[static_cast<uint8_t>(ASType::MAX_TYPE)])
+{
+    assert(m_CurrentAS);
+    if (!validStructures[static_cast<uint8_t>(m_CurrentType)]) {
+        LOG_ERROR("Model is not supported for this structure");
+        return;
+    }
+    m_CurrentAS->fromFile(path);
 }
 
 void ASManager::updateShaders()

@@ -41,6 +41,8 @@ class ASManager {
     void update(float dt);
 
     void setAS(ASType type);
+    void loadAS(
+        std::filesystem::path, bool validStructures[static_cast<uint8_t>(ASType::MAX_TYPE)]);
 
     void updateShaders();
 

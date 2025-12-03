@@ -12,12 +12,7 @@ namespace Serializers {
 std::optional<std::tuple<SerialInfo, std::vector<Generators::OctreeNode>>> loadOctree(
     std::filesystem::path directory)
 {
-    if (directory.has_filename()) {
-        LOG_ERROR("Expected a directory not a file\n");
-        return {};
-    }
-
-    std::string foldername = directory.parent_path().filename();
+    std::string foldername = directory.filename();
 
     std::filesystem::path file = directory / (foldername + ".voxoctree");
     std::ifstream inputStream(file.string(), std::ios::binary | std::ios::in);
