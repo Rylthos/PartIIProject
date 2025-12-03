@@ -74,6 +74,9 @@ void ASManager::setAS(ASType type)
     case ASType::GRID:
         m_CurrentAS = std::make_unique<GridAS>();
         break;
+    case ASType::TEXTURE:
+        m_CurrentAS = std::make_unique<TextureAS>();
+        break;
     case ASType::OCTREE:
         m_CurrentAS = std::make_unique<OctreeAS>();
         break;
@@ -82,9 +85,6 @@ void ASManager::setAS(ASType type)
         break;
     case ASType::BRICKMAP:
         m_CurrentAS = std::make_unique<BrickmapAS>();
-        break;
-    case ASType::TEXTURE:
-        m_CurrentAS = std::make_unique<TextureAS>();
         break;
     default:
         assert(false && "Invalid Type provided");

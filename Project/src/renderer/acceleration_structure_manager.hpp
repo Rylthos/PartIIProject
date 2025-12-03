@@ -11,10 +11,10 @@
 
 enum class ASType : uint8_t {
     GRID = 0,
-    OCTREE = 1,
-    CONTREE = 2,
-    BRICKMAP = 3,
-    TEXTURE = 4,
+    TEXTURE = 1,
+    OCTREE = 2,
+    CONTREE = 3,
+    BRICKMAP = 4,
     MAX_TYPE,
 };
 
