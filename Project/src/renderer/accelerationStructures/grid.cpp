@@ -1,5 +1,6 @@
 #include "grid.hpp"
 
+#include <stop_token>
 #include <vector>
 
 #include "logger/logger.hpp"
@@ -26,6 +27,9 @@ GridAS::GridAS() { }
 
 GridAS::~GridAS()
 {
+    p_GenerationThread.request_stop();
+    p_FileThread.request_stop();
+
     freeBuffers();
 
     freeDescriptorSets();
@@ -72,23 +76,28 @@ void GridAS::fromLoader(std::unique_ptr<Loader>&& loader)
 
 void GridAS::fromFile(std::filesystem::path path)
 {
-    Serializers::SerialInfo info;
-    auto data = Serializers::loadGrid(path);
+    p_FileThread.request_stop();
+    p_FileThread = std::jthread([this, path](std::stop_token stoken) {
+        p_Loading = true;
+        Serializers::SerialInfo info;
+        auto data = Serializers::loadGrid(path);
 
-    if (!data.has_value()) {
-        return;
-    }
+        if (!data.has_value() || stoken.stop_requested()) {
+            return;
+        }
 
-    std::tie(info, m_Voxels) = data.value();
+        std::tie(info, m_Voxels) = data.value();
 
-    m_Dimensions = info.dimensions;
+        m_Dimensions = info.dimensions;
 
-    p_GenerationInfo.voxelCount = info.voxels;
-    p_GenerationInfo.nodes = info.nodes;
-    p_GenerationInfo.generationTime = 0;
-    p_GenerationInfo.completionPercent = 1;
+        p_GenerationInfo.voxelCount = info.voxels;
+        p_GenerationInfo.nodes = info.nodes;
+        p_GenerationInfo.generationTime = 0;
+        p_GenerationInfo.completionPercent = 1;
 
-    m_UpdateBuffers = true;
+        m_UpdateBuffers = true;
+        p_Loading = false;
+    });
 }
 
 void GridAS::render(

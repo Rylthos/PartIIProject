@@ -2,6 +2,7 @@
 
 #include <deque>
 #include <memory>
+#include <stop_token>
 #include <unistd.h>
 #include <variant>
 #include <vulkan/vulkan_core.h>
@@ -35,6 +36,7 @@ OctreeAS::OctreeAS() { }
 OctreeAS::~OctreeAS()
 {
     p_GenerationThread.request_stop();
+    p_FileThread.request_stop();
 
     freeDescriptorSet();
     freeBuffers();
@@ -82,23 +84,28 @@ void OctreeAS::fromLoader(std::unique_ptr<Loader>&& loader)
 
 void OctreeAS::fromFile(std::filesystem::path path)
 {
-    Serializers::SerialInfo info;
-    auto data = Serializers::loadOctree(path);
+    p_FileThread.request_stop();
+    p_FileThread = std::jthread([this, path](std::stop_token stoken) {
+        p_Loading = true;
+        Serializers::SerialInfo info;
+        auto data = Serializers::loadOctree(path);
 
-    if (!data.has_value()) {
-        return;
-    }
+        if (!data.has_value()) {
+            return;
+        }
 
-    std::tie(info, m_Nodes) = data.value();
+        std::tie(info, m_Nodes) = data.value();
 
-    m_Dimensions = info.dimensions;
+        m_Dimensions = info.dimensions;
 
-    p_GenerationInfo.voxelCount = info.voxels;
-    p_GenerationInfo.nodes = info.nodes;
-    p_GenerationInfo.generationTime = 0;
-    p_GenerationInfo.completionPercent = 1;
+        p_GenerationInfo.voxelCount = info.voxels;
+        p_GenerationInfo.nodes = info.nodes;
+        p_GenerationInfo.generationTime = 0;
+        p_GenerationInfo.completionPercent = 1;
 
-    m_UpdateBuffers = true;
+        m_UpdateBuffers = true;
+        p_Loading = false;
+    });
 }
 
 void OctreeAS::render(

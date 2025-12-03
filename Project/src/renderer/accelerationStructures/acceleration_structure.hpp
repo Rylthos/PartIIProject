@@ -46,11 +46,16 @@ class IAccelerationStructure {
     virtual float getGenerationCompletion() { return p_GenerationInfo.completionPercent; }
     virtual float getGenerationTime() { return p_GenerationInfo.generationTime; }
 
+    virtual bool isLoading() { return p_Loading; }
+
   protected:
     ASStructInfo p_Info;
 
     std::jthread p_GenerationThread;
+    std::jthread p_FileThread;
+
     bool p_FinishedGeneration = false;
+    bool p_Loading = false;
     bool p_UpdateBuffers = false;
     bool p_Generating = false;
 

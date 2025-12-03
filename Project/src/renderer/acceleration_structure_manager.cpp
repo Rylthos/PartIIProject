@@ -328,7 +328,10 @@ void ASManager::UI(const Event& event)
         ImGui::End();
 
         if (ImGui::Begin("AS Generation")) {
-            ImGui::Text("Status: %s", m_CurrentAS->isGenerating() ? "Generating" : "Finished");
+            const char* status = m_CurrentAS->isGenerating() ? "Generating"
+                : m_CurrentAS->isLoading()                   ? "Loading"
+                                                             : "Idle";
+            ImGui::Text("Status: %s", status);
             float time = m_CurrentAS->getGenerationTime();
             float percent = m_CurrentAS->getGenerationCompletion();
             float timeRemaining = (time / percent) - time;
