@@ -82,7 +82,21 @@ void OctreeAS::fromLoader(std::unique_ptr<Loader>&& loader)
 
 void OctreeAS::fromFile(std::filesystem::path path)
 {
-    std::tie(m_Dimensions, m_Nodes) = Serializers::loadOctree(path);
+    Serializers::SerialInfo info;
+    auto data = Serializers::loadOctree(path);
+
+    if (!data.has_value()) {
+        return;
+    }
+
+    std::tie(info, m_Nodes) = data.value();
+
+    m_Dimensions = info.dimensions;
+
+    p_GenerationInfo.voxelCount = info.voxels;
+    p_GenerationInfo.nodes = info.nodes;
+    p_GenerationInfo.generationTime = 0;
+    p_GenerationInfo.completionPercent = 1;
 
     m_UpdateBuffers = true;
 }

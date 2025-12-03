@@ -4,6 +4,7 @@
 
 #include "logger/logger.hpp"
 
+#include "serializers/common.hpp"
 #include "serializers/grid.hpp"
 
 #include "../compute_pipeline.hpp"
@@ -71,7 +72,21 @@ void GridAS::fromLoader(std::unique_ptr<Loader>&& loader)
 
 void GridAS::fromFile(std::filesystem::path path)
 {
-    std::tie(m_Dimensions, m_Voxels) = Serializers::loadGrid(path);
+    Serializers::SerialInfo info;
+    auto data = Serializers::loadGrid(path);
+
+    if (!data.has_value()) {
+        return;
+    }
+
+    std::tie(info, m_Voxels) = data.value();
+
+    m_Dimensions = info.dimensions;
+
+    p_GenerationInfo.voxelCount = info.voxels;
+    p_GenerationInfo.nodes = info.nodes;
+    p_GenerationInfo.generationTime = 0;
+    p_GenerationInfo.completionPercent = 1;
 
     m_UpdateBuffers = true;
 }

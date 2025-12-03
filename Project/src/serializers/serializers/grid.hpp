@@ -10,9 +10,10 @@
 
 namespace Serializers {
 
-std::pair<glm::uvec3, std::vector<Generators::GridVoxel>> loadGrid(std::filesystem::path directory);
+std::optional<std::tuple<SerialInfo, std::vector<Generators::GridVoxel>>> loadGrid(
+    std::filesystem::path directory);
 
 void storeGrid(std::filesystem::path output, const std::string& name, glm::uvec3 dimensions,
-    std::vector<Generators::GridVoxel> grid);
+    std::vector<Generators::GridVoxel> grid, Generators::GenerationInfo generationInfo);
 
 }

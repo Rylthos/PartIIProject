@@ -23,6 +23,25 @@ uint32_t readUint32(std::ifstream& stream)
     return output;
 }
 
+void writeUint64(uint64_t value, std::ofstream& stream)
+{
+    for (size_t i = 0; i < 8; i++) {
+        uint8_t byte = (value >> (8 * i)) & 0xFF;
+        stream.put(byte);
+    }
+}
+
+uint64_t readUint64(std::ifstream& stream)
+{
+
+    uint64_t output = 0;
+    for (size_t i = 0; i < 8; i++) {
+        uint8_t byte = readByte(stream);
+        output |= ((uint64_t)byte) << (8 * i);
+    }
+    return output;
+}
+
 void writeUvec3(glm::uvec3 vec, std::ofstream& stream)
 {
     writeUint32(vec.x, stream);

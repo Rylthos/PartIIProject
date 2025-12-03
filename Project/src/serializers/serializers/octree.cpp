@@ -1,16 +1,20 @@
 #include "octree.hpp"
+
+#include "common.hpp"
+
+#include "generators/common.hpp"
 #include "generators/octree.hpp"
-#include "serializers/common.hpp"
 
 #include <iostream>
 
 namespace Serializers {
 
-std::pair<glm::uvec3, std::vector<Generators::OctreeNode>> loadOctree(
+std::optional<std::tuple<SerialInfo, std::vector<Generators::OctreeNode>>> loadOctree(
     std::filesystem::path directory)
 {
     if (directory.has_filename()) {
         LOG_ERROR("Expected a directory not a file\n");
+        return {};
     }
 
     std::string foldername = directory.parent_path().filename();
@@ -20,22 +24,27 @@ std::pair<glm::uvec3, std::vector<Generators::OctreeNode>> loadOctree(
 
     if (!inputStream.is_open()) {
         LOG_ERROR("Failed to open file: {}\n", file.string());
-        exit(-1);
+        return {};
     }
 
-    glm::uvec3 dimensions = Serializers::readUvec3(inputStream);
+    SerialInfo serialInfo;
+    serialInfo.dimensions = Serializers::readUvec3(inputStream);
+    serialInfo.voxels = Serializers::readUint64(inputStream);
+    serialInfo.nodes = Serializers::readUint64(inputStream);
+
     std::vector<Generators::OctreeNode> nodes;
+    nodes.reserve(serialInfo.nodes);
 
     while (!inputStream.eof()) {
         uint32_t data = Serializers::readUint32(inputStream);
 
         nodes.push_back(Generators::OctreeNode(data));
     }
-    return std::make_pair(dimensions, nodes);
+    return std::make_pair(serialInfo, nodes);
 }
 
 void storeOctree(std::filesystem::path output, const std::string& name, glm::uvec3 dimensions,
-    std::vector<Generators::OctreeNode> nodes)
+    std::vector<Generators::OctreeNode> nodes, Generators::GenerationInfo generationInfo)
 {
     std::filesystem::path target = output / name / (name + ".voxoctree");
 
@@ -46,6 +55,8 @@ void storeOctree(std::filesystem::path output, const std::string& name, glm::uve
     }
 
     writeUvec3(dimensions, outputStream);
+    writeUint64(generationInfo.voxelCount, outputStream);
+    writeUint64(generationInfo.nodes, outputStream);
 
     for (const auto& node : nodes) {
         uint32_t data = node.getData();
@@ -53,7 +64,5 @@ void storeOctree(std::filesystem::path output, const std::string& name, glm::uve
     }
 
     outputStream.close();
-
-    std::cout << "Wrote " << target << "\n";
 }
 }
