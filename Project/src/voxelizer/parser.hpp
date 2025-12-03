@@ -39,6 +39,9 @@ class Parser {
 
     void generateStructures();
 
+    bool aabbTriangleIntersection(
+        Triangle triangle, glm::vec3 cell, glm::vec3 cellSize = glm::vec3(1));
+
   private:
     ParserArgs m_Args;
 

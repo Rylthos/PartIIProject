@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <glm/gtx/string_cast.hpp>
 
+#include <cmath>
 #include <cstring>
 #include <fstream>
 #include <memory>
@@ -61,6 +62,8 @@ void Parser::parseObj(std::filesystem::path filepath)
     while (std::getline(file, line)) {
         if (line[0] == '#')
             continue;
+        if (line.length() == 0)
+            continue;
 
         auto codePosEnd = line.find(" ");
         std::string code = line.substr(0, codePosEnd);
@@ -76,7 +79,7 @@ void Parser::parseObj(std::filesystem::path filepath)
                 vertex[index++] = std::atof(v.c_str());
             }
 
-            vertices.push_back(glm::vec3(vertex.x, vertex.z, vertex.y));
+            vertices.push_back(glm::vec3(vertex.x, -vertex.y, -vertex.z));
         } else if (code == "vt") { // Vertex Textures
             glm::vec3 tex = { 0., 0., 0. };
 
@@ -95,6 +98,7 @@ void Parser::parseObj(std::filesystem::path filepath)
 
             auto lineFaces = split(arguments, " ");
 
+            bool textures = false;
             for (auto f : lineFaces) {
                 auto elements = split(f, "/");
 
@@ -103,8 +107,10 @@ void Parser::parseObj(std::filesystem::path filepath)
                 int normal = -1;
 
                 vertex = std::atoi(elements[0].c_str()) - 1;
-                if (elements.size() >= 2 && elements[1].length() != 0)
+                if (elements.size() >= 2 && elements[1].length() != 0) {
                     texture = std::atoi(elements[1].c_str()) - 1;
+                    textures = true;
+                }
                 if (elements.size() >= 3)
                     normal = std::atoi(elements[2].c_str()) - 1;
 
@@ -122,9 +128,11 @@ void Parser::parseObj(std::filesystem::path filepath)
                 t.positions[1] = vertices[std::get<0>(v2)];
                 t.positions[2] = vertices[std::get<0>(v3)];
 
-                t.texture[0] = texture[std::get<1>(v1)];
-                t.texture[1] = texture[std::get<1>(v2)];
-                t.texture[2] = texture[std::get<1>(v3)];
+                if (textures) {
+                    t.texture[0] = texture[std::get<1>(v1)];
+                    t.texture[1] = texture[std::get<1>(v2)];
+                    t.texture[2] = texture[std::get<1>(v3)];
+                }
 
                 m_Triangles.push_back(t);
             }
@@ -161,24 +169,27 @@ void Parser::parseMesh()
         glm::uvec3(glm::ceil((maxBound - minBound) * m_Args.voxels_per_unit)), glm::uvec3(1));
 
     for (auto t : m_Triangles) {
-        glm::vec3 triangleMin = glm::floor(
+        glm::uvec3 triangleMin = glm::floor(
             (glm::min(t.positions[0], glm::min(t.positions[1], t.positions[2])) - minBound)
             * m_Args.voxels_per_unit);
-        glm::vec3 triangleMax = glm::max(
-            glm::ceil(
+        glm::uvec3 triangleMax = glm::max(
+            glm::uvec3(glm::ceil(
                 (glm::max(t.positions[0], glm::max(t.positions[1], t.positions[2])) - minBound)
-                * m_Args.voxels_per_unit),
-            glm::vec3(1));
+                * m_Args.voxels_per_unit)),
+            glm::uvec3(1));
 
         for (int z = triangleMin.z; z < triangleMax.z; z++) {
             for (int y = triangleMin.y; y < triangleMax.y; y++) {
                 for (int x = triangleMin.x; x < triangleMax.x; x++) {
-                    glm::vec3 cubeMin = glm::vec3(x, y, z) / m_Args.voxels_per_unit;
-
-                    // Bad detection
-                    // TODO: Actually implement the code
+                    glm::vec3 cubeMin = (glm::vec3(x, y, z) / m_Args.voxels_per_unit) + minBound;
                     glm::ivec3 index = glm::ivec3(x, y, z);
-                    m_Voxels[index] = glm::vec3(1);
+                    // printf("Index: %s | Cube Min: %s\n", glm::to_string(index).c_str(),
+                    //     glm::to_string(cubeMin).c_str());
+
+                    if (aabbTriangleIntersection(
+                            t, cubeMin, glm::vec3(1.f / m_Args.voxels_per_unit))) {
+                        m_Voxels[index] = glm::vec3(1);
+                    }
                 }
             }
         }
@@ -216,4 +227,58 @@ void Parser::generateStructures()
 
         thread.join();
     }
+}
+
+bool aabbTriangleSAT(glm::vec3 v0, glm::vec3 v1, glm::vec3 v2, glm::vec3 aabbSize, glm::vec3 axis)
+{
+    float p0 = glm::dot(v0, axis);
+    float p1 = glm::dot(v1, axis);
+    float p2 = glm::dot(v2, axis);
+
+    float r = aabbSize.x * fabs(glm::dot(glm::vec3(1, 0, 0), axis))
+        + aabbSize.y * fabs(glm::dot(glm::vec3(0, 1, 0), axis))
+        + aabbSize.z * fabs(glm::dot(glm::vec3(0, 0, 1), axis));
+
+    float maxP = fmax(p0, fmax(p1, p2));
+    float minP = fmin(p0, fmin(p1, p2));
+
+    return !(fmax(-maxP, minP) > r);
+}
+
+bool Parser::aabbTriangleIntersection(Triangle triangle, glm::vec3 cell, glm::vec3 cellSize)
+{
+    glm::vec3 cellCenter = cell + cellSize / 2.f;
+    glm::vec3 v0 = triangle.positions[0] - cellCenter;
+    glm::vec3 v1 = triangle.positions[1] - cellCenter;
+    glm::vec3 v2 = triangle.positions[2] - cellCenter;
+
+    glm::vec3 ab = glm::normalize(triangle.positions[1] - triangle.positions[0]);
+    glm::vec3 bc = glm::normalize(triangle.positions[2] - triangle.positions[1]);
+    glm::vec3 ca = glm::normalize(triangle.positions[0] - triangle.positions[2]);
+
+    glm::vec3 a00 = glm::vec3(0, -ab.z, ab.y);
+    glm::vec3 a01 = glm::vec3(0, -bc.z, bc.y);
+    glm::vec3 a02 = glm::vec3(0, -ca.z, ca.y);
+
+    glm::vec3 a10 = glm::vec3(ab.z, 0.0, ab.x);
+    glm::vec3 a11 = glm::vec3(bc.z, 0.0, bc.x);
+    glm::vec3 a12 = glm::vec3(ca.z, 0.0, ca.x);
+
+    glm::vec3 a20 = glm::vec3(-ab.y, ab.x, 0.0);
+    glm::vec3 a21 = glm::vec3(-bc.y, bc.x, 0.0);
+    glm::vec3 a22 = glm::vec3(-ca.y, ca.x, 0.0);
+
+    return !(!aabbTriangleSAT(v0, v1, v2, cellSize, a00)
+        || !aabbTriangleSAT(v0, v1, v2, cellSize, a01)
+        || !aabbTriangleSAT(v0, v1, v2, cellSize, a02)
+        || !aabbTriangleSAT(v0, v1, v2, cellSize, a10)
+        || !aabbTriangleSAT(v0, v1, v2, cellSize, a11)
+        || !aabbTriangleSAT(v0, v1, v2, cellSize, a12)
+        || !aabbTriangleSAT(v0, v1, v2, cellSize, a20)
+        || !aabbTriangleSAT(v0, v1, v2, cellSize, a21)
+        || !aabbTriangleSAT(v0, v1, v2, cellSize, a22)
+        || !aabbTriangleSAT(v0, v1, v2, cellSize, glm::vec3(1, 0, 0))
+        || !aabbTriangleSAT(v0, v1, v2, cellSize, glm::vec3(0, 1, 0))
+        || !aabbTriangleSAT(v0, v1, v2, cellSize, glm::vec3(0, 0, 1))
+        || !aabbTriangleSAT(v0, v1, v2, cellSize, glm::cross(ab, bc)));
 }

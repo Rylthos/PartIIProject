@@ -157,7 +157,7 @@ void ASManager::setAS(ASType type)
     //     }));
 
     // m_CurrentAS->fromLoader(std::move(loader));
-    m_CurrentAS->fromFile("res/structures/suzanne/");
+    m_CurrentAS->fromFile("res/structures/bunny/");
 }
 
 void ASManager::updateShaders()
