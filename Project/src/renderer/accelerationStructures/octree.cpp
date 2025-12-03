@@ -6,6 +6,8 @@
 #include <variant>
 #include <vulkan/vulkan_core.h>
 
+#include "serializers/octree.hpp"
+
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/integer.hpp"
 #include "glm/matrix.hpp"
@@ -76,6 +78,13 @@ void OctreeAS::fromLoader(std::unique_ptr<Loader>&& loader)
               m_Nodes = Generators::generateOctree(
                   stoken, std::move(loader), p_GenerationInfo, m_Dimensions, m_UpdateBuffers);
           });
+}
+
+void OctreeAS::fromFile(std::filesystem::path path)
+{
+    std::tie(m_Dimensions, m_Nodes) = Serializers::loadOctree(path);
+
+    m_UpdateBuffers = true;
 }
 
 void OctreeAS::render(

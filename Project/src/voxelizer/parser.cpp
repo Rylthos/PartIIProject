@@ -1,10 +1,12 @@
 #include "parser.hpp"
 
+#include "generators/octree.hpp"
 #include "loaders/sparse_loader.hpp"
 
 #include "generators/grid.hpp"
 
 #include "serializers/grid.hpp"
+#include "serializers/octree.hpp"
 
 #include <filesystem>
 #include <glm/gtx/string_cast.hpp>
@@ -34,6 +36,17 @@ std::vector<std::string> split(std::string str, std::string delim)
 
 Parser::Parser(ParserArgs args) : m_Args(args)
 {
+    if (m_Args.flag_all || m_Args.flag_grid)
+        m_ValidStructures[GRID] = true;
+    if (m_Args.flag_all || m_Args.flag_texture)
+        m_ValidStructures[TEXTURE] = true;
+    if (m_Args.flag_all || m_Args.flag_octree)
+        m_ValidStructures[OCTREE] = true;
+    if (m_Args.flag_all || m_Args.flag_contree)
+        m_ValidStructures[CONTREE] = true;
+    if (m_Args.flag_all || m_Args.flag_brickmap)
+        m_ValidStructures[BRICKMAP] = true;
+
     parseFile();
     parseMesh();
     generateStructures();
@@ -210,22 +223,45 @@ void Parser::generateStructures()
         std::filesystem::create_directory(outputDirectory / outputName);
     }
 
-    if (m_Args.flag_all || m_Args.flag_grid) {
+    std::jthread threads[AS_COUNT];
+
+    if (m_ValidStructures[GRID]) {
         std::unique_ptr<Loader> loader = std::make_unique<SparseLoader>(m_Dimensions, m_Voxels);
         Generators::GenerationInfo info;
         glm::uvec3 dimensions;
         bool finished;
-        auto thread = std::jthread([&, loader = std::move(loader)](std::stop_token stoken) mutable {
-            auto voxels
-                = Generators::generateGrid(stoken, std::move(loader), info, dimensions, finished);
+        threads[GRID]
+            = std::jthread([&, loader = std::move(loader)](std::stop_token stoken) mutable {
+                  auto voxels = Generators::generateGrid(
+                      stoken, std::move(loader), info, dimensions, finished);
 
-            printf("%s\n", glm::to_string(dimensions).c_str());
-            printf("Time: %f\n", info.generationTime);
+                  printf("%s\n", glm::to_string(dimensions).c_str());
+                  printf("Time: %f\n", info.generationTime);
 
-            Serializers::storeGrid(outputDirectory, outputName, dimensions, voxels);
-        });
+                  Serializers::storeGrid(outputDirectory, outputName, dimensions, voxels);
+              });
+    }
 
-        thread.join();
+    if (m_ValidStructures[OCTREE]) {
+        std::unique_ptr<Loader> loader = std::make_unique<SparseLoader>(m_Dimensions, m_Voxels);
+        Generators::GenerationInfo info;
+        glm::uvec3 dimensions;
+        bool finished;
+        threads[OCTREE]
+            = std::jthread([&, loader = std::move(loader)](std::stop_token stoken) mutable {
+                  auto nodes = Generators::generateOctree(
+                      stoken, std::move(loader), info, dimensions, finished);
+
+                  printf("%s\n", glm::to_string(dimensions).c_str());
+                  printf("Time: %f\n", info.generationTime);
+
+                  Serializers::storeOctree(outputDirectory, outputName, dimensions, nodes);
+              });
+    }
+
+    for (size_t i = 0; i < AS_COUNT; i++) {
+        if (m_ValidStructures[i])
+            threads[i].join();
     }
 }
 

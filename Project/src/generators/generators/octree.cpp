@@ -33,7 +33,7 @@ OctreeNode::OctreeNode(uint8_t r, uint8_t g, uint8_t b)
     };
 }
 
-uint32_t OctreeNode::getData()
+uint32_t OctreeNode::getData() const
 {
     if (const NodeType* node = std::get_if<NodeType>(&m_CurrentType)) {
         uint32_t flags = (((uint32_t)node->flags & 0x3) << 30);

@@ -21,6 +21,8 @@ struct ParserArgs {
     float voxels_per_unit = 1.f;
 };
 
+enum Structures { GRID = 0, TEXTURE = 1, OCTREE = 2, CONTREE = 3, BRICKMAP = 4, AS_COUNT = 5 };
+
 struct Triangle {
     glm::vec3 positions[3];
     glm::vec3 texture[3];
@@ -44,6 +46,8 @@ class Parser {
 
   private:
     ParserArgs m_Args;
+
+    bool m_ValidStructures[AS_COUNT];
 
     glm::uvec3 m_Dimensions;
 

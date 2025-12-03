@@ -16,7 +16,7 @@ class OctreeNode {
     OctreeNode(uint8_t childMask, uint32_t offset);
     OctreeNode(uint8_t r, uint8_t g, uint8_t b);
 
-    uint32_t getData();
+    uint32_t getData() const;
 
   private:
     enum OctreeFlags : uint8_t { // 2 bits
