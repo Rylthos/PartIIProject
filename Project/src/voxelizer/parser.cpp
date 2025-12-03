@@ -1,21 +1,35 @@
 #include "parser.hpp"
 
+#include "generators/common.hpp"
 #include "generators/octree.hpp"
 #include "loaders/sparse_loader.hpp"
 
 #include "generators/grid.hpp"
 
+#include "pgbar/details/core/Core.hpp"
 #include "serializers/grid.hpp"
 #include "serializers/octree.hpp"
 
-#include <filesystem>
 #include <glm/gtx/string_cast.hpp>
+
+#include "pgbar/DynamicBar.hpp"
+#include "pgbar/ProgressBar.hpp"
 
 #include <cmath>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <memory>
+#include <unordered_map>
 #include <vector>
+
+static std::map<Structure, const char*> structureToString {
+    { GRID,     "[Grid]    " },
+    { TEXTURE,  "[Texture] " },
+    { OCTREE,   "[Octree]  " },
+    { CONTREE,  "[Contree] " },
+    { BRICKMAP, "[Brickmap]" },
+};
 
 std::vector<std::string> split(std::string str, std::string delim)
 {
@@ -224,44 +238,58 @@ void Parser::generateStructures()
     }
 
     std::jthread threads[AS_COUNT];
+    Generators::GenerationInfo info[AS_COUNT] {};
+    bool finished[AS_COUNT];
 
     if (m_ValidStructures[GRID]) {
-        std::unique_ptr<Loader> loader = std::make_unique<SparseLoader>(m_Dimensions, m_Voxels);
-        Generators::GenerationInfo info;
-        glm::uvec3 dimensions;
-        bool finished;
-        threads[GRID]
-            = std::jthread([&, loader = std::move(loader)](std::stop_token stoken) mutable {
-                  auto voxels = Generators::generateGrid(
-                      stoken, std::move(loader), info, dimensions, finished);
+        threads[GRID] = std::jthread([&](std::stop_token stoken) {
+            std::unique_ptr<Loader> loader = std::make_unique<SparseLoader>(m_Dimensions, m_Voxels);
+            glm::uvec3 dimensions;
 
-                  printf("%s\n", glm::to_string(dimensions).c_str());
-                  printf("Time: %f\n", info.generationTime);
+            auto voxels = Generators::generateGrid(
+                stoken, std::move(loader), info[GRID], dimensions, finished[GRID]);
 
-                  Serializers::storeGrid(outputDirectory, outputName, dimensions, voxels);
-              });
+            Serializers::storeGrid(outputDirectory, outputName, dimensions, voxels, info[GRID]);
+        });
     }
 
     if (m_ValidStructures[OCTREE]) {
-        std::unique_ptr<Loader> loader = std::make_unique<SparseLoader>(m_Dimensions, m_Voxels);
-        Generators::GenerationInfo info;
-        glm::uvec3 dimensions;
-        bool finished;
-        threads[OCTREE]
-            = std::jthread([&, loader = std::move(loader)](std::stop_token stoken) mutable {
-                  auto nodes = Generators::generateOctree(
-                      stoken, std::move(loader), info, dimensions, finished);
+        threads[OCTREE] = std::jthread([&](std::stop_token stoken) {
+            std::unique_ptr<Loader> loader = std::make_unique<SparseLoader>(m_Dimensions, m_Voxels);
+            glm::uvec3 dimensions;
+            auto nodes = Generators::generateOctree(
+                stoken, std::move(loader), info[OCTREE], dimensions, finished[OCTREE]);
 
-                  printf("%s\n", glm::to_string(dimensions).c_str());
-                  printf("Time: %f\n", info.generationTime);
+            Serializers::storeOctree(outputDirectory, outputName, dimensions, nodes, info[OCTREE]);
+        });
+    }
 
-                  Serializers::storeOctree(outputDirectory, outputName, dimensions, nodes);
-              });
+    pgbar::DynamicBar<pgbar::Channel::Stderr, pgbar::Policy::Async, pgbar::Region::Relative>
+        dynamicBar;
+    std::map<size_t, std::thread> barPool;
+    for (size_t i = 0; i < AS_COUNT; i++) {
+        if (!m_ValidStructures[i]) {
+            continue;
+        }
+
+        barPool[i] = std::thread([i, &info, &finished, &dynamicBar]() {
+            auto bar = dynamicBar.insert(pgbar::config::Line(pgbar::option::Tasks(100)));
+
+            bar->config().enable().percent().elapsed().countdown();
+            bar->config().disable().speed().counter();
+            bar->config().prefix(structureToString[(Structure)i]);
+
+            do {
+                bar->tick_to((uint8_t)(info[i].completionPercent * 100));
+            } while (!finished[i]);
+        });
     }
 
     for (size_t i = 0; i < AS_COUNT; i++) {
-        if (m_ValidStructures[i])
+        if (m_ValidStructures[i]) {
             threads[i].join();
+            barPool[i].join();
+        }
     }
 }
 

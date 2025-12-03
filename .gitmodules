@@ -26,3 +26,6 @@
 [submodule "Project/vendor/CLI11"]
 	path = Project/vendor/CLI11
 	url = https://github.com/CLIUtils/CLI11.git
+[submodule "Project/vendor/pgbar"]
+	path = Project/vendor/pgbar
+	url = https://github.com/Konvt/pgbar

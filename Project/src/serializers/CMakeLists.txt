@@ -12,7 +12,9 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif()
 
 target_link_libraries(serializers PUBLIC
-  glm::glm
   generators
   logger
+
+  glm::glm
+  pgbar
 )
