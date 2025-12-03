@@ -1,5 +1,6 @@
 #include "parser.hpp"
 
+#include "generators/brickmap.hpp"
 #include "generators/common.hpp"
 #include "generators/contree.hpp"
 #include "generators/octree.hpp"
@@ -9,6 +10,7 @@
 
 #include "pgbar/details/core/Core.hpp"
 
+#include "serializers/brickmap.hpp"
 #include "serializers/contree.hpp"
 #include "serializers/grid.hpp"
 #include "serializers/octree.hpp"
@@ -275,6 +277,20 @@ void Parser::generateStructures()
                 stoken, std::move(loader), info[CONTREE], dimensions, finished[CONTREE]);
 
             Serializers::storeContree(outputDirectory, outputName, dimensions, nodes, info[OCTREE]);
+        });
+    }
+
+    if (m_ValidStructures[BRICKMAP]) {
+        threads[BRICKMAP] = std::jthread([&](std::stop_token stoken) {
+            std::unique_ptr<Loader> loader = std::make_unique<SparseLoader>(m_Dimensions, m_Voxels);
+            glm::uvec3 dimensions;
+            std::vector<Generators::BrickgridPtr> brickgrid;
+            std::vector<Generators::Brickmap> brickmaps;
+            std::tie(brickgrid, brickmaps) = Generators::generateBrickmap(
+                stoken, std::move(loader), info[BRICKMAP], dimensions, finished[BRICKMAP]);
+
+            Serializers::storeBrickmap(
+                outputDirectory, outputName, dimensions, brickgrid, brickmaps, info[BRICKMAP]);
         });
     }
 

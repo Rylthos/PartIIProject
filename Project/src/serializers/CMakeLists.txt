@@ -6,6 +6,7 @@ target_include_directories(serializers PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_
 target_compile_options(serializers PRIVATE -Wall -Wextra -Wpedantic)
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+  message("Debug")
   target_compile_options(serializers
     PRIVATE -g -Og
   )

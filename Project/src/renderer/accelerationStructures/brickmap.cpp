@@ -9,6 +9,9 @@
 #include "../frame_commands.hpp"
 #include "../pipeline_layout.hpp"
 #include "../shader_manager.hpp"
+
+#include "serializers/brickmap.hpp"
+
 #include "spdlog/spdlog.h"
 
 struct PushConstants {
@@ -60,6 +63,32 @@ void BrickmapAS::fromLoader(std::unique_ptr<Loader>&& loader)
               std::tie(m_Brickgrid, m_Brickmaps) = Generators::generateBrickmap(
                   stoken, std::move(loader), p_GenerationInfo, m_BrickgridSize, m_UpdateBuffers);
           });
+}
+
+void BrickmapAS::fromFile(std::filesystem::path path)
+{
+    p_FileThread.request_stop();
+    p_FileThread = std::jthread([this, path](std::stop_token stoken) {
+        p_Loading = true;
+        Serializers::SerialInfo info;
+        auto data = Serializers::loadBrickmap(path);
+
+        if (!data.has_value() || stoken.stop_requested()) {
+            return;
+        }
+
+        std::tie(info, m_Brickgrid, m_Brickmaps) = data.value();
+
+        m_BrickgridSize = info.dimensions;
+
+        p_GenerationInfo.voxelCount = info.voxels;
+        p_GenerationInfo.nodes = info.nodes;
+        p_GenerationInfo.generationTime = 0;
+        p_GenerationInfo.completionPercent = 1;
+
+        m_UpdateBuffers = true;
+        p_Loading = false;
+    });
 }
 
 void BrickmapAS::render(
