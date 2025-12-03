@@ -10,6 +10,8 @@
 #include "../frame_commands.hpp"
 #include "../pipeline_layout.hpp"
 
+#include "serializers/texture.hpp"
+
 #include <cstring>
 #include <vulkan/vulkan_core.h>
 
@@ -59,6 +61,32 @@ void TextureAS::fromLoader(std::unique_ptr<Loader>&& loader)
               m_Voxels = Generators::generateTexture(
                   stoken, std::move(loader), p_GenerationInfo, m_Dimensions, m_UpdateBuffers);
           });
+}
+
+void TextureAS::fromFile(std::filesystem::path path)
+{
+    p_FileThread.request_stop();
+    p_FileThread = std::jthread([this, path](std::stop_token stoken) {
+        p_Loading = true;
+        Serializers::SerialInfo info;
+        auto data = Serializers::loadTexture(path);
+
+        if (!data.has_value() || stoken.stop_requested()) {
+            return;
+        }
+
+        std::tie(info, m_Voxels) = data.value();
+
+        m_Dimensions = info.dimensions;
+
+        p_GenerationInfo.voxelCount = info.voxels;
+        p_GenerationInfo.nodes = info.nodes;
+        p_GenerationInfo.generationTime = 0;
+        p_GenerationInfo.completionPercent = 1;
+
+        m_UpdateBuffers = true;
+        p_Loading = false;
+    });
 }
 
 void TextureAS::render(

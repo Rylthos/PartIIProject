@@ -4,6 +4,7 @@
 #include "generators/common.hpp"
 #include "generators/contree.hpp"
 #include "generators/octree.hpp"
+#include "generators/texture.hpp"
 #include "loaders/sparse_loader.hpp"
 
 #include "generators/grid.hpp"
@@ -19,6 +20,7 @@
 
 #include "pgbar/DynamicBar.hpp"
 #include "pgbar/ProgressBar.hpp"
+#include "serializers/texture.hpp"
 
 #include <cmath>
 #include <cstring>
@@ -175,7 +177,7 @@ void Parser::parseObj(std::filesystem::path filepath)
             fprintf(stderr, "[WARNING]: Materials not supported\n");
         } else if (code == "s") {
             if (arguments == "1" || arguments == "on")
-                fprintf(stderr, "[ERROR]: Smooth shading not supported");
+                fprintf(stderr, "[ERROR]: Smooth shading not supported\n");
         } else if (code == "o") {
             // Dont currently handle multiple objects
         } else {
@@ -255,6 +257,18 @@ void Parser::generateStructures()
                 stoken, std::move(loader), info[GRID], dimensions, finished[GRID]);
 
             Serializers::storeGrid(outputDirectory, outputName, dimensions, voxels, info[GRID]);
+        });
+    }
+
+    if (m_ValidStructures[TEXTURE]) {
+        threads[TEXTURE] = std::jthread([&](std::stop_token stoken) {
+            std::unique_ptr<Loader> loader = std::make_unique<SparseLoader>(m_Dimensions, m_Voxels);
+            glm::uvec3 dimensions;
+            auto nodes = Generators::generateTexture(
+                stoken, std::move(loader), info[TEXTURE], dimensions, finished[TEXTURE]);
+
+            Serializers::storeTexture(
+                outputDirectory, outputName, dimensions, nodes, info[TEXTURE]);
         });
     }
 
