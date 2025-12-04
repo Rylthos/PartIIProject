@@ -210,6 +210,13 @@ void Parser::parseMesh()
 
     m_Dimensions = glm::max(glm::uvec3(glm::ceil(size * scalar)), glm::uvec3(1));
 
+    pgbar::ProgressBar<pgbar::Channel::Stderr, pgbar::Policy::Async, pgbar::Region::Relative> bar;
+
+    bar.config().tasks(m_Triangles.size());
+    bar.config().enable().percent().elapsed().countdown();
+    bar.config().disable().speed();
+    bar.config().prefix("Voxelizing triangles");
+
     for (auto t : m_Triangles) {
         glm::uvec3 triangleMin = glm::floor(
             (glm::min(t.positions[0], glm::min(t.positions[1], t.positions[2])) - minBound)
@@ -233,7 +240,11 @@ void Parser::parseMesh()
                 }
             }
         }
+
+        bar.tick();
     }
+
+    bar.reset();
 }
 
 void Parser::generateStructures()
