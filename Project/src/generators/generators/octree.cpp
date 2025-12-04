@@ -69,7 +69,7 @@ static OctreeIntNode convert(const std::optional<glm::vec3> v)
         return OctreeIntNode { .visible = false };
 }
 
-static std::optional<OctreeIntNode> allEqual(const std::deque<OctreeIntNode>& nodes)
+static std::optional<OctreeIntNode> allEqual(const std::array<OctreeIntNode, 8>& nodes)
 {
     assert(nodes.size() == 8);
     if (nodes.at(0).parent)
@@ -172,79 +172,87 @@ std::vector<OctreeNode> generateOctree(std::stop_token stoken, std::unique_ptr<L
 
     auto start = timer.now();
 
-    uint64_t current_code = 0;
-    uint64_t final_code = dimensions.x * dimensions.y * dimensions.z;
+    uint64_t currentCode = 0;
+    uint64_t finalCode = dimensions.x * dimensions.y * dimensions.z;
 
-    const uint32_t max_depth = 23;
-    uint32_t current_depth = max_depth - 1;
+    const uint32_t maxDepth = 23;
+    uint32_t currentDepth = maxDepth - 1;
 
-    std::array<std::deque<OctreeIntNode>, max_depth> queues;
+    std::array<size_t, maxDepth> queueSizes;
+    for (uint32_t i = 0; i < maxDepth; i++)
+        queueSizes[i] = 0;
+
+    std::array<std::array<OctreeIntNode, 8>, maxDepth> queues;
     std::vector<OctreeIntNode> intermediaryNodes;
 
     std::vector<OctreeNode> nodes;
 
     info.voxelCount = 0;
 
-    while (current_code != final_code) {
+    while (currentCode != finalCode) {
         if (stoken.stop_requested())
             return nodes;
 
-        const auto current_voxel = loader->getVoxelMorton(current_code);
-        current_code++;
+        const auto currentVoxel = loader->getVoxelMorton(currentCode);
+        currentCode++;
 
-        current_depth = max_depth - 1;
-        queues[current_depth].push_back(convert(current_voxel));
+        currentDepth = maxDepth - 1;
+        queues[currentDepth][queueSizes[currentDepth]] = convert(currentVoxel);
+        queueSizes[currentDepth]++;
 
         auto current = timer.now();
 
         std::chrono::duration<float, std::milli> difference = current - start;
-        info.completionPercent = ((float)current_code / (float)final_code);
+        info.completionPercent = ((float)currentCode / (float)finalCode);
         info.generationTime = difference.count() / 1000.0f;
 
-        while (current_depth > 0 && queues[current_depth].size() == 8) {
+        while (currentDepth > 0 && queueSizes[currentDepth] == 8) {
             if (stoken.stop_requested())
                 return nodes;
 
             OctreeIntNode node;
 
-            const auto& possible_parent_node = allEqual(queues[current_depth]);
+            const auto& possible_parent_node = allEqual(queues[currentDepth]);
 
             if (possible_parent_node.has_value()) {
-                queues[current_depth - 1].push_back(possible_parent_node.value());
+                queues[currentDepth - 1][queueSizes[currentDepth - 1]]
+                    = possible_parent_node.value();
+                queueSizes[currentDepth - 1]++;
             } else {
                 uint8_t childMask = 0;
                 uint32_t childCount = 0;
                 for (int8_t i = 0; i < 8; i++) {
-                    if (queues[current_depth].at(i).visible) {
+                    if (queues[currentDepth].at(i).visible) {
                         childMask |= (1 << i);
-                        intermediaryNodes.push_back(queues[current_depth].at(i));
-                        if (!queues[current_depth].at(i).parent
-                            && queues[current_depth].at(i).visible) {
-                            info.voxelCount += pow(8, 22 - current_depth);
+                        intermediaryNodes.push_back(queues[currentDepth].at(i));
+                        if (!queues[currentDepth].at(i).parent
+                            && queues[currentDepth].at(i).visible) {
+                            info.voxelCount += pow(8, 22 - currentDepth);
                         }
-                        childCount += queues[current_depth].at(i).childCount + 1;
+                        childCount += queues[currentDepth].at(i).childCount + 1;
                     }
                 }
 
                 OctreeIntNode parent = {
+                    .colour = glm::u8vec3(1),
                     .visible = childMask != 0,
                     .parent = true,
                     .childMask = childMask,
                     .childStartIndex = (uint32_t)(intermediaryNodes.size() - 1),
                     .childCount = childCount,
                 };
-
-                queues[current_depth - 1].push_back(parent);
+                queues[currentDepth - 1][queueSizes[currentDepth - 1]] = parent;
+                queueSizes[currentDepth - 1]++;
             }
 
-            queues[current_depth].clear();
-            current_depth--;
+            queueSizes[currentDepth] = 0;
+            currentDepth--;
         }
     }
-    assert(queues[current_depth].size() == 1);
-    intermediaryNodes.push_back(queues[current_depth].at(0));
-    if (!queues[current_depth].at(0).parent && queues[current_depth].at(0).visible) {
-        info.voxelCount += pow(8, 22 - current_depth);
+    assert(queueSizes[currentDepth] == 1);
+    intermediaryNodes.push_back(queues[currentDepth].at(0));
+    if (!queues[currentDepth].at(0).parent && queues[currentDepth].at(0).visible) {
+        info.voxelCount += pow(8, 22 - currentDepth);
     }
 
     nodes.reserve(intermediaryNodes.size());

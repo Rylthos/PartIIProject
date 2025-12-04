@@ -1,5 +1,9 @@
 #include "contree.hpp"
+#include "loaders/loader.hpp"
 
+#include <cstdlib>
+
+#include <cstring>
 #include <deque>
 #include <iterator>
 
@@ -81,7 +85,7 @@ static ContreeIntNode convert(const std::optional<glm::vec3> v)
     }
 };
 
-static std::optional<ContreeIntNode> allEqual(const std::deque<ContreeIntNode>& nodes)
+static std::optional<ContreeIntNode> allEqual(const std::array<ContreeIntNode, 64>& nodes)
 {
     assert(nodes.size() == 64);
     bool allVisible = nodes.at(0).visible;
@@ -121,7 +125,11 @@ std::vector<ContreeNode> generateContree(std::stop_token stoken, std::unique_ptr
     const uint32_t maxDepth = 11;
     uint32_t currentDepth = maxDepth;
 
-    std::array<std::deque<ContreeIntNode>, maxDepth> queues;
+    std::array<size_t, maxDepth> queueSizes;
+    for (uint32_t i = 0; i < maxDepth; i++)
+        queueSizes[i] = 0;
+
+    std::array<std::array<ContreeIntNode, 64>, maxDepth> queues;
     std::vector<ContreeIntNode> intermediaryNodes;
 
     std::vector<ContreeNode> nodes;
@@ -136,14 +144,15 @@ std::vector<ContreeNode> generateContree(std::stop_token stoken, std::unique_ptr
         currentCode++;
 
         currentDepth = maxDepth - 1;
-        queues[currentDepth].push_back(convert(currentVoxel));
+        queues[currentDepth][queueSizes[currentDepth]] = convert(currentVoxel);
+        queueSizes[currentDepth]++;
 
         auto current = timer.now();
         std::chrono::duration<float, std::milli> difference = current - start;
         info.completionPercent = ((float)currentCode / (float)finalCode);
         info.generationTime = difference.count() / 1000.0f;
 
-        while (currentDepth > 0 && queues[currentDepth].size() == 64) {
+        while (currentDepth > 0 && queueSizes[currentDepth] == 64) {
             if (stoken.stop_requested())
                 return nodes;
 
@@ -152,7 +161,8 @@ std::vector<ContreeNode> generateContree(std::stop_token stoken, std::unique_ptr
             const auto& possibleParentNode = allEqual(queues[currentDepth]);
 
             if (possibleParentNode.has_value()) {
-                queues[currentDepth - 1].push_back(possibleParentNode.value());
+                queues[currentDepth - 1][queueSizes[currentDepth - 1]] = possibleParentNode.value();
+                queueSizes[currentDepth - 1]++;
             } else {
                 uint64_t childMask = 0;
                 uint32_t childCount = 0;
@@ -168,6 +178,7 @@ std::vector<ContreeNode> generateContree(std::stop_token stoken, std::unique_ptr
                 }
 
                 ContreeIntNode parent = {
+                    .colour = glm::vec3(0.f),
                     .visible = childMask != 0,
                     .parent = true,
                     .childMask = childMask,
@@ -175,13 +186,15 @@ std::vector<ContreeNode> generateContree(std::stop_token stoken, std::unique_ptr
                     .childCount = childCount,
                 };
 
-                queues[currentDepth - 1].push_back(parent);
+                queues[currentDepth - 1][queueSizes[currentDepth - 1]] = parent;
+                queueSizes[currentDepth - 1]++;
             }
-            queues[currentDepth].clear();
+
+            queueSizes[currentDepth] = 0;
             currentDepth--;
         }
     }
-    assert(queues[currentDepth].size() == 1);
+    assert(queueSizes[currentDepth] == 1);
     intermediaryNodes.push_back(queues[currentDepth].at(0));
     if (!queues[currentDepth].at(0).parent && queues[currentDepth].at(0).visible) {
         info.voxelCount += pow(64, 10 - currentDepth);
