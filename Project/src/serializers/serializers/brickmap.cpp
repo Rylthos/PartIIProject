@@ -48,7 +48,7 @@ loadBrickmap(std::filesystem::path directory)
             brickmap.occupancy[i] = Serializers::readUint64(inputStream);
         }
         uint64_t colours = Serializers::readUint64(inputStream);
-        assert(colours < 8 * 8 * 8 * 3);
+        assert(colours <= 8 * 8 * 8 * 3);
         brickmap.colour.resize(colours);
         for (size_t i = 0; i < colours; i++) {
             brickmap.colour[i] = Serializers::readByte(inputStream);
