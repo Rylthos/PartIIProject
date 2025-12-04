@@ -5,6 +5,7 @@
 #include "default_defines.slang"
 #include "lighting.slang"
 #include "render_descriptor.slang"
+#include "intersection_colour.slang"
 
 struct PushConstants {
   float3 camera_position;
@@ -112,8 +113,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
 
 #ifdef HEATMAP
     if (hit.intersection_checks != 0) {
-      float3 mix = lerp(MIN_INTERSECTION_COLOUR, MAX_INTERSECTION_COLOUR, float3(hit.intersection_checks / float(INTERSECTION_MAX)));
-      o_Image[pixelCoord] = float4(mix, 1.);
+      o_Image[pixelCoord] = float4(viridis(hit.intersection_checks), 1.);
     } else {
       o_Image[pixelCoord] = float4(0);
     }

@@ -12,9 +12,6 @@
 #ifndef INTERSECTION_MAX
 #define INTERSECTION_MAX 10
 #endif // INTERSECTION_MAX
-
-#define MIN_INTERSECTION_COLOUR float3(0.26, 0, 0.33)
-#define MAX_INTERSECTION_COLOUR float3(0.99, 0.9, 0.14)
 #endif // HEATMAP
 
 #ifdef CYCLES
