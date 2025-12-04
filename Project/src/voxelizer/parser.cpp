@@ -203,26 +203,28 @@ void Parser::parseMesh()
         }
     }
 
-    m_Dimensions = glm::max(
-        glm::uvec3(glm::ceil((maxBound - minBound) * m_Args.voxels_per_unit)), glm::uvec3(1));
+    glm::vec3 size = maxBound - minBound;
+    float maxSide = fmax(size.x, fmax(size.y, size.z));
+    glm::vec3 aspect = size / maxSide;
+    glm::vec3 scalar = (aspect * (float)m_Args.voxels_per_unit * m_Args.units) / size;
+
+    m_Dimensions = glm::max(glm::uvec3(glm::ceil(size * scalar)), glm::uvec3(1));
 
     for (auto t : m_Triangles) {
         glm::uvec3 triangleMin = glm::floor(
             (glm::min(t.positions[0], glm::min(t.positions[1], t.positions[2])) - minBound)
-            * m_Args.voxels_per_unit);
+            * scalar);
         glm::uvec3 triangleMax = glm::max(
             glm::uvec3(glm::ceil(
                 (glm::max(t.positions[0], glm::max(t.positions[1], t.positions[2])) - minBound)
-                * m_Args.voxels_per_unit)),
+                * scalar)),
             glm::uvec3(1));
 
         for (int z = triangleMin.z; z < triangleMax.z; z++) {
             for (int y = triangleMin.y; y < triangleMax.y; y++) {
                 for (int x = triangleMin.x; x < triangleMax.x; x++) {
-                    glm::vec3 cubeMin = (glm::vec3(x, y, z) / m_Args.voxels_per_unit) + minBound;
+                    glm::vec3 cubeMin = (glm::vec3(x, y, z) / scalar) + minBound;
                     glm::ivec3 index = glm::ivec3(x, y, z);
-                    // printf("Index: %s | Cube Min: %s\n", glm::to_string(index).c_str(),
-                    //     glm::to_string(cubeMin).c_str());
 
                     if (aabbTriangleIntersection(
                             t, cubeMin, glm::vec3(1.f / m_Args.voxels_per_unit))) {

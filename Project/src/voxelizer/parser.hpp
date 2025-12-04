@@ -18,7 +18,8 @@ struct ParserArgs {
     bool flag_octree = false;
     bool flag_contree = false;
     bool flag_brickmap = false;
-    float voxels_per_unit = 1.f;
+    uint32_t voxels_per_unit = 1;
+    float units = 128.f;
 };
 
 enum Structure { GRID = 0, TEXTURE = 1, OCTREE = 2, CONTREE = 3, BRICKMAP = 4, AS_COUNT = 5 };
