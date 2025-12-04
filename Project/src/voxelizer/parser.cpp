@@ -92,6 +92,10 @@ void Parser::parseObj(std::filesystem::path filepath)
     std::vector<glm::vec3> texture;
 
     std::ifstream file(filepath.c_str());
+    if (!file.is_open()) {
+        fprintf(stderr, "Failed to open file %s\n", filepath.c_str());
+        exit(-1);
+    }
     std::string line;
     while (std::getline(file, line)) {
         if (line[0] == '#')
@@ -244,6 +248,8 @@ void Parser::generateStructures()
         std::filesystem::create_directory(outputDirectory / outputName);
     }
 
+    printf("Voxel dimensions: %s\n", glm::to_string(m_Dimensions).c_str());
+
     std::jthread threads[AS_COUNT];
     Generators::GenerationInfo info[AS_COUNT] {};
     bool finished[AS_COUNT];
@@ -317,14 +323,22 @@ void Parser::generateStructures()
         }
 
         barPool[i] = std::thread([i, &info, &finished, &dynamicBar]() {
-            auto bar = dynamicBar.insert(pgbar::config::Line(pgbar::option::Tasks(100)));
+            auto bar = dynamicBar.insert(pgbar::config::Line(pgbar::option::Tasks(10000)));
 
             bar->config().enable().percent().elapsed().countdown();
             bar->config().disable().speed().counter();
             bar->config().prefix(structureToString[(Structure)i]);
 
+            float prev = 0.0f;
             do {
-                bar->tick_to((uint8_t)(info[i].completionPercent * 100));
+                if (info[i].completionPercent >= 1.f) {
+                    bar->tick_to(100);
+                } else {
+                    if (fabs(info[i].completionPercent - prev) > 0.0001) {
+                        bar->tick((info[i].completionPercent - prev) * 10000);
+                        prev = info[i].completionPercent;
+                    }
+                }
             } while (!finished[i]);
         });
     }
