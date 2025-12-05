@@ -67,3 +67,6 @@ add_subdirectory(CLI11)
 
 # pgbar
 add_subdirectory(pgbar)
+
+# stb
+add_subdirectory(stb)

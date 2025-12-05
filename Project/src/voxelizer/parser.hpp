@@ -27,11 +27,20 @@ enum Structure { GRID = 0, TEXTURE = 1, OCTREE = 2, CONTREE = 3, BRICKMAP = 4, A
 struct Triangle {
     glm::vec3 positions[3];
     glm::vec3 texture[3];
+    uint32_t matIndex;
+};
+
+struct Material {
+    int width;
+    int height;
+    int colourDepth;
+    uint8_t* data;
 };
 
 class Parser {
   public:
     Parser(ParserArgs args);
+    ~Parser();
 
     void parseFile();
 
@@ -40,10 +49,14 @@ class Parser {
 
     void parseMesh();
 
+    void parseMaterials();
+
     void generateStructures();
 
     bool aabbTriangleIntersection(
         Triangle triangle, glm::vec3 cell, glm::vec3 cellSize = glm::vec3(1));
+
+    void parseImage(std::filesystem::path filepath, Material& material);
 
   private:
     ParserArgs m_Args;
@@ -51,6 +64,13 @@ class Parser {
     bool m_ValidStructures[AS_COUNT];
 
     glm::uvec3 m_Dimensions;
+
+    std::vector<std::filesystem::path> m_MaterialLibs;
+
+    std::map<uint32_t, std::string> m_IndexToMaterial;
+    std::map<std::string, uint32_t> m_MaterialToIndex;
+
+    std::unordered_map<std::string, Material> m_Materials;
 
     std::unordered_map<glm::ivec3, glm::vec3> m_Voxels;
     std::vector<Triangle> m_Triangles;

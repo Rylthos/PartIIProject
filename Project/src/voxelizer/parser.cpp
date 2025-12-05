@@ -1,5 +1,8 @@
 #include "parser.hpp"
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb/stb_image.h"
+
 #include "generators/brickmap.hpp"
 #include "generators/common.hpp"
 #include "generators/contree.hpp"
@@ -70,7 +73,15 @@ Parser::Parser(ParserArgs args) : m_Args(args)
 
     parseFile();
     parseMesh();
+    parseMaterials();
     generateStructures();
+}
+
+Parser::~Parser()
+{
+    for (auto& material : m_Materials) {
+        stbi_image_free(material.second.data);
+    }
 }
 
 void Parser::parseFile()
@@ -96,6 +107,9 @@ void Parser::parseObj(std::filesystem::path filepath)
         fprintf(stderr, "Failed to open file %s\n", filepath.c_str());
         exit(-1);
     }
+
+    uint32_t currentMaterial = 0;
+
     std::string line;
     while (std::getline(file, line)) {
         if (line[0] == '#')
@@ -172,13 +186,22 @@ void Parser::parseObj(std::filesystem::path filepath)
                     t.texture[2] = texture[std::get<1>(v3)];
                 }
 
+                t.matIndex = currentMaterial;
+
                 m_Triangles.push_back(t);
             }
 
         } else if (code == "mtllib") {
-            fprintf(stderr, "[WARNING]: Materials not supported\n");
+            std::string name = arguments;
+            m_MaterialLibs.push_back(filepath.parent_path() / name);
         } else if (code == "usemtl") {
-            fprintf(stderr, "[WARNING]: Materials not supported\n");
+            if (m_MaterialToIndex.contains(arguments)) {
+                currentMaterial = m_MaterialToIndex[arguments];
+            } else {
+                uint32_t index = m_MaterialToIndex.size();
+                m_MaterialToIndex[arguments] = index;
+                m_IndexToMaterial[index] = arguments;
+            }
         } else if (code == "s") {
             if (arguments == "1" || arguments == "on")
                 fprintf(stderr, "[ERROR]: Smooth shading not supported\n");
@@ -188,6 +211,50 @@ void Parser::parseObj(std::filesystem::path filepath)
             fprintf(stderr, "[ERROR]: Unsupported element of OBJ: %s\n", code.c_str());
             exit(-1);
         }
+    }
+}
+
+void Parser::parseMaterials()
+{
+    for (auto path : m_MaterialLibs) {
+        std::ifstream materialFile(path.string());
+        if (!materialFile) {
+            fprintf(stderr, "Failed to open material lib: %s\n", path.string().c_str());
+            exit(-1);
+        }
+
+        std::string currentMaterial = "";
+        Material material;
+
+        std::string line;
+        while (std::getline(materialFile, line)) {
+            if (line[0] == '#')
+                continue;
+            if (line.length() == 0)
+                continue;
+
+            auto codePosEnd = line.find(" ");
+            std::string code = line.substr(0, codePosEnd);
+            std::string arguments = line.substr(codePosEnd + 1);
+
+            if (code == "newmtl") {
+                if (currentMaterial != "")
+                    m_Materials[currentMaterial] = material;
+
+                currentMaterial = arguments;
+            } else if (code == "Ns") {
+            } else if (code == "Ka") {
+            } else if (code == "Ke") {
+            } else if (code == "Ni") {
+            } else if (code == "d") {
+            } else if (code == "illum") {
+            } else if (code == "map_Kd") {
+                parseImage(path.parent_path() / arguments, material);
+            }
+        }
+
+        if (currentMaterial != "")
+            m_Materials[currentMaterial] = material;
     }
 }
 
@@ -235,6 +302,10 @@ void Parser::parseMesh()
 
                     if (aabbTriangleIntersection(
                             t, cubeMin, glm::vec3(1.f / m_Args.voxels_per_unit))) {
+
+                        // Interpolate texture coordinates
+                        // Get voxel colour
+
                         m_Voxels[index] = glm::vec3(1);
                     }
                 }
@@ -416,4 +487,10 @@ bool Parser::aabbTriangleIntersection(Triangle triangle, glm::vec3 cell, glm::ve
         || !aabbTriangleSAT(v0, v1, v2, cellSize, glm::vec3(0, 1, 0))
         || !aabbTriangleSAT(v0, v1, v2, cellSize, glm::vec3(0, 0, 1))
         || !aabbTriangleSAT(v0, v1, v2, cellSize, glm::cross(ab, bc)));
+}
+
+void Parser::parseImage(std::filesystem::path filepath, Material& material)
+{
+    material.data = stbi_load(
+        filepath.string().c_str(), &material.width, &material.height, &material.colourDepth, 3);
 }

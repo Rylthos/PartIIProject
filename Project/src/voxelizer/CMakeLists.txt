@@ -22,4 +22,5 @@ target_link_libraries(Voxelizer PRIVATE
 
   CLI11::CLI11
   glm::glm
+  stb_lib
 )
