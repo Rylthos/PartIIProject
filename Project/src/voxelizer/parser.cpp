@@ -284,7 +284,7 @@ void Parser::parseMaterialLib(std::filesystem::path filepath)
 
             currentMaterial = arguments;
         } else if (code == "Ns") {
-        } else if (code == "Ka") {
+        } else if (code == "Kd") {
             auto items = split(arguments, " ");
             material.diffuse = glm::vec3(0);
             int index = 0;
@@ -296,6 +296,7 @@ void Parser::parseMaterialLib(std::filesystem::path filepath)
         } else if (code == "d") {
         } else if (code == "illum") {
         } else if (code == "map_Kd") {
+            material.validTexture = true;
             parseImage(filepath.parent_path() / arguments, material);
         }
     }
@@ -353,7 +354,7 @@ void Parser::parseMesh()
                     if (aabbTriangleIntersection(t, cubeMin, cellSize)) {
                         if (t.matIndex != -1) {
                             const Material& mat = m_Materials[m_IndexToMaterial[t.matIndex]];
-                            if (mat.width != 0 || mat.height != 0) {
+                            if (mat.validTexture) {
                                 glm::vec3 tex = calculateTexCoords(t, cubeMin, cellSize);
 
                                 int x = std::clamp((int)(tex.x * mat.width), 0, mat.width - 1);

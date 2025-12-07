@@ -35,6 +35,7 @@ struct Material {
     int height;
     int colourDepth;
     uint8_t* data;
+    bool validTexture = false;
 
     glm::vec3 diffuse;
 };
