@@ -54,7 +54,8 @@ std::vector<std::string> split(std::string str, std::string delim)
         std::string sect = str.substr(pos, newPos - pos);
         pos = newPos + 1;
 
-        components.push_back(sect);
+        if (sect.length() != 0)
+            components.push_back(sect);
     }
 
     return components;
@@ -62,6 +63,8 @@ std::vector<std::string> split(std::string str, std::string delim)
 
 Parser::Parser(ParserArgs args) : m_Args(args)
 {
+    memset(m_ValidStructures, 0, AS_COUNT * sizeof(bool));
+
     if (m_Args.flag_all || m_Args.flag_grid)
         m_ValidStructures[GRID] = true;
     if (m_Args.flag_all || m_Args.flag_texture)
@@ -80,9 +83,10 @@ Parser::Parser(ParserArgs args) : m_Args(args)
 
 Parser::~Parser()
 {
-    for (auto& material : m_Materials) {
-        stbi_image_free(material.second.data);
-    }
+    // Technically required
+    // for (auto& material : m_Materials) {
+    //     stbi_image_free(material.second.data);
+    // }
 }
 
 void Parser::parseFile()
@@ -236,9 +240,10 @@ void Parser::parseObj(std::filesystem::path filepath)
                 currentMaterial = index;
             }
         } else if (code == "s") {
-            if (arguments == "1" || arguments == "on")
-                fprintf(stderr, "[ERROR]: Smooth shading not supported\n");
+            // No smooth shading
         } else if (code == "o") {
+            // Dont currently handle multiple objects
+        } else if (code == "g") {
             // Dont currently handle multiple objects
         } else {
             fprintf(stderr, "[ERROR]: Unsupported element of OBJ: %s\n", code.c_str());
@@ -268,6 +273,10 @@ void Parser::parseMaterialLib(std::filesystem::path filepath)
         auto codePosEnd = line.find(" ");
         std::string code = line.substr(0, codePosEnd);
         std::string arguments = line.substr(codePosEnd + 1);
+
+        if (code[0] == '\t') {
+            code = code.erase(0, 1);
+        }
 
         if (code == "newmtl") {
             if (currentMaterial != "")
@@ -626,12 +635,19 @@ glm::vec3 Parser::calculateTexCoords(const Triangle& triangle, glm::vec3 cell, g
     u /= denom;
     v /= denom;
 
-    return u * triangle.texture[0] + v * triangle.texture[1] + (1.f - u - v) * triangle.texture[2];
+    return glm::mod(
+        u * triangle.texture[0] + v * triangle.texture[1] + (1.f - u - v) * triangle.texture[2],
+        glm::vec3(1.0f));
 }
 
 void Parser::parseImage(std::filesystem::path filepath, Material& material)
 {
     stbi_set_flip_vertically_on_load(true);
     material.data = stbi_load(
-        filepath.string().c_str(), &material.width, &material.height, &material.colourDepth, 4);
+        filepath.string().c_str(), &material.width, &material.height, &material.colourDepth, 0);
+
+    if (!material.data) {
+        fprintf(stderr, "Failed to load %s\n", filepath.string().c_str());
+        exit(-1);
+    }
 }
