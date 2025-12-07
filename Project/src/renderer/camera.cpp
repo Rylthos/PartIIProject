@@ -64,6 +64,11 @@ void Camera::frameEvent(const Event& event)
             ImGui::Text("Forward: %.4f %.4f %.4f", m_Forward.x, m_Forward.y, m_Forward.z);
             ImGui::Text("Right  : %.4f %.4f %.4f", m_Right.x, m_Right.y, m_Right.z);
             ImGui::Text("Up     : %.4f %.4f %.4f", m_Up.x, m_Up.y, m_Up.z);
+
+            ImGui::Text("Movement speed");
+            ImGui::PushItemWidth(-1.f);
+            ImGui::DragFloat("##CameraMovementSpeed", &m_MovementSpeed, 0.1f, 0.1f, 30.0f);
+            ImGui::PopItemWidth();
         }
         ImGui::End();
     }
