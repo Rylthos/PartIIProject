@@ -59,8 +59,8 @@ class Application : public EventDispatcher {
     std::vector<VkImage> m_VkSwapchainImages;
     std::vector<VkImageView> m_VkSwapchainImageViews;
 
-    std::vector<VkSemaphore> m_RenderSemaphores;
-    std::vector<VkSemaphore> m_SwapchainSemaphores;
+    std::vector<VkSemaphore> m_AcquireSemaphore;
+    std::vector<VkSemaphore> m_SubmitSemaphore;
 
     VkCommandPool m_GeneralPool;
     std::array<PerFrameData, FRAMES_IN_FLIGHT> m_PerFrameData;
@@ -81,7 +81,6 @@ class Application : public EventDispatcher {
     double m_PreviousFrameTime = 0.;
 
     uint32_t m_CurrentFrameIndex { 0 };
-    uint32_t m_CurrentSemaphore { 0 };
 
     Camera m_Camera;
 

@@ -398,19 +398,19 @@ void Application::createSyncStructures()
     semaphoreCI.pNext = nullptr;
     semaphoreCI.flags = 0;
 
-    m_RenderSemaphores.resize(m_VkSwapchainImages.size());
-    m_SwapchainSemaphores.resize(m_VkSwapchainImages.size());
+    m_SubmitSemaphore.resize(m_VkSwapchainImages.size());
+    m_AcquireSemaphore.resize(m_VkSwapchainImages.size());
 
     for (size_t i = 0; i < m_VkSwapchainImages.size(); i++) {
-        VK_CHECK(vkCreateSemaphore(m_VkDevice, &semaphoreCI, nullptr, &m_RenderSemaphores[i]),
+        VK_CHECK(vkCreateSemaphore(m_VkDevice, &semaphoreCI, nullptr, &m_SubmitSemaphore[i]),
             "Failed to create render semaphore");
-        VK_CHECK(vkCreateSemaphore(m_VkDevice, &semaphoreCI, nullptr, &m_SwapchainSemaphores[i]),
+        VK_CHECK(vkCreateSemaphore(m_VkDevice, &semaphoreCI, nullptr, &m_AcquireSemaphore[i]),
             "Failed to create swapchain semaphore");
 
-        Debug::setDebugName(m_VkDevice, VK_OBJECT_TYPE_SEMAPHORE, (uint64_t)m_RenderSemaphores[i],
+        Debug::setDebugName(m_VkDevice, VK_OBJECT_TYPE_SEMAPHORE, (uint64_t)m_SubmitSemaphore[i],
             "Per swapchain render semaphore");
-        Debug::setDebugName(m_VkDevice, VK_OBJECT_TYPE_SEMAPHORE,
-            (uint64_t)m_SwapchainSemaphores[i], "Per swapchain present semaphore");
+        Debug::setDebugName(m_VkDevice, VK_OBJECT_TYPE_SEMAPHORE, (uint64_t)m_AcquireSemaphore[i],
+            "Per swapchain present semaphore");
     }
 
     LOG_DEBUG("Created sync structures");
@@ -423,8 +423,8 @@ void Application::destroySyncStructures()
     }
 
     for (size_t i = 0; i < m_VkSwapchainImages.size(); i++) {
-        vkDestroySemaphore(m_VkDevice, m_RenderSemaphores[i], nullptr);
-        vkDestroySemaphore(m_VkDevice, m_SwapchainSemaphores[i], nullptr);
+        vkDestroySemaphore(m_VkDevice, m_SubmitSemaphore[i], nullptr);
+        vkDestroySemaphore(m_VkDevice, m_AcquireSemaphore[i], nullptr);
     }
 
     LOG_DEBUG("Destroyed sync structures");
@@ -823,13 +823,22 @@ void Application::render()
 
     uint64_t timeout = 1e9;
 
-    VK_CHECK(vkWaitForFences(m_VkDevice, 1, &currentFrame.fence, true, timeout), "Fence");
+    VkResult result = vkWaitForFences(m_VkDevice, 1, &currentFrame.fence, true, timeout);
+
+    if (result != VK_SUCCESS) {
+        LOG_ERROR("Fence timeout: {}", string_VkResult(result));
+        return;
+    }
 
     VK_CHECK(vkResetFences(m_VkDevice, 1, &currentFrame.fence), "Reset fence");
 
     uint32_t swapchainImageIndex = 0;
-    vkAcquireNextImageKHR(m_VkDevice, m_VkSwapchain, timeout,
-        m_SwapchainSemaphores[m_CurrentSemaphore], nullptr, &swapchainImageIndex);
+    result = vkAcquireNextImageKHR(m_VkDevice, m_VkSwapchain, timeout,
+        m_AcquireSemaphore[m_CurrentFrameIndex], nullptr, &swapchainImageIndex);
+
+    if (result == VK_NOT_READY) {
+        return;
+    }
 
     VkCommandBuffer commandBuffer = currentFrame.commandBuffer;
     VK_CHECK(vkResetCommandBuffer(commandBuffer, 0), "Reset command Buffer");
@@ -974,7 +983,7 @@ void Application::render()
         VkSemaphoreSubmitInfo waitSI {};
         waitSI.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
         waitSI.pNext = nullptr;
-        waitSI.semaphore = m_SwapchainSemaphores[m_CurrentSemaphore];
+        waitSI.semaphore = m_AcquireSemaphore[m_CurrentFrameIndex];
         waitSI.value = 1;
         waitSI.stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR;
         waitSI.deviceIndex = 0;
@@ -982,7 +991,7 @@ void Application::render()
         VkSemaphoreSubmitInfo signalSI {};
         signalSI.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
         signalSI.pNext = nullptr;
-        signalSI.semaphore = m_RenderSemaphores[m_CurrentSemaphore];
+        signalSI.semaphore = m_SubmitSemaphore[swapchainImageIndex];
         signalSI.value = 1;
         signalSI.stageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
         signalSI.deviceIndex = 0;
@@ -1005,7 +1014,7 @@ void Application::render()
         presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
         presentInfo.pNext = nullptr;
         presentInfo.waitSemaphoreCount = 1;
-        presentInfo.pWaitSemaphores = &m_RenderSemaphores[m_CurrentSemaphore];
+        presentInfo.pWaitSemaphores = &m_SubmitSemaphore[swapchainImageIndex];
         presentInfo.swapchainCount = 1;
         presentInfo.pSwapchains = &m_VkSwapchain;
         presentInfo.pImageIndices = &swapchainImageIndex;
@@ -1071,7 +1080,6 @@ void Application::renderImGui(VkCommandBuffer& commandBuffer, const PerFrameData
 void Application::update(float delta)
 {
     m_CurrentFrameIndex = (m_CurrentFrameIndex + 1) % FRAMES_IN_FLIGHT;
-    m_CurrentSemaphore = (m_CurrentSemaphore + 1) % m_VkSwapchainImages.size();
 
     m_PreviousFrameTime = delta;
 
