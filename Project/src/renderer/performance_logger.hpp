@@ -1,20 +1,32 @@
 #pragma once
 
 #include "events/events.hpp"
-#include "glm/fwd.hpp"
+
+#include "acceleration_structure_manager.hpp"
 
 #include <filesystem>
 #include <functional>
+#include <memory>
 #include <vector>
 
+#include <nlohmann/json.hpp>
+
 class PerformanceLogger {
-    struct Defaults {
+    struct PerfEntry {
+        std::string name = "";
+        std::string scene = "";
+        ASType structure = ASType::MAX_TYPE;
+
         uint32_t steps = 100;
         uint32_t captures = 10;
-        std::string scene = "";
+        uint32_t delay = 10;
         glm::vec3 camera_pos = glm::vec3(0.f);
         float pitch = 0.0f;
         float yaw = 0.0f;
+    };
+
+    struct Data {
+        std::vector<float> gpuFrameTimes;
     };
 
   public:
@@ -24,27 +36,49 @@ class PerformanceLogger {
         return &logger;
     }
 
-    std::function<void(const Event& event)> getUIEvent()
+    std::function<void(const Event& event)> getFrameEvent()
     {
-        return std::bind(&PerformanceLogger::UI, this, std::placeholders::_1);
+        return std::bind(&PerformanceLogger::frameEvent, this, std::placeholders::_1);
     }
+
+    void init(Camera* camera);
+
+    void addGPUTime(float GPUTime);
 
   private:
     PerformanceLogger();
 
-    void UI(const Event& event);
+    void frameEvent(const Event& event);
+    void UI();
+    void update(float delta);
 
     void getEntries();
 
-    void startPerf(std::filesystem::path file);
+    void startLog(std::filesystem::path file);
 
-    void parseJson();
+    void parseJson(std::filesystem::path file);
+
+    PerfEntry parseEntry(const nlohmann::json& json);
+
+    void startPerf(const PerfEntry& perf);
+
+    void savePerf();
 
   private:
     std::filesystem::path m_CurrentPath;
     std::filesystem::path m_Selected;
 
-    Defaults m_Defaults;
+    Camera* m_Camera;
+
+    PerfEntry m_Defaults;
+
+    bool m_Running = false;
+    std::vector<PerfEntry> m_PerfEntries;
+    std::vector<Data> m_DataEntries;
+    size_t m_CurrentEntry = 0;
+
+    uint32_t m_CurrentCaptures = 0;
+    uint32_t m_CurrentDelay = 0;
 
     std::vector<std::filesystem::path> m_FileEntries;
     std::vector<std::filesystem::path> m_Directories;

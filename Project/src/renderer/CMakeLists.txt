@@ -55,4 +55,5 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
   ImGui
   Tracy::TracyClient
   GPUOpen::VulkanMemoryAllocator
+  nlohmann_json::nlohmann_json
 )

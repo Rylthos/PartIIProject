@@ -26,6 +26,20 @@ class Camera {
         return std::bind(&Camera::frameEvent, this, std::placeholders::_1);
     }
 
+    void setPosition(glm::vec3 pos)
+    {
+        m_Position = pos;
+        updateVectors();
+    }
+
+    void setRotation(float yaw, float pitch)
+    {
+        m_Yaw = yaw;
+        m_Pitch = pitch;
+
+        updateVectors();
+    }
+
     glm::vec3 getPosition() { return m_Position; }
     glm::vec3 getForwardVector() { return m_Forward; }
     glm::vec3 getRightVector() { return m_Right; }

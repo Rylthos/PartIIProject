@@ -70,3 +70,6 @@ add_subdirectory(pgbar)
 
 # stb
 add_subdirectory(stb)
+
+# json
+add_subdirectory(json)

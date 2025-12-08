@@ -1,13 +1,14 @@
 {
-  "defaults": [
+  "defaults": {
     "steps": 100,
     "captures": 50,
+    "delay": 100,
     "scene": "",
     "camera": {
       "pos": [ 0.0, 0.0, 0.0 ],
       "rot": [ 0.0, 0.0 ]
     }
-  ],
+  },
   "tests": [
     {
       "name": "EmptyGrid",

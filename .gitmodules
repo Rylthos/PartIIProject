@@ -29,3 +29,6 @@
 [submodule "Project/vendor/pgbar"]
 	path = Project/vendor/pgbar
 	url = https://github.com/Konvt/pgbar
+[submodule "Project/vendor/json"]
+	path = Project/vendor/json
+	url = https://github.com/nlohmann/json.git

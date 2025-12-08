@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <vector>
 
 #include "events/events.hpp"
@@ -81,6 +82,8 @@ void Application::init()
         .renderDescriptorLayout = m_RenderDescriptorLayout,
     });
 
+    PerformanceLogger::getLogger()->init(&m_Camera);
+
     createQueryPool();
 
     m_Window.subscribe(EventFamily::KEYBOARD, std::bind(&Application::handleKeyInput, this, _1));
@@ -91,7 +94,7 @@ void Application::init()
     subscribe(EventFamily::FRAME, Logger::getFrameEvent());
     subscribe(EventFamily::FRAME, ASManager::getManager()->getUIEvent());
     subscribe(EventFamily::FRAME, SceneManager::getManager()->getUIEvent());
-    subscribe(EventFamily::FRAME, PerformanceLogger::getLogger()->getUIEvent());
+    subscribe(EventFamily::FRAME, PerformanceLogger::getLogger()->getFrameEvent());
 
     m_Window.subscribe(EventFamily::KEYBOARD, m_Camera.getKeyboardEvent());
     m_Window.subscribe(EventFamily::MOUSE, m_Camera.getMouseEvent());
@@ -1089,6 +1092,8 @@ void Application::update(float delta)
     FrameCommands::getInstance()->commit();
 
     ASManager::getManager()->update(delta);
+
+    PerformanceLogger::getLogger()->addGPUTime(m_PreviousFrameTime);
 
     UpdateEvent event;
     event.delta = delta;
