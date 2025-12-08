@@ -1,0 +1,33 @@
+{
+  "defaults": [
+    "steps": 100,
+    "captures": 50,
+    "scene": "",
+    "camera": {
+      "pos": [ 0.0, 0.0, 0.0 ],
+      "rot": [ 0.0, 0.0 ]
+    }
+  ],
+  "tests": [
+    {
+      "name": "EmptyGrid",
+      "structure": "Grid"
+    },
+    {
+      "name": "EmptyTexture",
+      "structure": "Texture"
+    },
+    {
+      "name": "EmptyContree",
+      "structure": "Contree"
+    },
+    {
+      "name": "EmptyOctree",
+      "structure": "Octree"
+    },
+    {
+      "name": "EmptyBrick",
+      "structure": "Brickmap"
+    }
+  ]
+}

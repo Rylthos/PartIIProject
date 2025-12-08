@@ -17,6 +17,7 @@ set (SOURCE_LIST
   "descriptor_set.cpp" "descriptor_set.hpp"
   "image.cpp" "image.hpp"
   "scene_manager.cpp" "scene_manager.hpp"
+  "performance_logger.cpp" "performance_logger.hpp"
 )
 
 add_compile_definitions(GLM_ENABLE_EXPERIMENTAL)
