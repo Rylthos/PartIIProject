@@ -51,6 +51,10 @@ class ASManager {
         return std::bind(&ASManager::UI, this, std::placeholders::_1);
     }
 
+    uint64_t getMemoryUsage() { return m_CurrentAS->getMemoryUsage(); }
+    uint64_t getVoxels() { return m_CurrentAS->getTotalVoxels(); }
+    uint64_t getNodes() { return m_CurrentAS->getNodes(); }
+
   private:
     ASManager() { };
 

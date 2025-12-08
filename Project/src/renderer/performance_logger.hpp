@@ -27,6 +27,10 @@ class PerformanceLogger {
 
     struct Data {
         std::vector<float> gpuFrameTimes;
+
+        uint64_t memoryUsage;
+        uint64_t voxels;
+        uint64_t nodes;
     };
 
   public:
@@ -73,6 +77,7 @@ class PerformanceLogger {
     PerfEntry m_Defaults;
 
     bool m_Running = false;
+    std::string m_PerfName;
     std::vector<PerfEntry> m_PerfEntries;
     std::vector<Data> m_DataEntries;
     size_t m_CurrentEntry = 0;

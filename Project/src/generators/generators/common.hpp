@@ -7,7 +7,7 @@ struct GenerationInfo {
     float completionPercent;
     float generationTime;
 
-    uint64_t voxelCount;
-    uint64_t nodes;
+    uint64_t voxelCount = 0;
+    uint64_t nodes = 0;
 };
 }

@@ -1,5 +1,6 @@
 #include "performance_logger.hpp"
 
+#include "acceleration_structure_manager.hpp"
 #include "events/events.hpp"
 #include "imgui.h"
 
@@ -134,6 +135,11 @@ void PerformanceLogger::update(float delta)
     m_CurrentCaptures++;
 
     if (m_CurrentCaptures > entry.captures) {
+        Data& data = m_DataEntries[m_CurrentEntry];
+        data.memoryUsage = ASManager::getManager()->getMemoryUsage();
+        data.voxels = ASManager::getManager()->getVoxels();
+        data.nodes = ASManager::getManager()->getNodes();
+
         m_CurrentEntry++;
 
         if (m_CurrentEntry < m_PerfEntries.size()) {
@@ -158,6 +164,7 @@ void PerformanceLogger::startLog(std::filesystem::path file)
 
     LOG_INFO("Running Perf: {}", file.filename().string());
 
+    m_PerfName = file.stem().string();
     parseJson(file);
 }
 
@@ -305,26 +312,26 @@ void PerformanceLogger::savePerf()
 
         value["name"] = entry.name;
 
-        std::vector<float> frametimes;
-        for (size_t j = 0; j < data.gpuFrameTimes.size(); j++) {
-            frametimes.push_back(data.gpuFrameTimes[j]);
-        }
-        LOG_INFO("Wrote {} entries", frametimes.size());
+        value["frametimes"] = data.gpuFrameTimes;
 
-        json frametimeJ = json(frametimes);
-        value["frametimes"] = frametimeJ;
+        value["stats"] = {
+            { "memory", data.memoryUsage },
+            { "voxels", data.voxels      },
+            { "nodes",  data.nodes       },
+        };
 
         values.push_back(value);
     }
     output["values"] = values;
 
-    std::ofstream outputStream("output.json", std::ios::out);
+    std::string filename = std::format("res/perf_output/{}.json", m_PerfName);
+    std::ofstream outputStream(filename, std::ios::out);
 
     outputStream << output.dump(2) << std::endl;
 
     outputStream.close();
 
-    LOG_INFO("Wrote perf file");
+    LOG_INFO("Wrote perf file {}", filename);
 }
 
 void PerformanceLogger::getEntries()
