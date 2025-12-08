@@ -108,10 +108,4 @@ void SceneManager::getFileEntries()
             }
         }
     }
-
-    LOG_INFO("Entries:");
-    for (auto entry : m_FileEntries) {
-        LOG_INFO(" {}", entry.string());
-    }
-    LOG_INFO("");
 }
