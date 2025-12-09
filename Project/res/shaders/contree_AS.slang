@@ -227,10 +227,9 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
   o_Image[pixelCoord] = float4(mix, 1.);
 #else
   if (hit.hit) {
-    o_Image[pixelCoord] = float4(calculateColour(hit, float3(5, 5, 0), float3(0.8)), 1);
-    // o_Image[pixelCoord] = float4(hit.colour, 1);
+    o_Image[pixelCoord] = calculateColour(hit);
   } else {
-    o_Image[pixelCoord] = float4(0.2);
+    o_Image[pixelCoord] = missColour();
   }
 #endif
 }
