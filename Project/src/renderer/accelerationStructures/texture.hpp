@@ -25,6 +25,8 @@ class TextureAS : public IAccelerationStructure {
         return m_Dimensions.x * m_Dimensions.y * m_Dimensions.z * 4 * sizeof(uint8_t);
     }
 
+    glm::uvec3 getDimensions() override { return m_Dimensions; }
+
   private:
     void createDescriptorLayouts();
     void destroyDescriptorLayouts();

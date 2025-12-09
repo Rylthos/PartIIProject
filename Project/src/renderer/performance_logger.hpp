@@ -31,6 +31,8 @@ class PerformanceLogger {
         uint64_t memoryUsage;
         uint64_t voxels;
         uint64_t nodes;
+
+        glm::uvec3 dimensions;
     };
 
   public:

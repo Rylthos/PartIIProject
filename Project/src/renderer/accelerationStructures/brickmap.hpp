@@ -29,6 +29,8 @@ class BrickmapAS : public IAccelerationStructure {
         return m_BrickgridBuffer.getSize() + m_BrickmapsBuffer.getSize() + m_ColourBuffer.getSize();
     }
 
+    glm::uvec3 getDimensions() override { return m_BrickgridSize * 8u; }
+
   private:
     void createDescriptorLayout();
     void destroyDescriptorLayout();

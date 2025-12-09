@@ -25,6 +25,8 @@ class OctreeAS : public IAccelerationStructure {
 
     uint64_t getMemoryUsage() override { return m_OctreeBuffer.getSize(); }
 
+    glm::uvec3 getDimensions() override { return m_Dimensions; }
+
   private:
     void createDescriptorLayout();
     void destroyDescriptorLayout();

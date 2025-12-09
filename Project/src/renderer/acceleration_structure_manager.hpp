@@ -55,6 +55,8 @@ class ASManager {
     uint64_t getVoxels() { return m_CurrentAS->getTotalVoxels(); }
     uint64_t getNodes() { return m_CurrentAS->getNodes(); }
 
+    glm::uvec3 getDimensions() { return m_CurrentAS->getDimensions(); };
+
   private:
     ASManager() { };
 

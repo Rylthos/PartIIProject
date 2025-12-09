@@ -29,6 +29,8 @@ class GridAS : public IAccelerationStructure {
         return m_OccupancyBuffer.getSize() + m_ColourBuffer.getSize();
     }
 
+    glm::uvec3 getDimensions() override { return m_Dimensions; }
+
   private:
     void createDescriptorLayouts();
     void destroyDescriptorLayouts();

@@ -46,6 +46,8 @@ class IAccelerationStructure {
     virtual float getGenerationCompletion() { return p_GenerationInfo.completionPercent; }
     virtual float getGenerationTime() { return p_GenerationInfo.generationTime; }
 
+    virtual glm::uvec3 getDimensions() = 0;
+
     virtual bool isLoading() { return p_Loading; }
 
   protected:

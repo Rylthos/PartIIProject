@@ -139,6 +139,7 @@ void PerformanceLogger::update(float delta)
         data.memoryUsage = ASManager::getManager()->getMemoryUsage();
         data.voxels = ASManager::getManager()->getVoxels();
         data.nodes = ASManager::getManager()->getNodes();
+        data.dimensions = ASManager::getManager()->getDimensions();
 
         m_CurrentEntry++;
 
@@ -318,6 +319,12 @@ void PerformanceLogger::savePerf()
             { "memory", data.memoryUsage },
             { "voxels", data.voxels      },
             { "nodes",  data.nodes       },
+        };
+
+        value["dimensions"] = {
+            data.dimensions.x,
+            data.dimensions.y,
+            data.dimensions.z,
         };
 
         values.push_back(value);
