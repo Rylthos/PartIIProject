@@ -1,0 +1,109 @@
+import json
+import sys
+
+import matplotlib.pyplot as plt
+
+if (len(sys.argv) != 2):
+    print("Wrong number of arguments")
+    print(f"Usage: {sys.argv[0]} filepath")
+    exit(-1)
+
+lines = ""
+with open(sys.argv[1], 'r') as f:
+    lines = f.read()
+
+data = json.loads(lines)["values"]
+
+def parse_frames(data):
+    frames = data["frametimes"]
+
+    return [(i, x * 1000) for i, x in enumerate(frames)]
+
+def stat_frames(data):
+    frames = data["frametimes"]
+
+    frames_ms = [x * 1000 for x in frames]
+
+    total = sum(frames_ms)
+
+    mean = total / len(frames_ms)
+    frame_min = min(frames_ms)
+    frame_max = max(frames_ms)
+
+    return mean, frame_max - frame_min
+
+def bytes_per_voxel(data):
+    stats = data["stats"]
+
+    memory_bytes = stats["memory"];
+    voxels = stats["voxels"];
+
+    return memory_bytes / voxels
+
+def scatter():
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+
+    ax.set_title("Frame times")
+    ax.set_xlabel("Frame")
+    ax.set_ylabel("Frame time (ms)")
+    for i in range(len(data)):
+        frame = data[i]
+
+        frametimes = parse_frames(data[i])
+        x, y = zip(*frametimes)
+        name = frame["name"]
+        ax.scatter(x, y, label=f"{name}")
+
+    plt.legend()
+    plt.show()
+
+def errorbar():
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+
+    ax.set_title("Frame times")
+    ax.set_ylabel("Frame time (ms)")
+
+    x = [f["name"] for f in data]
+    y = [stat_frames(f) for f in data]
+
+    mean, err = zip(*y)
+
+    ax.bar(x, mean)
+    ax.errorbar(x, mean, yerr = err, fmt='o', color="r")
+
+    plt.show()
+
+def memory_use():
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+
+    ax.set_title("Memory usage")
+    ax.set_ylabel("Memory usage (bytes)")
+
+    x = [f["name"] for f in data]
+    y = [f["stats"]["memory"] for f in data]
+
+    ax.bar(x, y)
+
+    plt.show()
+
+def memory_per_voxel():
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+
+    ax.set_title("Memory usage")
+    ax.set_ylabel("Bytes per voxels")
+
+    x = [f["name"] for f in data]
+    y = [bytes_per_voxel(f) for f in data]
+
+    ax.bar(x, y)
+
+    plt.show()
+
+# scatter()
+errorbar()
+memory_use()
+memory_per_voxel()
