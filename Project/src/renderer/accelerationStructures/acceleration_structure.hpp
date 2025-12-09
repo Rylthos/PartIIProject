@@ -21,6 +21,7 @@ struct ASStructInfo {
 
     VkCommandPool commandPool;
     VkDescriptorSetLayout renderDescriptorLayout;
+    VkDeviceAddress hitDataAddress;
 };
 
 class IAccelerationStructure {

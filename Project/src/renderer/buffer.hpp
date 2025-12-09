@@ -19,6 +19,16 @@ class Buffer {
     VkDeviceSize getSize() { return m_Size; }
     VkBuffer getBuffer() { return m_Buffer; }
 
+    VkDeviceAddress getBufferAddress()
+    {
+        VkBufferDeviceAddressInfo deviceAI {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
+            .pNext = nullptr,
+            .buffer = getBuffer(),
+        };
+        return vkGetBufferDeviceAddress(m_Device, &deviceAI);
+    }
+
     void* mapMemory();
     void unmapMemory();
 

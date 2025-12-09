@@ -2,6 +2,7 @@
 
 #include "ray.slang"
 #include "hit_record.slang"
+#include "hit_data.slang"
 #include "default_defines.slang"
 #include "lighting.slang"
 #include "render_descriptor.slang"
@@ -10,6 +11,7 @@
 struct PushConstants {
   float3 camera_position;
   uint3 dimensions;
+  uint64_t hit_data_address;
 };
 
 [[vk_push_constant]]
@@ -73,6 +75,8 @@ func traverse(in ray : Ray) -> HitRecord {
       hit.colour.g = i_Colour[colour_index + 1];
       hit.colour.b = i_Colour[colour_index + 2];
 
+      hit.voxel_index = voxel_pos;
+
       return hit;
     }
 
@@ -112,19 +116,25 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
 #endif
 
 #ifdef HEATMAP
-    if (hit.intersection_checks != 0) {
-      o_Image[pixelCoord] = float4(viridis(hit.intersection_checks), 1.);
-    } else {
-      o_Image[pixelCoord] = float4(0);
-    }
+  if (hit.intersection_checks != 0) {
+    o_Image[pixelCoord] = float4(viridis(hit.intersection_checks), 1.);
+  } else {
+    o_Image[pixelCoord] = float4(0);
+  }
 #elif defined(CYCLES)
   float3 mix = lerp(MIN_CYCLE_COLOUR, MAX_CYCLE_COLOUR, float3((end_cycles - start_cycles) / float(CYCLE_MAX)));
   o_Image[pixelCoord] = float4(mix, 1.);
 #else
-    if (hit.hit) {
-      o_Image[pixelCoord] = calculateColour(hit);
-    } else {
-      o_Image[pixelCoord] = missColour();
-    }
+  int width, height;
+  i_RayDirectionImage.GetDimensions(width, height);
+  if (pixelCoord.x == width / 2 && pixelCoord.y == height / 2) {
+    setHitRecord((HitData*)push_constants.hit_data_address, hit);
+  }
+
+  if (hit.hit) {
+    o_Image[pixelCoord] = calculateColour(hit);
+  } else {
+    o_Image[pixelCoord] = missColour();
+  }
 #endif
 }

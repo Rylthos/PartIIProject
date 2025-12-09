@@ -11,6 +11,7 @@
 #include "accelerationStructures/octree.hpp"
 #include "accelerationStructures/texture.hpp"
 
+#include "buffer.hpp"
 #include "shader_manager.hpp"
 
 #include "events/events.hpp"
@@ -42,10 +43,25 @@ static std::map<RenderStyle, const char*> styleToStringMap {
 void ASManager::init(ASStructInfo initInfo)
 {
     m_InitInfo = initInfo;
+
+    m_HitDataBuffer.init(initInfo.device, initInfo.allocator, sizeof(HitData),
+        VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT, VMA_MEMORY_USAGE_AUTO);
+
+    m_InitInfo.hitDataAddress = m_HitDataBuffer.getBufferAddress();
+
+    m_MappedHitData = (HitData*)m_HitDataBuffer.mapMemory();
+
     setAS(m_CurrentType);
 }
 
-void ASManager::cleanup() { delete m_CurrentAS.release(); }
+void ASManager::cleanup()
+{
+    m_HitDataBuffer.unmapMemory();
+    m_HitDataBuffer.cleanup();
+
+    delete m_CurrentAS.release();
+}
 
 void ASManager::render(
     VkCommandBuffer cmd, Camera camera, VkDescriptorSet renderSet, VkExtent2D imageSize)
@@ -338,6 +354,17 @@ void ASManager::UI(const Event& event)
             ImGui::Text("  Time       : %6.2f", time);
             ImGui::Text("  Completion : %6.5f", percent);
             ImGui::Text("  Remaining  : %6.5f", timeRemaining);
+        }
+        ImGui::End();
+
+        if (ImGui::Begin("Hit Data")) {
+            ImGui::Text("Hit         : %b", m_MappedHitData->hit);
+            glm::vec4 hitPos = m_MappedHitData->hitPosition;
+            ImGui::Text("Hit position: %5.2f %5.2f %5.2f", hitPos.x, hitPos.y, hitPos.z);
+            glm::ivec4 hitIndex = m_MappedHitData->voxelIndex;
+            ImGui::Text("Voxel Index : %d %d %d", hitIndex.x, hitIndex.y, hitIndex.z);
+            glm::vec4 hitNormal = m_MappedHitData->normal;
+            ImGui::Text("Normal      : %5.2f %5.2f %5.2f", hitNormal.x, hitNormal.y, hitNormal.z);
         }
         ImGui::End();
     }

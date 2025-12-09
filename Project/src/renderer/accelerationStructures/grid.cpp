@@ -21,6 +21,7 @@
 struct PushConstants {
     alignas(16) glm::vec3 cameraPosition;
     alignas(16) glm::uvec3 dimensions;
+    alignas(16) VkDeviceAddress hitDataAddress;
 };
 
 GridAS::GridAS() { }
@@ -108,6 +109,7 @@ void GridAS::render(
     PushConstants pushConstant {
         .cameraPosition = camera.getPosition(),
         .dimensions = m_Dimensions,
+        .hitDataAddress = p_Info.hitDataAddress,
     };
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_RenderPipeline);

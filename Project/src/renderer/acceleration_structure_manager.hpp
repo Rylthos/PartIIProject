@@ -6,6 +6,8 @@
 
 #include "events/events.hpp"
 
+#include "buffer.hpp"
+
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
 
@@ -23,6 +25,13 @@ enum class RenderStyle : uint8_t {
     HEAT = 1,
     CYCLES = 2,
     MAX_STYLE,
+};
+
+struct HitData {
+    alignas(16) glm::vec4 hitPosition;
+    alignas(16) glm::ivec4 voxelIndex;
+    alignas(16) glm::vec4 normal;
+    alignas(16) int hit;
 };
 
 class ASManager {
@@ -69,4 +78,7 @@ class ASManager {
 
     ASType m_CurrentType = ASType::GRID;
     std::unique_ptr<IAccelerationStructure> m_CurrentAS;
+
+    HitData* m_MappedHitData;
+    Buffer m_HitDataBuffer;
 };
