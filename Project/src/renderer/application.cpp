@@ -64,11 +64,16 @@ void Application::init()
     createDescriptorPool();
     createDescriptorLayouts();
 
+    createSetupPipelineLayout();
     ShaderManager::getInstance()->addModule("ray_generation",
         std::bind(&Application::createSetupPipeline, this),
         std::bind(&Application::destroySetupPipeline, this));
-    createSetupPipelineLayout();
     createSetupPipeline();
+
+    createUIPipelineLayout();
+    ShaderManager::getInstance()->addModule("ui", std::bind(&Application::createUIPipeline, this),
+        std::bind(&Application::destroyUIPipeline, this));
+    createUIPipeline();
 
     createDescriptors();
 
@@ -135,6 +140,8 @@ void Application::cleanup()
 
     destroyQueryPool();
 
+    destroyUIPipelineLayout();
+    destroyUIPipeline();
     destroySetupPipelineLayout();
     destroySetupPipeline();
 
@@ -621,6 +628,29 @@ void Application::destroySetupPipeline()
     vkDestroyPipeline(m_VkDevice, m_VkSetupPipeline, nullptr);
 }
 
+void Application::createUIPipelineLayout()
+{
+    m_VkUIPipelineLayout = PipelineLayoutGenerator::start(m_VkDevice)
+                               .addDescriptorLayout(m_RenderDescriptorLayout)
+                               .setDebugName("UI pipeline layout")
+                               .build();
+}
+
+void Application::destroyUIPipelineLayout()
+{
+    vkDestroyPipelineLayout(m_VkDevice, m_VkUIPipelineLayout, nullptr);
+}
+
+void Application::createUIPipeline()
+{
+    m_VkUIPipeline = ComputePipelineGenerator::start(m_VkDevice, m_VkUIPipelineLayout)
+                         .setShader("ui")
+                         .setDebugName("UI pipeline")
+                         .build();
+}
+
+void Application::destroyUIPipeline() { vkDestroyPipeline(m_VkDevice, m_VkUIPipeline, nullptr); }
+
 void Application::createDescriptors()
 {
     createSetupDescriptor();
@@ -944,13 +974,66 @@ void Application::render()
 
         vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_VkQueryPool,
             m_CurrentFrameIndex * 4 + 2);
-        ASManager::getManager()->render(commandBuffer, m_Camera, currentFrame.renderDescriptorSet,
-            {
-                .width = currentFrame.drawImage.getExtent().width,
-                .height = currentFrame.drawImage.getExtent().height,
-            });
+
+        VkExtent2D imageSize = {
+            .width = currentFrame.drawImage.getExtent().width,
+            .height = currentFrame.drawImage.getExtent().height,
+        };
+
+        ASManager::getManager()->render(
+            commandBuffer, m_Camera, currentFrame.renderDescriptorSet, imageSize);
+
         vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_VkQueryPool,
             m_CurrentFrameIndex * 4 + 3);
+
+        {
+            VkImageMemoryBarrier2 imageMB
+            {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2, .pNext = nullptr,
+                .srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                .srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT,
+                .dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                .dstAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT, .oldLayout = VK_IMAGE_LAYOUT_GENERAL,
+                .newLayout = VK_IMAGE_LAYOUT_GENERAL,
+                .srcQueueFamilyIndex = m_GraphicsQueue.queueFamily,
+                .dstQueueFamilyIndex = m_GraphicsQueue.queueFamily,
+                .image = currentFrame.drawImage.getImage(),
+                .subresourceRange = {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel = 0,
+                    .levelCount = VK_REMAINING_MIP_LEVELS,
+                    .baseArrayLayer = 0,
+                    .layerCount = VK_REMAINING_ARRAY_LAYERS,
+                },
+            };
+
+            VkDependencyInfo dependency = {
+                .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+                .pNext = nullptr,
+                .dependencyFlags = 0,
+                .memoryBarrierCount = 0,
+                .pMemoryBarriers = nullptr,
+                .bufferMemoryBarrierCount = 0,
+                .pBufferMemoryBarriers = nullptr,
+                .imageMemoryBarrierCount = 1,
+                .pImageMemoryBarriers = &imageMB,
+            };
+
+            vkCmdPipelineBarrier2(commandBuffer, &dependency);
+        }
+
+        {
+            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_VkUIPipeline);
+            std::vector<VkDescriptorSet> descriptorSets = {
+                currentFrame.renderDescriptorSet,
+            };
+
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+                m_VkUIPipelineLayout, 0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);
+
+            vkCmdDispatch(commandBuffer, std::ceil(imageSize.width / 8.f),
+                std::ceil(imageSize.height / 8.f), 1);
+        }
 
         currentFrame.drawImage.transition(
             commandBuffer, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);

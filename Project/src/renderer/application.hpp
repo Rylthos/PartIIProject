@@ -73,6 +73,9 @@ class Application : public EventDispatcher {
     VkPipelineLayout m_VkSetupPipelineLayout;
     VkPipeline m_VkSetupPipeline;
 
+    VkPipelineLayout m_VkUIPipelineLayout;
+    VkPipeline m_VkUIPipeline;
+
     VkQueryPool m_VkQueryPool;
     double m_PreviousGPUTime = 0.;
     float m_TimestampInterval = 0.f;
@@ -118,6 +121,12 @@ class Application : public EventDispatcher {
 
     void createSetupPipeline();
     void destroySetupPipeline();
+
+    void createUIPipelineLayout();
+    void destroyUIPipelineLayout();
+
+    void createUIPipeline();
+    void destroyUIPipeline();
 
     void createDescriptors();
     void createSetupDescriptor();
