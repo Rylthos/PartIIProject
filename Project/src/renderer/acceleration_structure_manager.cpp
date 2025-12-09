@@ -378,14 +378,20 @@ void ASManager::mouse(const Event& event)
     if (mouseEvent.type() == MouseEventType::CLICK) {
         const MouseClickEvent& clickEvent = static_cast<const MouseClickEvent&>(event);
 
+        if (!m_MappedHitData->hit)
+            return;
+
         if (clickEvent.button == GLFW_MOUSE_BUTTON_1) {
             glm::ivec3 index
                 = glm::ivec3(m_MappedHitData->voxelIndex) + glm::ivec3(m_MappedHitData->normal);
-            if (index.x < 0 || index.y < 0 || index.z < 0) {
-                return;
-            }
 
             m_CurrentAS->setVoxel(glm::uvec3(index), glm::vec3(1));
+        }
+
+        if (clickEvent.button == GLFW_MOUSE_BUTTON_2) {
+            glm::ivec3 index = glm::ivec3(m_MappedHitData->voxelIndex);
+
+            m_CurrentAS->eraseVoxel(glm::uvec3(index));
         }
     }
 }

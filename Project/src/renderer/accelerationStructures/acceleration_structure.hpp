@@ -1,5 +1,6 @@
 #pragma once
 
+#include "glm/fwd.hpp"
 #include "vk_mem_alloc.h"
 #include "vulkan/vulkan.h"
 
@@ -58,6 +59,10 @@ class IAccelerationStructure {
     virtual void setVoxel(glm::uvec3 index, glm::vec3 colour)
     {
         p_Mods.emplace_back(ModEnum::OP_SET, index, colour);
+    }
+    virtual void eraseVoxel(glm::uvec3 index)
+    {
+        p_Mods.emplace_back(ModEnum::OP_ERASE, index, glm::vec3(0));
     }
 
     virtual uint64_t getMemoryUsage() = 0;
