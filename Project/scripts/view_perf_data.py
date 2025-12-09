@@ -17,12 +17,22 @@ data = json.loads(lines)["values"]
 def parse_frames(data):
     frames = data["frametimes"]
 
-    return [(i, x * 1000) for i, x in enumerate(frames)]
+    return [(i, x) for i, x in enumerate(frames)]
 
 def stat_frames(data):
     frames = data["frametimes"]
 
-    frames_ms = [x * 1000 for x in frames]
+    frames_ms = [x for x in frames]
+
+
+    frames_ms = sorted(frames_ms)
+    median = (len(frames_ms) + 1) // 2
+
+    q1 = median // 2
+    q3 = median + q1
+
+    frames_ms = frames_ms[q1:q3]
+    print(frames_ms)
 
     total = sum(frames_ms)
 
@@ -30,7 +40,7 @@ def stat_frames(data):
     frame_min = min(frames_ms)
     frame_max = max(frames_ms)
 
-    return mean, frame_max - frame_min
+    return mean, frame_max - mean,  mean - frame_min
 
 def bytes_per_voxel(data):
     stats = data["stats"]
@@ -68,7 +78,9 @@ def errorbar():
     x = [f["structure"] for f in data]
     y = [stat_frames(f) for f in data]
 
-    mean, err = zip(*y)
+    mean, err_high, err_low = zip(*y)
+
+    err = [err_low, err_high]
 
     ax.bar(x, mean)
     ax.errorbar(x, mean, yerr = err, fmt='o', color="r")
@@ -105,5 +117,5 @@ def memory_per_voxel():
 
 # scatter()
 errorbar()
-memory_use()
-memory_per_voxel()
+# memory_use()
+# memory_per_voxel()

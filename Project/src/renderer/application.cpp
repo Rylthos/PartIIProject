@@ -1093,7 +1093,7 @@ void Application::update(float delta)
 
     ASManager::getManager()->update(delta);
 
-    PerformanceLogger::getLogger()->addGPUTime(m_PreviousFrameTime);
+    PerformanceLogger::getLogger()->addGPUTime(m_PreviousGPUTime);
 
     UpdateEvent event;
     event.delta = delta;
