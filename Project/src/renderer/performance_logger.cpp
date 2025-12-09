@@ -13,6 +13,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <string>
 #include <tracy/TracyC.h>
 
 PerformanceLogger::PerformanceLogger()
@@ -326,6 +327,30 @@ void PerformanceLogger::savePerf()
             data.dimensions.y,
             data.dimensions.z,
         };
+
+        std::string structure = "";
+        switch (entry.structure) {
+        case ASType::GRID:
+            structure = "Grid";
+            break;
+        case ASType::TEXTURE:
+            structure = "Texture";
+            break;
+        case ASType::OCTREE:
+            structure = "Octree";
+            break;
+        case ASType::CONTREE:
+            structure = "Contree";
+            break;
+        case ASType::BRICKMAP:
+            structure = "Brickmap";
+            break;
+        default:
+            structure = "unknown";
+            break;
+        }
+
+        value["structure"] = structure;
 
         values.push_back(value);
     }

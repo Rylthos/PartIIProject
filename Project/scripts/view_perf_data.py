@@ -52,7 +52,7 @@ def scatter():
 
         frametimes = parse_frames(data[i])
         x, y = zip(*frametimes)
-        name = frame["name"]
+        name = frame["structure"]
         ax.scatter(x, y, label=f"{name}")
 
     plt.legend()
@@ -65,7 +65,7 @@ def errorbar():
     ax.set_title("Frame times")
     ax.set_ylabel("Frame time (ms)")
 
-    x = [f["name"] for f in data]
+    x = [f["structure"] for f in data]
     y = [stat_frames(f) for f in data]
 
     mean, err = zip(*y)
@@ -82,7 +82,7 @@ def memory_use():
     ax.set_title("Memory usage")
     ax.set_ylabel("Memory usage (bytes)")
 
-    x = [f["name"] for f in data]
+    x = [f["structure"] for f in data]
     y = [f["stats"]["memory"] for f in data]
 
     ax.bar(x, y)
@@ -96,7 +96,7 @@ def memory_per_voxel():
     ax.set_title("Memory usage")
     ax.set_ylabel("Bytes per voxels")
 
-    x = [f["name"] for f in data]
+    x = [f["structure"] for f in data]
     y = [bytes_per_voxel(f) for f in data]
 
     ax.bar(x, y)
