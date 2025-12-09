@@ -1,5 +1,6 @@
 #include "acceleration_structure_manager.hpp"
 
+#include <GLFW/glfw3.h>
 #include <cassert>
 #include <format>
 #include <memory>
@@ -367,5 +368,24 @@ void ASManager::UI(const Event& event)
             ImGui::Text("Normal      : %5.2f %5.2f %5.2f", hitNormal.x, hitNormal.y, hitNormal.z);
         }
         ImGui::End();
+    }
+}
+
+void ASManager::mouse(const Event& event)
+{
+    const MouseEvent& mouseEvent = static_cast<const MouseEvent&>(event);
+
+    if (mouseEvent.type() == MouseEventType::CLICK) {
+        const MouseClickEvent& clickEvent = static_cast<const MouseClickEvent&>(event);
+
+        if (clickEvent.button == GLFW_MOUSE_BUTTON_1) {
+            glm::ivec3 index
+                = glm::ivec3(m_MappedHitData->voxelIndex) + glm::ivec3(m_MappedHitData->normal);
+            if (index.x < 0 || index.y < 0 || index.z < 0) {
+                return;
+            }
+
+            m_CurrentAS->setVoxel(glm::uvec3(index), glm::vec3(1));
+        }
     }
 }

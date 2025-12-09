@@ -94,6 +94,7 @@ void Application::init()
     m_Window.subscribe(EventFamily::KEYBOARD, std::bind(&Application::handleKeyInput, this, _1));
     m_Window.subscribe(EventFamily::MOUSE, std::bind(&Application::handleMouse, this, _1));
     m_Window.subscribe(EventFamily::WINDOW, std::bind(&Application::handleWindow, this, _1));
+    m_Window.subscribe(EventFamily::MOUSE, ASManager::getManager()->getMouseEvent());
 
     subscribe(EventFamily::FRAME, std::bind(&Application::UI, this, _1));
     subscribe(EventFamily::FRAME, Logger::getFrameEvent());

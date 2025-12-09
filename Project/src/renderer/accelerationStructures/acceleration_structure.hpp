@@ -24,6 +24,22 @@ struct ASStructInfo {
     VkDeviceAddress hitDataAddress;
 };
 
+enum class ModEnum : int {
+    OP_SET = 1 << 0,
+    OP_ERASE = 1 << 1,
+};
+
+struct ModInfo {
+    alignas(16) int modType;
+    alignas(16) glm::uvec3 voxelIndex;
+    alignas(16) glm::vec3 colour;
+
+    ModInfo(ModEnum mod, glm::uvec3 index, glm::vec3 colour)
+        : modType(static_cast<int>(mod)), voxelIndex(index), colour(colour)
+    {
+    }
+};
+
 class IAccelerationStructure {
   public:
     IAccelerationStructure() { }
@@ -38,6 +54,11 @@ class IAccelerationStructure {
     virtual void update(float dt) { }
 
     virtual void updateShaders() { }
+
+    virtual void setVoxel(glm::uvec3 index, glm::vec3 colour)
+    {
+        p_Mods.emplace_back(ModEnum::OP_SET, index, colour);
+    }
 
     virtual uint64_t getMemoryUsage() = 0;
     virtual uint64_t getTotalVoxels() { return p_GenerationInfo.voxelCount; }
@@ -61,6 +82,8 @@ class IAccelerationStructure {
     bool p_Loading = false;
     bool p_UpdateBuffers = false;
     bool p_Generating = false;
+
+    std::vector<ModInfo> p_Mods;
 
     Generators::GenerationInfo p_GenerationInfo;
 };

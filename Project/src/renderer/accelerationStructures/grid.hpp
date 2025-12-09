@@ -47,6 +47,12 @@ class GridAS : public IAccelerationStructure {
     void createRenderPipeline();
     void destroyRenderPipeline();
 
+    void createModPipelineLayout();
+    void destroyModPipelineLayout();
+
+    void createModPipeline();
+    void destroyModPipeline();
+
   private:
     std::vector<Generators::GridVoxel> m_Voxels;
     glm::uvec3 m_Dimensions;
@@ -59,6 +65,9 @@ class GridAS : public IAccelerationStructure {
 
     VkPipeline m_RenderPipeline;
     VkPipelineLayout m_RenderPipelineLayout;
+
+    VkPipeline m_ModPipeline;
+    VkPipelineLayout m_ModPipelineLayout;
 
     bool m_UpdateBuffers = false;
 };

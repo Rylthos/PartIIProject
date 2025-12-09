@@ -15,6 +15,7 @@
 #include "../frame_commands.hpp"
 #include "../pipeline_layout.hpp"
 #include "../shader_manager.hpp"
+#include "spdlog/fmt/bundled/base.h"
 
 #include <vulkan/vulkan_core.h>
 
@@ -22,6 +23,11 @@ struct PushConstants {
     alignas(16) glm::vec3 cameraPosition;
     alignas(16) glm::uvec3 dimensions;
     alignas(16) VkDeviceAddress hitDataAddress;
+};
+
+struct ModPushConstants {
+    alignas(16) glm::uvec3 dimensions;
+    alignas(16) ModInfo mod;
 };
 
 GridAS::GridAS() { }
@@ -39,7 +45,11 @@ GridAS::~GridAS()
     destroyRenderPipeline();
     destroyRenderPipelineLayout();
 
+    destroyModPipeline();
+    destroyModPipelineLayout();
+
     ShaderManager::getInstance()->removeModule("grid_AS");
+    ShaderManager::getInstance()->removeModule("grid_AS_mod");
 }
 
 void GridAS::init(ASStructInfo info)
@@ -56,6 +66,11 @@ void GridAS::init(ASStructInfo info)
         std::bind(&GridAS::destroyRenderPipeline, this));
 
     createRenderPipeline();
+
+    createModPipelineLayout();
+    ShaderManager::getInstance()->addModule("grid_AS_mod",
+        std::bind(&GridAS::createModPipeline, this), std::bind(&GridAS::destroyModPipeline, this));
+    createModPipeline();
 }
 
 void GridAS::fromLoader(std::unique_ptr<Loader>&& loader)
@@ -128,6 +143,65 @@ void GridAS::render(
     vkCmdDispatch(cmd, std::ceil(imageSize.width / 8.f), std::ceil(imageSize.height / 8.f), 1);
 
     Debug::endCmdDebugLabel(cmd);
+
+    if (p_Mods.size() != 0 && p_FinishedGeneration) {
+        Debug::beginCmdDebugLabel(cmd, "Grid mod AS render", { 0.0f, 0.0f, 1.0f, 1.0f });
+
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_ModPipeline);
+        std::vector<VkDescriptorSet> descriptorSets = {
+            m_BufferSet,
+        };
+
+        LOG_INFO("Modify voxels");
+
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_ModPipelineLayout, 0,
+            descriptorSets.size(), descriptorSets.data(), 0, nullptr);
+
+        for (const auto& mod : p_Mods) {
+            ModPushConstants pushConstant { .dimensions = m_Dimensions, .mod = mod };
+            vkCmdPushConstants(cmd, m_ModPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
+                sizeof(ModPushConstants), &pushConstant);
+
+            vkCmdDispatch(cmd, 1, 1, 1);
+        }
+
+        {
+            VkBufferMemoryBarrier occupancyMB = {
+                .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+                .pNext = nullptr,
+                .srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT,
+                .dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
+                .srcQueueFamilyIndex = p_Info.graphicsQueueIndex,
+                .dstQueueFamilyIndex = p_Info.graphicsQueueIndex,
+                .buffer = m_OccupancyBuffer.getBuffer(),
+                .offset = 0,
+                .size = VK_WHOLE_SIZE,
+            };
+
+            VkBufferMemoryBarrier colourMB = {
+                .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+                .pNext = nullptr,
+                .srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT,
+                .dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
+                .srcQueueFamilyIndex = p_Info.graphicsQueueIndex,
+                .dstQueueFamilyIndex = p_Info.graphicsQueueIndex,
+                .buffer = m_ColourBuffer.getBuffer(),
+                .offset = 0,
+                .size = VK_WHOLE_SIZE,
+            };
+
+            std::vector<VkBufferMemoryBarrier> bufferMemoryBarriers = { occupancyMB, colourMB };
+
+            vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr,
+                static_cast<uint32_t>(bufferMemoryBarriers.size()), bufferMemoryBarriers.data(), 0,
+                nullptr);
+        }
+
+        p_Mods.clear();
+
+        Debug::endCmdDebugLabel(cmd);
+    }
 }
 
 void GridAS::update(float dt)
@@ -147,7 +221,11 @@ void GridAS::update(float dt)
     }
 }
 
-void GridAS::updateShaders() { ShaderManager::getInstance()->moduleUpdated("grid_AS"); }
+void GridAS::updateShaders()
+{
+    ShaderManager::getInstance()->moduleUpdated("grid_AS");
+    ShaderManager::getInstance()->moduleUpdated("grid_AS_mod");
+}
 
 void GridAS::createDescriptorLayouts()
 {
@@ -186,10 +264,6 @@ void GridAS::createBuffer()
               uint32_t current_index = 0;
               uint32_t current_mask = 0;
               for (size_t i = 0; i < m_Voxels.size(); i++) {
-                  // dataColour[i * 3 + 0] = m_Voxels[i].colour.x;
-                  // dataColour[i * 3 + 1] = m_Voxels[i].colour.y;
-                  // dataColour[i * 3 + 2] = m_Voxels[i].colour.z;
-                  //
                   if ((i / 32) != current_index) {
                       dataOccupancy[current_index] = current_mask;
                       current_index = i / 32;
@@ -284,3 +358,28 @@ void GridAS::destroyRenderPipeline()
 {
     vkDestroyPipeline(p_Info.device, m_RenderPipeline, nullptr);
 }
+
+void GridAS::createModPipelineLayout()
+{
+    m_ModPipelineLayout
+        = PipelineLayoutGenerator::start(p_Info.device)
+              .addDescriptorLayouts({ m_BufferSetLayout })
+              .addPushConstant(VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ModPushConstants))
+              .setDebugName("Grid mod pipeline layout")
+              .build();
+}
+
+void GridAS::destroyModPipelineLayout()
+{
+    vkDestroyPipelineLayout(p_Info.device, m_ModPipelineLayout, nullptr);
+}
+
+void GridAS::createModPipeline()
+{
+    m_ModPipeline = ComputePipelineGenerator::start(p_Info.device, m_ModPipelineLayout)
+                        .setShader("grid_AS_mod")
+                        .setDebugName("Grid mod pipeline")
+                        .build();
+}
+
+void GridAS::destroyModPipeline() { vkDestroyPipeline(p_Info.device, m_ModPipeline, nullptr); }
