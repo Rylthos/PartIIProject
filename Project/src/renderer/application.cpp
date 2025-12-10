@@ -12,6 +12,7 @@
 #include "compute_pipeline.hpp"
 #include "debug_utils.hpp"
 #include "frame_commands.hpp"
+#include "modification_manager.hpp"
 #include "performance_logger.hpp"
 #include "pipeline_layout.hpp"
 #include "ring_buffer.hpp"
@@ -101,6 +102,7 @@ void Application::init()
     subscribe(EventFamily::FRAME, ASManager::getManager()->getUIEvent());
     subscribe(EventFamily::FRAME, SceneManager::getManager()->getUIEvent());
     subscribe(EventFamily::FRAME, PerformanceLogger::getLogger()->getFrameEvent());
+    subscribe(EventFamily::FRAME, ModificationManager::getManager()->getUIEvent());
 
     m_Window.subscribe(EventFamily::KEYBOARD, m_Camera.getKeyboardEvent());
     m_Window.subscribe(EventFamily::MOUSE, m_Camera.getMouseEvent());

@@ -1,14 +1,13 @@
 #pragma once
 
 enum {
-  OP_SET   = 1 << 0,
-  OP_ERASE = 1 << 1,
-  OP_SPHERE = 1 << 2,
+  SHAPE_VOXEL  = 0,
+  SHAPE_SPHERE = 1,
 };
 
 struct ModStruct {
-  int mod_type;
-
+  int shape;
+  int place;
   uint3 voxel_index;
   float3 colour;
   float4 additional;
@@ -16,11 +15,10 @@ struct ModStruct {
 
 interface IModification {
   static bool validIndex(in int3);
-  static void setVoxel(in int3, in float3);
-  static void eraseVoxel(in int3);
+  static void setVoxel(in int3, in float3, in bool);
 }
 
-func sphere<T>(in center: uint3, in radius: int, in colour: float3) -> void
+func sphere<T>(in center: uint3, in radius: int, in colour: float3, in place: bool) -> void
   where T: IModification
 {
   for (int y = -radius; y < radius; y++) {
@@ -32,7 +30,7 @@ func sphere<T>(in center: uint3, in radius: int, in colour: float3) -> void
         float dist = length(float3(newIndex));
 
         if (dist <= radius) {
-         T.setVoxel(center + newIndex, colour);
+         T.setVoxel(center + newIndex, colour, place);
         }
       }
     }

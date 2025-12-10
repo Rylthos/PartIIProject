@@ -23,30 +23,25 @@ func getIndex(in voxel_index: int3) -> uint {
 
 struct GridModification : IModification {
   static func validIndex(in voxel_index: int3) -> bool {
-    return any(voxel_index >= 0) && any(voxel_index < push_constants.dimensions);
+    return all(voxel_index >= 0) && all(voxel_index < push_constants.dimensions);
   }
 
-  static func setVoxel(in voxel_index: int3, in colour: float3) -> void {
+  static func setVoxel(in voxel_index: int3, in colour: float3, in place: bool) -> void {
     uint index = getIndex(voxel_index);
 
     uint array_index = index / 32;
     uint bit_index = index % 32;
 
-    i_Occupancy[array_index] |= 1 << bit_index;
+    if (place) {
+      i_Occupancy[array_index] |= 1 << bit_index;
 
-    float3 colour = push_constants.mod.colour;
-    i_Colour[index * 3 + 0] = colour.r;
-    i_Colour[index * 3 + 1] = colour.g;
-    i_Colour[index * 3 + 2] = colour.b;
-  }
-
-  static func eraseVoxel(in voxel_index: int3) -> void {
-    uint index = getIndex(voxel_index);
-
-    uint array_index = index / 32;
-    uint bit_index = index % 32;
-
-    i_Occupancy[array_index] &= ~(1 << bit_index);
+      float3 colour = push_constants.mod.colour;
+      i_Colour[index * 3 + 0] = colour.r;
+      i_Colour[index * 3 + 1] = colour.g;
+      i_Colour[index * 3 + 2] = colour.b;
+    } else {
+      i_Occupancy[array_index] &= ~(1 << bit_index);
+    }
   }
 }
 
@@ -59,11 +54,10 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
   if (!GridModification::validIndex(voxel_index))
     return;
 
-  if (push_constants.mod.mod_type == OP_SET) {
-    GridModification::setVoxel(voxel_index, push_constants.mod.colour);
-  } else if (push_constants.mod.mod_type == OP_ERASE) {
-    GridModification::eraseVoxel(voxel_index);
-  } else if (push_constants.mod.mod_type == OP_SPHERE) {
-    sphere<GridModification>(voxel_index, int(push_constants.mod.additional.x), push_constants.mod.colour);
+  bool place = push_constants.mod.place == 1;
+  if (push_constants.mod.shape == SHAPE_VOXEL) {
+    GridModification::setVoxel(voxel_index, push_constants.mod.colour, place);
+  } else if (push_constants.mod.shape == SHAPE_SPHERE) {
+    sphere<GridModification>(voxel_index, int(push_constants.mod.additional.x), push_constants.mod.colour, place);
   }
 }

@@ -20,8 +20,6 @@
 
           shader-slang
 
-          # llvm.libllvm
-          # llvm.libcxx
           clang-tools
           llvm.clang
 

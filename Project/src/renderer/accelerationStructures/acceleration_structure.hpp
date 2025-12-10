@@ -9,6 +9,7 @@
 #include "generators/common.hpp"
 
 #include "../camera.hpp"
+#include "../modification_manager.hpp"
 #include "loaders/loader.hpp"
 
 #include <filesystem>
@@ -25,27 +26,32 @@ struct ASStructInfo {
     VkDeviceAddress hitDataAddress;
 };
 
-enum class ModEnum : int {
-    OP_SET = 1 << 0,
-    OP_ERASE = 1 << 1,
-    OP_SPHERE = 1 << 2,
-};
-
 struct ModInfo {
-    alignas(16) int modType;
+    uint32_t shape;
+    uint32_t place;
+    uint32_t _1;
+    uint32_t _2;
     alignas(16) glm::uvec3 voxelIndex;
     alignas(16) glm::vec3 colour;
     alignas(16) glm::vec4 additional;
 
-    ModInfo(ModEnum mod, glm::uvec3 index) : modType(static_cast<int>(mod)), voxelIndex(index) { }
-
-    ModInfo(ModEnum mod, glm::uvec3 index, glm::vec3 colour)
-        : modType(static_cast<int>(mod)), voxelIndex(index), colour(colour)
+    ModInfo(ModificationShape shape, glm::uvec3 index, bool place)
+        : shape(static_cast<int>(shape)), place(place), voxelIndex(index)
     {
     }
 
-    ModInfo(ModEnum mod, glm::uvec3 index, glm::vec3 colour, glm::vec4 additional)
-        : modType(static_cast<int>(mod)), voxelIndex(index), colour(colour), additional(additional)
+    ModInfo(ModificationShape shape, glm::uvec3 index, glm::vec3 colour, bool place)
+        : shape(static_cast<int>(shape)), place(place), voxelIndex(index), colour(colour)
+    {
+    }
+
+    ModInfo(ModificationShape shape, glm::uvec3 index, glm::vec3 colour, glm::vec4 additional,
+        bool place)
+        : shape(static_cast<int>(shape))
+        , place(place)
+        , voxelIndex(index)
+        , colour(colour)
+        , additional(additional)
     {
     }
 };

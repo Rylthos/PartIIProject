@@ -18,6 +18,7 @@ set (SOURCE_LIST
   "image.cpp" "image.hpp"
   "scene_manager.cpp" "scene_manager.hpp"
   "performance_logger.cpp" "performance_logger.hpp"
+  "modification_manager.cpp" "modification_manager.hpp"
 )
 
 add_compile_definitions(GLM_ENABLE_EXPERIMENTAL)

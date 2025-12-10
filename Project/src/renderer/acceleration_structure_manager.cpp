@@ -13,6 +13,7 @@
 #include "accelerationStructures/texture.hpp"
 
 #include "buffer.hpp"
+#include "modification_manager.hpp"
 #include "shader_manager.hpp"
 
 #include "events/events.hpp"
@@ -385,13 +386,17 @@ void ASManager::mouse(const Event& event)
             glm::ivec3 index
                 = glm::ivec3(m_MappedHitData->voxelIndex) + glm::ivec3(m_MappedHitData->normal);
 
-            m_CurrentAS->addMod({ ModEnum::OP_SET, glm::uvec3(index), glm::vec3(1) });
+            auto shape = ModificationManager::getManager()->getShape();
+            auto colour = ModificationManager::getManager()->getSelectedColour();
+
+            m_CurrentAS->addMod({ shape.shape, glm::uvec3(index), colour, shape.additional, true });
         }
 
         if (clickEvent.button == GLFW_MOUSE_BUTTON_2) {
             glm::ivec3 index = glm::ivec3(m_MappedHitData->voxelIndex);
 
-            m_CurrentAS->addMod({ ModEnum::OP_ERASE, glm::uvec3(index) });
+            auto shape = ModificationManager::getManager()->getShape();
+            m_CurrentAS->addMod({ shape.shape, glm::uvec3(index), shape.additional, false });
         }
     }
 }
