@@ -1,4 +1,4 @@
-#include "modification/general.slang"
+#include "general.slang"
 
 struct PushConstants {
   uint3 dimensions;
@@ -15,66 +15,55 @@ RWStructuredBuffer<uint32_t> i_Occupancy;
 [[vk::binding(1, 0)]]
 RWStructuredBuffer<float> i_Colour;
 
-func validIndex(in voxel_index: int3) -> bool {
-  return any(voxel_index >= 0) && any(voxel_index < push_constants.dimensions);
-}
-
 func getIndex(in voxel_index: int3) -> uint {
   return voxel_index.x +
     voxel_index.z * push_constants.dimensions.x +
     voxel_index.y * push_constants.dimensions.x * push_constants.dimensions.z;
 }
 
-func setVoxel(in voxel_index: int3, in place: bool) {
-  uint index = getIndex(voxel_index);
+struct GridModification : IModification {
+  static func validIndex(in voxel_index: int3) -> bool {
+    return any(voxel_index >= 0) && any(voxel_index < push_constants.dimensions);
+  }
 
-  uint array_index = index / 32;
-  uint bit_index = index % 32;
+  static func setVoxel(in voxel_index: int3, in colour: float3) -> void {
+    uint index = getIndex(voxel_index);
 
-  if (place) {
+    uint array_index = index / 32;
+    uint bit_index = index % 32;
+
     i_Occupancy[array_index] |= 1 << bit_index;
 
     float3 colour = push_constants.mod.colour;
     i_Colour[index * 3 + 0] = colour.r;
     i_Colour[index * 3 + 1] = colour.g;
     i_Colour[index * 3 + 2] = colour.b;
-  } else {
+  }
+
+  static func eraseVoxel(in voxel_index: int3) -> void {
+    uint index = getIndex(voxel_index);
+
+    uint array_index = index / 32;
+    uint bit_index = index % 32;
+
     i_Occupancy[array_index] &= ~(1 << bit_index);
   }
 }
 
-func sphere(in voxel_index: uint3) {
-  int radius = int(push_constants.mod.additional.x);
-
-  for (int y = -radius; y < radius; y++) {
-    for (int z = -radius; z < radius; z++) {
-      for (int x = -radius; x < radius; x++) {
-        int3 newIndex = int3(x, y, z);
-        if (!validIndex(voxel_index + newIndex)) continue;
-
-        float dist = length(float3(newIndex));
-
-        if (dist <= radius) {
-          setVoxel(voxel_index + newIndex, true);
-        }
-      }
-    }
-  }
-}
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
   uint3 voxel_index = push_constants.mod.voxel_index;
 
-  if (!validIndex(voxel_index))
+  if (!GridModification::validIndex(voxel_index))
     return;
 
   if (push_constants.mod.mod_type == OP_SET) {
-    setVoxel(voxel_index, true);
+    GridModification::setVoxel(voxel_index, push_constants.mod.colour);
   } else if (push_constants.mod.mod_type == OP_ERASE) {
-    setVoxel(voxel_index, false);
+    GridModification::eraseVoxel(voxel_index);
   } else if (push_constants.mod.mod_type == OP_SPHERE) {
-    sphere(voxel_index);
+    sphere<GridModification>(voxel_index, int(push_constants.mod.additional.x), push_constants.mod.colour);
   }
 }
