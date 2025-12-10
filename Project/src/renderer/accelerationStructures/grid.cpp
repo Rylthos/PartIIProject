@@ -165,39 +165,6 @@ void GridAS::render(
             vkCmdDispatch(cmd, 1, 1, 1);
         }
 
-        {
-            VkBufferMemoryBarrier occupancyMB = {
-                .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-                .pNext = nullptr,
-                .srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT,
-                .dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
-                .srcQueueFamilyIndex = p_Info.graphicsQueueIndex,
-                .dstQueueFamilyIndex = p_Info.graphicsQueueIndex,
-                .buffer = m_OccupancyBuffer.getBuffer(),
-                .offset = 0,
-                .size = VK_WHOLE_SIZE,
-            };
-
-            VkBufferMemoryBarrier colourMB = {
-                .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-                .pNext = nullptr,
-                .srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT,
-                .dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
-                .srcQueueFamilyIndex = p_Info.graphicsQueueIndex,
-                .dstQueueFamilyIndex = p_Info.graphicsQueueIndex,
-                .buffer = m_ColourBuffer.getBuffer(),
-                .offset = 0,
-                .size = VK_WHOLE_SIZE,
-            };
-
-            std::vector<VkBufferMemoryBarrier> bufferMemoryBarriers = { occupancyMB, colourMB };
-
-            vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr,
-                static_cast<uint32_t>(bufferMemoryBarriers.size()), bufferMemoryBarriers.data(), 0,
-                nullptr);
-        }
-
         p_Mods.clear();
 
         Debug::endCmdDebugLabel(cmd);
