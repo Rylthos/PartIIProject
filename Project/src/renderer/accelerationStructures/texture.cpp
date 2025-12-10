@@ -28,7 +28,7 @@ TextureAS::~TextureAS()
     destroyDescriptorLayouts();
     destroyRenderPipeline();
     destroyRenderPipelineLayout();
-    ShaderManager::getInstance()->removeModule("texture_AS");
+    ShaderManager::getInstance()->removeModule("AS/texture_AS");
 }
 
 void TextureAS::init(ASStructInfo info)
@@ -39,7 +39,7 @@ void TextureAS::init(ASStructInfo info)
     createRenderPipelineLayout();
 
     ShaderManager::getInstance()->removeMacro("TEXTURE_GENERATION_FINISHED");
-    ShaderManager::getInstance()->addModule("texture_AS",
+    ShaderManager::getInstance()->addModule("AS/texture_AS",
         std::bind(&TextureAS::createRenderPipeline, this),
         std::bind(&TextureAS::destroyRenderPipeline, this));
 
@@ -134,7 +134,7 @@ void TextureAS::update(float dt)
     }
 }
 
-void TextureAS::updateShaders() { ShaderManager::getInstance()->moduleUpdated("texture_AS"); }
+void TextureAS::updateShaders() { ShaderManager::getInstance()->moduleUpdated("AS/texture_AS"); }
 
 void TextureAS::createDescriptorLayouts()
 {
@@ -235,7 +235,7 @@ void TextureAS::destroyRenderPipelineLayout()
 void TextureAS::createRenderPipeline()
 {
     m_RenderPipeline = ComputePipelineGenerator::start(p_Info.device, m_RenderPipelineLayout)
-                           .setShader("texture_AS")
+                           .setShader("AS/texture_AS")
                            .setDebugName("texture render pipeline")
                            .build();
 }

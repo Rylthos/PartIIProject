@@ -30,7 +30,7 @@ BrickmapAS::~BrickmapAS()
 
     freeBuffers();
 
-    ShaderManager::getInstance()->removeModule("brickmap_AS");
+    ShaderManager::getInstance()->removeModule("AS/brickmap_AS");
 }
 
 void BrickmapAS::init(ASStructInfo info)
@@ -40,7 +40,7 @@ void BrickmapAS::init(ASStructInfo info)
     createDescriptorLayout();
 
     ShaderManager::getInstance()->removeMacro("BRICKMAP_FINISHED_GENERATION");
-    ShaderManager::getInstance()->addModule("brickmap_AS",
+    ShaderManager::getInstance()->addModule("AS/brickmap_AS",
         std::bind(&BrickmapAS::createRenderPipeline, this),
         std::bind(&BrickmapAS::destroyRenderPipeline, this));
 
@@ -136,7 +136,7 @@ void BrickmapAS::update(float dt)
     }
 }
 
-void BrickmapAS::updateShaders() { ShaderManager::getInstance()->moduleUpdated("brickmap_AS"); }
+void BrickmapAS::updateShaders() { ShaderManager::getInstance()->moduleUpdated("AS/brickmap_AS"); }
 
 void BrickmapAS::createDescriptorLayout()
 {
@@ -286,7 +286,7 @@ void BrickmapAS::destroyRenderPipelineLayout()
 void BrickmapAS::createRenderPipeline()
 {
     m_RenderPipeline = ComputePipelineGenerator::start(p_Info.device, m_RenderPipelineLayout)
-                           .setShader("brickmap_AS")
+                           .setShader("AS/brickmap_AS")
                            .setDebugName("Brickmap render pipeline")
                            .build();
 }

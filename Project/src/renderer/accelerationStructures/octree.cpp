@@ -46,7 +46,7 @@ OctreeAS::~OctreeAS()
     destroyRenderPipeline();
     destroyRenderPipelineLayout();
 
-    ShaderManager::getInstance()->removeModule("octree_AS");
+    ShaderManager::getInstance()->removeModule("AS/octree_AS");
 }
 
 void OctreeAS::init(ASStructInfo info)
@@ -58,7 +58,7 @@ void OctreeAS::init(ASStructInfo info)
     createRenderPipelineLayout();
 
     ShaderManager::getInstance()->removeMacro("OCTREE_GENERATION_FINISHED");
-    ShaderManager::getInstance()->addModule("octree_AS",
+    ShaderManager::getInstance()->addModule("AS/octree_AS",
         std::bind(&OctreeAS::createRenderPipeline, this),
         std::bind(&OctreeAS::destroyRenderPipeline, this));
 
@@ -161,7 +161,7 @@ void OctreeAS::update(float dt)
     }
 }
 
-void OctreeAS::updateShaders() { ShaderManager::getInstance()->moduleUpdated("octree_AS"); }
+void OctreeAS::updateShaders() { ShaderManager::getInstance()->moduleUpdated("AS/octree_AS"); }
 
 void OctreeAS::createDescriptorLayout()
 {
@@ -239,7 +239,7 @@ void OctreeAS::destroyRenderPipelineLayout()
 void OctreeAS::createRenderPipeline()
 {
     m_RenderPipeline = ComputePipelineGenerator::start(p_Info.device, m_RenderPipelineLayout)
-                           .setShader("octree_AS")
+                           .setShader("AS/octree_AS")
                            .setDebugName("Octree render pipeline")
                            .build();
 }

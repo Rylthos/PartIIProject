@@ -48,8 +48,8 @@ GridAS::~GridAS()
     destroyModPipeline();
     destroyModPipelineLayout();
 
-    ShaderManager::getInstance()->removeModule("grid_AS");
     ShaderManager::getInstance()->removeModule("grid_AS_mod");
+    ShaderManager::getInstance()->removeModule("AS/grid_AS");
 }
 
 void GridAS::init(ASStructInfo info)
@@ -61,7 +61,7 @@ void GridAS::init(ASStructInfo info)
     createRenderPipelineLayout();
 
     ShaderManager::getInstance()->removeMacro("GRID_GENERATION_FINISHED");
-    ShaderManager::getInstance()->addModule("grid_AS",
+    ShaderManager::getInstance()->addModule("AS/grid_AS",
         std::bind(&GridAS::createRenderPipeline, this),
         std::bind(&GridAS::destroyRenderPipeline, this));
 
@@ -223,8 +223,8 @@ void GridAS::update(float dt)
 
 void GridAS::updateShaders()
 {
-    ShaderManager::getInstance()->moduleUpdated("grid_AS");
     ShaderManager::getInstance()->moduleUpdated("grid_AS_mod");
+    ShaderManager::getInstance()->moduleUpdated("AS/grid_AS");
 }
 
 void GridAS::createDescriptorLayouts()
@@ -349,7 +349,7 @@ void GridAS::destroyRenderPipelineLayout()
 void GridAS::createRenderPipeline()
 {
     m_RenderPipeline = ComputePipelineGenerator::start(p_Info.device, m_RenderPipelineLayout)
-                           .setShader("grid_AS")
+                           .setShader("AS/grid_AS")
                            .setDebugName("Grid render pipeline")
                            .build();
 }

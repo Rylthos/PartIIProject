@@ -4,11 +4,11 @@
 #include <mutex>
 #include <optional>
 #include <set>
-#include <thread>
+#include <string>
 
 #include <map>
 
-#include "vulkan/vulkan.h"
+#include "vulkan/vulkan_core.h"
 
 #include "slang-com-ptr.h"
 #include "slang.h"
@@ -66,11 +66,6 @@ class ShaderManager {
 
     void addFileHandler(ModuleHandler& module, const FileName& file);
     void removeFileHandler(ModuleHandler& module, const FileName& file);
-
-    // bool generateShaderModule(const ModuleName& moduleName);
-    // void setDependencies(const ModuleName& moduleName);
-    //
-    // void updateSessionDesc();
 
   private:
     VkDevice m_VkDevice;

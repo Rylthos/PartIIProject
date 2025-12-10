@@ -39,7 +39,7 @@ ContreeAS::~ContreeAS()
     destroyRenderPipeline();
     destroyRenderPipelineLayout();
 
-    ShaderManager::getInstance()->removeModule("contree_AS");
+    ShaderManager::getInstance()->removeModule("AS/contree_AS");
 }
 
 void ContreeAS::init(ASStructInfo info)
@@ -50,7 +50,7 @@ void ContreeAS::init(ASStructInfo info)
     createRenderPipelineLayout();
 
     ShaderManager::getInstance()->removeMacro("CONTREE_GENERATION_FINISHED");
-    ShaderManager::getInstance()->addModule("contree_AS",
+    ShaderManager::getInstance()->addModule("AS/contree_AS",
         std::bind(&ContreeAS::createRenderPipeline, this),
         std::bind(&ContreeAS::destroyRenderPipeline, this));
     createRenderPipeline();
@@ -154,7 +154,7 @@ void ContreeAS::update(float dt)
     }
 }
 
-void ContreeAS::updateShaders() { ShaderManager::getInstance()->moduleUpdated("contree_AS"); }
+void ContreeAS::updateShaders() { ShaderManager::getInstance()->moduleUpdated("AS/contree_AS"); }
 
 void ContreeAS::createDescriptorLayout()
 {
@@ -234,7 +234,7 @@ void ContreeAS::destroyRenderPipelineLayout()
 void ContreeAS::createRenderPipeline()
 {
     m_RenderPipeline = ComputePipelineGenerator::start(p_Info.device, m_RenderPipelineLayout)
-                           .setShader("contree_AS")
+                           .setShader("AS/contree_AS")
                            .setDebugName("Contree render pipeline")
                            .build();
 }
