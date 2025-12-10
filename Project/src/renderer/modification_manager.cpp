@@ -50,7 +50,7 @@ void ModificationManager::UI(const Event& event)
             case ModificationShape::SPHERE: {
                 int radius = int(m_CurrentAdditional.x);
 
-                if (ImGui::DragInt("Radius", &radius, 1, 1, 20)) {
+                if (ImGui::SliderInt("Radius", &radius, 1, 25)) {
                     m_CurrentAdditional.x = radius;
                 }
                 break;

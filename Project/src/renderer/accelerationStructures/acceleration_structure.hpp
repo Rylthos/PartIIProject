@@ -35,16 +35,6 @@ struct ModInfo {
     alignas(16) glm::vec3 colour;
     alignas(16) glm::vec4 additional;
 
-    ModInfo(ModificationShape shape, glm::uvec3 index, bool place)
-        : shape(static_cast<int>(shape)), place(place), voxelIndex(index)
-    {
-    }
-
-    ModInfo(ModificationShape shape, glm::uvec3 index, glm::vec3 colour, bool place)
-        : shape(static_cast<int>(shape)), place(place), voxelIndex(index), colour(colour)
-    {
-    }
-
     ModInfo(ModificationShape shape, glm::uvec3 index, glm::vec3 colour, glm::vec4 additional,
         bool place)
         : shape(static_cast<int>(shape))
