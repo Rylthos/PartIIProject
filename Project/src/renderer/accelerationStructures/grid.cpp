@@ -152,8 +152,6 @@ void GridAS::render(
             m_BufferSet,
         };
 
-        LOG_INFO("Modify voxels");
-
         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_ModPipelineLayout, 0,
             descriptorSets.size(), descriptorSets.data(), 0, nullptr);
 

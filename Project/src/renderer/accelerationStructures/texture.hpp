@@ -43,6 +43,12 @@ class TextureAS : public IAccelerationStructure {
     void createRenderPipeline();
     void destroyRenderPipeline();
 
+    void createModPipelineLayout();
+    void destroyModPipelineLayout();
+
+    void createModPipeline();
+    void destroyModPipeline();
+
   private:
     std::vector<Generators::TextureVoxel> m_Voxels;
     glm::uvec3 m_Dimensions;
@@ -52,6 +58,9 @@ class TextureAS : public IAccelerationStructure {
 
     VkPipeline m_RenderPipeline;
     VkPipelineLayout m_RenderPipelineLayout;
+
+    VkPipeline m_ModPipeline;
+    VkPipelineLayout m_ModPipelineLayout;
 
     Image m_DataImage;
 

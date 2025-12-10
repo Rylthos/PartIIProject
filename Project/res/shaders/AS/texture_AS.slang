@@ -5,11 +5,13 @@
 #include "default_defines.slang"
 #include "lighting.slang"
 #include "render_descriptor.slang"
+#include "hit_data.slang"
 #include "intersection_colour.slang"
 
 struct PushConstants {
   float3 camera_position;
   uint3 dimensions;
+  uint64_t hit_data_address;
 };
 
 [[vk_push_constant]]
@@ -61,6 +63,8 @@ func traverse(in ray : Ray) -> HitRecord {
       hit.normal = normal;
       hit.hit_position = ray.calculate(t);
 
+      hit.voxel_index = voxel_pos;
+
       hit.colour.rgb = i_VoxelData[voxel_pos].rgb;
 
       return hit;
@@ -111,6 +115,12 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
   float3 mix = lerp(MIN_CYCLE_COLOUR, MAX_CYCLE_COLOUR, float3((end_cycles - start_cycles) / float(CYCLE_MAX)));
   o_Image[pixelCoord] = float4(mix, 1.);
 #else
+    int width, height;
+    i_RayDirectionImage.GetDimensions(width, height);
+    if (pixelCoord.x == width / 2 && pixelCoord.y == height / 2) {
+      setHitRecord((HitData*)push_constants.hit_data_address, hit);
+    }
+
     if (hit.hit) {
       o_Image[pixelCoord] = calculateColour(hit);
     } else {

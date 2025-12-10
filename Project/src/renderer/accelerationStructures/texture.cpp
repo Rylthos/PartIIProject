@@ -10,6 +10,7 @@
 #include "../frame_commands.hpp"
 #include "../pipeline_layout.hpp"
 
+#include "logger/logger.hpp"
 #include "serializers/texture.hpp"
 
 #include <cstring>
@@ -18,6 +19,12 @@
 struct PushConstants {
     alignas(16) glm::vec3 cameraPosition;
     alignas(16) glm::uvec3 dimensions;
+    VkDeviceAddress hitDataAddress;
+};
+
+struct ModPushConstants {
+    alignas(16) glm::uvec3 dimensions;
+    alignas(16) ModInfo mod;
 };
 
 TextureAS::TextureAS() { }
@@ -26,9 +33,12 @@ TextureAS::~TextureAS()
     destroyImages();
     freeDescriptorSets();
     destroyDescriptorLayouts();
+    destroyModPipeline();
+    destroyModPipelineLayout();
     destroyRenderPipeline();
     destroyRenderPipelineLayout();
     ShaderManager::getInstance()->removeModule("AS/texture_AS");
+    ShaderManager::getInstance()->removeModule("modification/texture");
 }
 
 void TextureAS::init(ASStructInfo info)
@@ -37,13 +47,19 @@ void TextureAS::init(ASStructInfo info)
 
     createDescriptorLayouts();
     createRenderPipelineLayout();
+    createModPipelineLayout();
 
     ShaderManager::getInstance()->removeMacro("TEXTURE_GENERATION_FINISHED");
     ShaderManager::getInstance()->addModule("AS/texture_AS",
         std::bind(&TextureAS::createRenderPipeline, this),
         std::bind(&TextureAS::destroyRenderPipeline, this));
 
+    ShaderManager::getInstance()->addModule("modification/texture",
+        std::bind(&TextureAS::createModPipeline, this),
+        std::bind(&TextureAS::destroyModPipeline, this));
+
     createRenderPipeline();
+    createModPipeline();
 }
 
 void TextureAS::fromLoader(std::unique_ptr<Loader>&& loader)
@@ -97,6 +113,7 @@ void TextureAS::render(
     PushConstants pushConstant {
         .cameraPosition = camera.getPosition(),
         .dimensions = m_Dimensions,
+        .hitDataAddress = p_Info.hitDataAddress,
     };
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_RenderPipeline);
@@ -115,6 +132,30 @@ void TextureAS::render(
     vkCmdDispatch(cmd, std::ceil(imageSize.width / 8.f), std::ceil(imageSize.height / 8.f), 1);
 
     Debug::endCmdDebugLabel(cmd);
+
+    if (p_Mods.size() != 0 && p_FinishedGeneration) {
+        Debug::beginCmdDebugLabel(cmd, "Texture mod AS render", { 0.0f, 0.0f, 1.0f, 1.0f });
+
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_ModPipeline);
+        std::vector<VkDescriptorSet> descriptorSets = {
+            m_ImageSet,
+        };
+
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_ModPipelineLayout, 0,
+            descriptorSets.size(), descriptorSets.data(), 0, nullptr);
+
+        for (const auto& mod : p_Mods) {
+            ModPushConstants pushConstant { .dimensions = m_Dimensions, .mod = mod };
+            vkCmdPushConstants(cmd, m_ModPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
+                sizeof(ModPushConstants), &pushConstant);
+
+            vkCmdDispatch(cmd, 1, 1, 1);
+        }
+
+        p_Mods.clear();
+
+        Debug::endCmdDebugLabel(cmd);
+    }
 }
 
 void TextureAS::update(float dt)
@@ -134,7 +175,11 @@ void TextureAS::update(float dt)
     }
 }
 
-void TextureAS::updateShaders() { ShaderManager::getInstance()->moduleUpdated("AS/texture_AS"); }
+void TextureAS::updateShaders()
+{
+    ShaderManager::getInstance()->moduleUpdated("AS/texture_AS");
+    ShaderManager::getInstance()->moduleUpdated("modification/texture");
+}
 
 void TextureAS::createDescriptorLayouts()
 {
@@ -244,3 +289,28 @@ void TextureAS::destroyRenderPipeline()
 {
     vkDestroyPipeline(p_Info.device, m_RenderPipeline, nullptr);
 }
+
+void TextureAS::createModPipelineLayout()
+{
+    m_ModPipelineLayout
+        = PipelineLayoutGenerator::start(p_Info.device)
+              .addDescriptorLayouts({ m_ImageSetLayout })
+              .addPushConstant(VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ModPushConstants))
+              .setDebugName("Texture mod pipeline layout")
+              .build();
+}
+
+void TextureAS::destroyModPipelineLayout()
+{
+    vkDestroyPipelineLayout(p_Info.device, m_ModPipelineLayout, nullptr);
+}
+
+void TextureAS::createModPipeline()
+{
+    m_ModPipeline = ComputePipelineGenerator::start(p_Info.device, m_ModPipelineLayout)
+                        .setShader("modification/texture")
+                        .setDebugName("texture mod pipeline")
+                        .build();
+}
+
+void TextureAS::destroyModPipeline() { vkDestroyPipeline(p_Info.device, m_ModPipeline, nullptr); }
