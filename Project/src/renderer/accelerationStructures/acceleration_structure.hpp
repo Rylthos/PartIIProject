@@ -28,15 +28,24 @@ struct ASStructInfo {
 enum class ModEnum : int {
     OP_SET = 1 << 0,
     OP_ERASE = 1 << 1,
+    OP_SPHERE = 1 << 2,
 };
 
 struct ModInfo {
     alignas(16) int modType;
     alignas(16) glm::uvec3 voxelIndex;
     alignas(16) glm::vec3 colour;
+    alignas(16) glm::vec4 additional;
+
+    ModInfo(ModEnum mod, glm::uvec3 index) : modType(static_cast<int>(mod)), voxelIndex(index) { }
 
     ModInfo(ModEnum mod, glm::uvec3 index, glm::vec3 colour)
         : modType(static_cast<int>(mod)), voxelIndex(index), colour(colour)
+    {
+    }
+
+    ModInfo(ModEnum mod, glm::uvec3 index, glm::vec3 colour, glm::vec4 additional)
+        : modType(static_cast<int>(mod)), voxelIndex(index), colour(colour), additional(additional)
     {
     }
 };
@@ -56,14 +65,7 @@ class IAccelerationStructure {
 
     virtual void updateShaders() { }
 
-    virtual void setVoxel(glm::uvec3 index, glm::vec3 colour)
-    {
-        p_Mods.emplace_back(ModEnum::OP_SET, index, colour);
-    }
-    virtual void eraseVoxel(glm::uvec3 index)
-    {
-        p_Mods.emplace_back(ModEnum::OP_ERASE, index, glm::vec3(0));
-    }
+    virtual void addMod(ModInfo mod) { p_Mods.push_back(mod); }
 
     virtual uint64_t getMemoryUsage() = 0;
     virtual uint64_t getTotalVoxels() { return p_GenerationInfo.voxelCount; }

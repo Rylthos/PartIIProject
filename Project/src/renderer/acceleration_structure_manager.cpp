@@ -385,13 +385,13 @@ void ASManager::mouse(const Event& event)
             glm::ivec3 index
                 = glm::ivec3(m_MappedHitData->voxelIndex) + glm::ivec3(m_MappedHitData->normal);
 
-            m_CurrentAS->setVoxel(glm::uvec3(index), glm::vec3(1));
+            m_CurrentAS->addMod({ ModEnum::OP_SET, glm::uvec3(index), glm::vec3(1) });
         }
 
         if (clickEvent.button == GLFW_MOUSE_BUTTON_2) {
             glm::ivec3 index = glm::ivec3(m_MappedHitData->voxelIndex);
 
-            m_CurrentAS->eraseVoxel(glm::uvec3(index));
+            m_CurrentAS->addMod({ ModEnum::OP_ERASE, glm::uvec3(index) });
         }
     }
 }
