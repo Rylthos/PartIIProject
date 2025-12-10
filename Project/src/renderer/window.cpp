@@ -2,6 +2,7 @@
 
 #include "events/events.hpp"
 
+#include "imgui.h"
 #include "logger/logger.hpp"
 
 #include "vulkan/vk_enum_string_helper.h"
@@ -73,10 +74,15 @@ void Window::handleKeyInput(GLFWwindow* glfwWindow, int key, int scancode, int a
         int currentMode = glfwGetInputMode(window->m_Window, GLFW_CURSOR);
         if (currentMode == GLFW_CURSOR_DISABLED) {
             glfwSetInputMode(window->m_Window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            ImGui::GetIO().ConfigFlags &= ~ImGuiConfigFlags_NoMouse;
         } else {
             glfwSetInputMode(window->m_Window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+            ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouse;
         }
     }
+
+    if (ImGui::GetIO().WantCaptureKeyboard)
+        return;
 
     if (action == GLFW_PRESS) {
         KeyboardPressEvent event {};
@@ -94,6 +100,9 @@ void Window::handleKeyInput(GLFWwindow* glfwWindow, int key, int scancode, int a
 void Window::handleMouseButton(GLFWwindow* glfwWindow, int button, int action, int mods)
 {
     Window* window = (Window*)glfwGetWindowUserPointer(glfwWindow);
+
+    if (ImGui::GetIO().WantCaptureMouse)
+        return;
 
     if (action == GLFW_PRESS) {
         MouseClickEvent event;
