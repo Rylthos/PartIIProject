@@ -29,6 +29,7 @@ struct PushConstants {
     alignas(16) glm::mat4 octreeWorld;
     alignas(16) glm::mat4 octreeWorldInverse;
     alignas(16) glm::mat4 octreeScaleInverse;
+    VkDeviceAddress hitDataAddress;
 };
 
 OctreeAS::OctreeAS() { }
@@ -125,6 +126,7 @@ void OctreeAS::render(
         .octreeWorld = octreeWorld,
         .octreeWorldInverse = octreeWorldInverse,
         .octreeScaleInverse = octreeScaleInverse,
+        .hitDataAddress = p_Info.hitDataAddress,
     };
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_RenderPipeline);

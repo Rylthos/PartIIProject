@@ -1,5 +1,6 @@
 #include "ray.slang"
 #include "hit_record.slang"
+#include "hit_data.slang"
 #include "lighting.slang"
 #include "default_defines.slang"
 #include "render_descriptor.slang"
@@ -10,6 +11,7 @@ struct PushConstants {
   float4x4 contree_world;
   float4x4 contree_world_inverse;
   float4x4 contree_scale_inverse;
+  uint64_t hit_data_address;
 };
 
 struct ContreeNode {
@@ -152,6 +154,8 @@ for (int i = 0; i < STEP_LIMIT; i++) {
       hit.hit_position = pos.xyz / pos.w;
       hit.colour = node.colour;
       hit.normal = normal;
+      hit.voxel_index = int3(pos.xyz / pos.w);
+
       return hit;
     }
 
@@ -226,6 +230,12 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
   float3 mix = lerp(MIN_CYCLE_COLOUR, MAX_CYCLE_COLOUR, float3((end_cycles - start_cycles) / float(CYCLE_MAX)));
   o_Image[pixelCoord] = float4(mix, 1.);
 #else
+  int width, height;
+  i_RayDirectionImage.GetDimensions(width, height);
+  if (pixelCoord.x == width / 2 && pixelCoord.y == height / 2) {
+    setHitRecord((HitData*)push_constants.hit_data_address, hit);
+  }
+
   if (hit.hit) {
     o_Image[pixelCoord] = calculateColour(hit);
   } else {

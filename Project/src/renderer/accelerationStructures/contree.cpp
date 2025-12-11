@@ -24,6 +24,7 @@ struct PushConstants {
     alignas(16) glm::mat4 contreeWorld;
     alignas(16) glm::mat4 contreeWorldInverse;
     alignas(16) glm::mat4 contreeScaleInverse;
+    VkDeviceAddress hitDataAddress;
 };
 
 ContreeAS::ContreeAS() { }
@@ -128,6 +129,7 @@ void ContreeAS::render(
         .contreeWorld = contreeWorld,
         .contreeWorldInverse = contreeWorldInverse,
         .contreeScaleInverse = contreeScaleInverse,
+        .hitDataAddress = p_Info.hitDataAddress,
     };
     vkCmdPushConstants(cmd, m_RenderPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
         sizeof(PushConstants), &pushConstants);
