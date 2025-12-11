@@ -17,14 +17,20 @@ struct Brickgrid {
 
   property bool isValid {
     get { return (data & 0x1) != 0; }
+    set { data = (data & ~(0x1)) | ((newValue == true) ? 1 : 0) << 0; }
+  }
+
+  property bool isRequested {
+    get { return (data & 0x2) != 0; }
+    set { data = (data & ~(0x2)) | ((newValue == true) ? 1 : 0) << 1; }
   }
 
   property bool isEmpty {
-    get { return (data >> 1) == 0; }
+    get { return (data >> 2) == 0; }
   }
 
   property uint32_t getPtr {
-    get { return (data >> 1) - 1; }
+    get { return (data >> 2) - 1; }
   }
 }
 
@@ -37,13 +43,16 @@ struct Brickmap {
 PushConstants push_constants;
 
 [[vk::binding(0, 1)]]
-StructuredBuffer<Brickgrid> i_Brickgrid;
+RWStructuredBuffer<Brickgrid> i_Brickgrid;
 
 [[vk::binding(1, 1)]]
 StructuredBuffer<Brickmap> i_Brickmap;
 
 [[vk::binding(2, 1)]]
 StructuredBuffer<uint8_t> i_Colours;
+
+[[vk::binding(3, 1)]]
+RWStructuredBuffer<uint32_t> i_Request;
 
 func traverse_brick(in ray: Ray, in brick: Brickmap, in step_dir: int3, in step_size: float3, in starting_t: float, in min_bound: float3, inout steps: int, inout hit: HitRecord) -> bool {
   const int3 brick_size = int3(8);
@@ -135,6 +144,30 @@ func traverse(in ray_original: Ray) -> HitRecord {
     voxel_pos.y * push_constants.brickgrid_dimensions.x * push_constants.brickgrid_dimensions.z;
 
     Brickgrid grid = i_Brickgrid[index];
+
+    if (!grid.isValid) {
+      if (!grid.isRequested) {
+        uint32_t data = grid.data | 0x2;
+        uint32_t prev;
+        InterlockedCompareExchange(i_Brickgrid[index].data, grid.data, data, prev);
+        if (prev == grid.data) {
+          int index = i_Request[0];
+          InterlockedAdd(i_Request[0], 1, index);
+
+          uint size, stride;
+          i_Request.GetDimensions(size, stride);
+
+          if (index < size - 1) {
+            i_Request[index + 1] = index;
+          } else {
+            InterlockedCompareExchange(i_Brickgrid[index].data, data, prev, prev);
+          }
+        }
+      }
+
+      hit.hit = true;
+      return hit;
+    }
 
     if (!grid.isEmpty) {
       Brickmap brick = i_Brickmap[grid.getPtr];

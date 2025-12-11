@@ -10,7 +10,9 @@
 #include "loaders/loader.hpp"
 
 namespace Generators {
-using BrickgridPtr = uint32_t; // Highest bit marks loaded
+// Lowest bit marks loaded
+// Second lowest marks requested
+using BrickgridPtr = uint32_t;
 
 struct Brickmap {
     uint64_t colourPtr;

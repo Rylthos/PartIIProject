@@ -1,6 +1,7 @@
 #include "brickmap.hpp"
 
 #include <vector>
+#include <vulkan/vulkan_core.h>
 
 #include "../compute_pipeline.hpp"
 #include "../debug_utils.hpp"
@@ -10,6 +11,7 @@
 #include "../pipeline_layout.hpp"
 #include "../shader_manager.hpp"
 
+#include "acceleration_structure.hpp"
 #include "serializers/brickmap.hpp"
 
 #include "spdlog/spdlog.h"
@@ -26,12 +28,16 @@ BrickmapAS::~BrickmapAS()
     freeDescriptorSet();
     destroyDescriptorLayout();
 
+    destroyRequestPipeline();
+    destroyRequestPipelineLayout();
+
     destroyRenderPipeline();
     destroyRenderPipelineLayout();
 
     freeBuffers();
 
     ShaderManager::getInstance()->removeModule("AS/brickmap_AS");
+    ShaderManager::getInstance()->removeModule("AS/brickmap_AS_req");
 }
 
 void BrickmapAS::init(ASStructInfo info)
@@ -47,6 +53,12 @@ void BrickmapAS::init(ASStructInfo info)
         std::bind(&BrickmapAS::createRenderPipeline, this),
         std::bind(&BrickmapAS::destroyRenderPipeline, this));
     createRenderPipeline();
+
+    createRequestPipelineLayout();
+    ShaderManager::getInstance()->addModule("AS/brickmap_AS_req",
+        std::bind(&BrickmapAS::createRequestPipeline, this),
+        std::bind(&BrickmapAS::destroyRequestPipeline, this));
+    createRequestPipeline();
 }
 
 void BrickmapAS::fromLoader(std::unique_ptr<Loader>&& loader)
@@ -118,6 +130,40 @@ void BrickmapAS::render(
     vkCmdDispatch(cmd, std::ceil(imageSize.width / 8.f), std::ceil(imageSize.height / 8.f), 1);
 
     Debug::endCmdDebugLabel(cmd);
+
+    if (p_FinishedGeneration && m_MappedRequests[0] != 0) {
+        Debug::beginCmdDebugLabel(cmd, "Brickmap Requests", { 0.0f, 0.0f, 1.0f, 1.0f });
+        {
+            VkBufferMemoryBarrier memoryBarrier {
+                .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+                .pNext = nullptr,
+                .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+                .dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT,
+                .srcQueueFamilyIndex = p_Info.graphicsQueueIndex,
+                .dstQueueFamilyIndex = p_Info.graphicsQueueIndex,
+                .buffer = m_RequestBuffer.getBuffer(),
+                .offset = 0,
+                .size = VK_WHOLE_SIZE,
+            };
+
+            vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 1, &memoryBarrier, 0, nullptr);
+        }
+
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_RequestPipeline);
+        std::vector<VkDescriptorSet> descriptorSets = {
+            m_BufferSet,
+        };
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_RequestPipelineLayout, 0,
+            descriptorSets.size(), descriptorSets.data(), 0, nullptr);
+
+        LOG_INFO("Dispatching {}", m_MappedRequests[0]);
+        uint32_t requests = std::min(m_MappedRequests[0], m_Requests);
+        vkCmdDispatch(cmd, requests, 1, 1);
+        m_MappedRequests[0] = 0;
+
+        Debug::endCmdDebugLabel(cmd);
+    }
 }
 
 void BrickmapAS::update(float dt)
@@ -138,7 +184,11 @@ void BrickmapAS::update(float dt)
     }
 }
 
-void BrickmapAS::updateShaders() { ShaderManager::getInstance()->moduleUpdated("AS/brickmap_AS"); }
+void BrickmapAS::updateShaders()
+{
+    ShaderManager::getInstance()->moduleUpdated("AS/brickmap_AS");
+    ShaderManager::getInstance()->moduleUpdated("AS/brickmap_AS_req");
+}
 
 void BrickmapAS::createDescriptorLayout()
 {
@@ -146,6 +196,7 @@ void BrickmapAS::createDescriptorLayout()
                             .addStorageBufferBinding(VK_SHADER_STAGE_COMPUTE_BIT, 0)
                             .addStorageBufferBinding(VK_SHADER_STAGE_COMPUTE_BIT, 1)
                             .addStorageBufferBinding(VK_SHADER_STAGE_COMPUTE_BIT, 2)
+                            .addStorageBufferBinding(VK_SHADER_STAGE_COMPUTE_BIT, 3)
                             .setDebugName("Brickmap descriptor set layout")
                             .build();
 }
@@ -181,11 +232,16 @@ void BrickmapAS::createBuffers()
         VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
     m_ColourBuffer.setDebugName("Colour Buffer");
 
+    VkDeviceSize requestSize = 1 + m_Requests;
+    m_RequestBuffer.init(p_Info.device, p_Info.allocator, requestSize,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT,
+        VMA_MEMORY_USAGE_AUTO);
+
     auto gridBufferIndex
         = FrameCommands::getInstance()->createStaging(gridSize, [=, this](void* ptr) {
               Generators::BrickgridPtr* data = (Generators::BrickgridPtr*)ptr;
               for (size_t i = 0; i < m_Brickgrid.size(); i++) {
-                  data[i] = m_Brickgrid[i];
+                  data[i] = m_Brickgrid[i] & 0xFFFFFFFE;
               }
           });
 
@@ -242,13 +298,21 @@ void BrickmapAS::createBuffers()
             };
             vkCmdCopyBuffer(cmd, buffer.buffer, m_ColourBuffer.getBuffer(), 1, &region);
         });
+
+    m_MappedRequests = (uint32_t*)m_RequestBuffer.mapMemory();
 }
 
 void BrickmapAS::freeBuffers()
 {
+    if (m_MappedRequests) {
+        m_RequestBuffer.unmapMemory();
+        m_MappedRequests = nullptr;
+    }
+
     m_ColourBuffer.cleanup();
     m_BrickmapsBuffer.cleanup();
     m_BrickgridBuffer.cleanup();
+    m_RequestBuffer.cleanup();
 }
 
 void BrickmapAS::createDescriptorSet()
@@ -258,6 +322,7 @@ void BrickmapAS::createDescriptorSet()
               .addBufferDescriptor(0, m_BrickgridBuffer)
               .addBufferDescriptor(1, m_BrickmapsBuffer)
               .addBufferDescriptor(2, m_ColourBuffer)
+              .addBufferDescriptor(3, m_RequestBuffer)
               .setDebugName("Brickmap descriptor set")
               .build();
 }
@@ -296,4 +361,30 @@ void BrickmapAS::createRenderPipeline()
 void BrickmapAS::destroyRenderPipeline()
 {
     vkDestroyPipeline(p_Info.device, m_RenderPipeline, nullptr);
+}
+
+void BrickmapAS::createRequestPipelineLayout()
+{
+    m_RequestPipelineLayout = PipelineLayoutGenerator::start(p_Info.device)
+                                  .addDescriptorLayout(m_BufferSetLayout)
+                                  .setDebugName("Brickmap request pipeline layout")
+                                  .build();
+}
+
+void BrickmapAS::destroyRequestPipelineLayout()
+{
+    vkDestroyPipelineLayout(p_Info.device, m_RequestPipelineLayout, nullptr);
+}
+
+void BrickmapAS::createRequestPipeline()
+{
+    m_RequestPipeline = ComputePipelineGenerator::start(p_Info.device, m_RequestPipelineLayout)
+                            .setShader("AS/brickmap_AS_req")
+                            .setDebugName("Brickmap request pipeline")
+                            .build();
+}
+
+void BrickmapAS::destroyRequestPipeline()
+{
+    vkDestroyPipeline(p_Info.device, m_RequestPipeline, nullptr);
 }

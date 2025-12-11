@@ -43,9 +43,13 @@ class BrickmapAS : public IAccelerationStructure {
 
     void createRenderPipelineLayout();
     void destroyRenderPipelineLayout();
-
     void createRenderPipeline();
     void destroyRenderPipeline();
+
+    void createRequestPipelineLayout();
+    void destroyRequestPipelineLayout();
+    void createRequestPipeline();
+    void destroyRequestPipeline();
 
   private:
     VkDescriptorSetLayout m_BufferSetLayout;
@@ -54,9 +58,16 @@ class BrickmapAS : public IAccelerationStructure {
     VkPipelineLayout m_RenderPipelineLayout;
     VkPipeline m_RenderPipeline;
 
+    VkPipelineLayout m_RequestPipelineLayout;
+    VkPipeline m_RequestPipeline;
+
     Buffer m_BrickgridBuffer;
     Buffer m_BrickmapsBuffer;
     Buffer m_ColourBuffer;
+
+    uint32_t m_Requests = 128;
+    Buffer m_RequestBuffer;
+    uint32_t* m_MappedRequests = nullptr;
 
     glm::uvec3 m_BrickgridSize;
 

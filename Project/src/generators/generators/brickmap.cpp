@@ -77,7 +77,7 @@ std::pair<std::vector<BrickgridPtr>, std::vector<Brickmap>> generateBrickmap(std
 
                     brickmaps.push_back(brick);
 
-                    brickgrid[index] = 0x1 | (brickmaps.size() << 1);
+                    brickgrid[index] = 0x1 | (brickmaps.size() << 2);
 
                     info.voxelCount += 8 * 8 * 8;
                 }
