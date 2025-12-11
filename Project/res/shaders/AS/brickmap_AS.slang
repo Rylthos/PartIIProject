@@ -1,4 +1,5 @@
 #include "ray.slang"
+#include "hit_data.slang"
 #include "hit_record.slang"
 #include "lighting.slang"
 #include "default_defines.slang"
@@ -8,6 +9,7 @@
 struct PushConstants {
   float3 camera_position;
   uint3 brickgrid_dimensions;
+  uint64_t hit_data_address;
 };
 
 struct Brickgrid {
@@ -75,6 +77,8 @@ func traverse_brick(in ray: Ray, in brick: Brickmap, in step_dir: int3, in step_
       uint8_t g = i_Colours[ptr * 3 + 1];
       uint8_t b = i_Colours[ptr * 3 + 2];
       hit.colour = float3(float(r) / 255., float(g) / 255., float(b) / 255.);
+
+      hit.voxel_index = int3(min_bound * 8) + voxel_pos;
 
       hit.hit_position = ray.calculate(t);
 
@@ -185,6 +189,12 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
   float3 mix = lerp(MIN_CYCLE_COLOUR, MAX_CYCLE_COLOUR, float3((end_cycles - start_cycles) / float(CYCLE_MAX)));
   o_Image[pixelCoord] = float4(mix, 1.);
 #else
+  int width, height;
+  i_RayDirectionImage.GetDimensions(width, height);
+  if (pixelCoord.x == width / 2 && pixelCoord.y == height / 2) {
+    setHitRecord((HitData*)push_constants.hit_data_address, hit);
+  }
+
   if (hit.hit) {
     o_Image[pixelCoord] = calculateColour(hit);
   } else {

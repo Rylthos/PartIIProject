@@ -17,6 +17,7 @@
 struct PushConstants {
     alignas(16) glm::vec3 cameraPosition;
     alignas(16) glm::uvec3 brickgridSize;
+    VkDeviceAddress hitDataAddress;
 };
 
 BrickmapAS::BrickmapAS() { }
@@ -40,11 +41,11 @@ void BrickmapAS::init(ASStructInfo info)
     createDescriptorLayout();
 
     ShaderManager::getInstance()->removeMacro("BRICKMAP_FINISHED_GENERATION");
+
+    createRenderPipelineLayout();
     ShaderManager::getInstance()->addModule("AS/brickmap_AS",
         std::bind(&BrickmapAS::createRenderPipeline, this),
         std::bind(&BrickmapAS::destroyRenderPipeline, this));
-
-    createRenderPipelineLayout();
     createRenderPipeline();
 }
 
@@ -99,6 +100,7 @@ void BrickmapAS::render(
     PushConstants pushConstant = {
         .cameraPosition = camera.getPosition(),
         .brickgridSize = m_BrickgridSize,
+        .hitDataAddress = p_Info.hitDataAddress,
     };
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_RenderPipeline);
