@@ -73,6 +73,11 @@ struct Ray {
   }
 };
 
+func createShadowRay(in hit: HitRecord, in light_pos: float3) -> Ray {
+  const float3 origin = hit.voxel_index + float3(0.5) + hit.normal / 2.;
+  return Ray(origin, light_pos - origin);
+}
+
 HitRecord sphereIntersection(Ray ray, float3 center, float radius) {
 
   float3 p = ray.origin - center;

@@ -239,7 +239,14 @@ uint64_t end_cycles = clockARB();
   }
 
   if (hit.hit) {
+#ifdef SHADOW_RAY
+    Ray shadowRay = createShadowRay(hit, LightPos);
+    HitRecord shadow = traverse(shadowRay);
+
+    o_Image[pixelCoord] = calculateColour(hit, shadow.hit);
+#else
     o_Image[pixelCoord] = calculateColour(hit);
+#endif
   } else {
     o_Image[pixelCoord] = missColour();
   }

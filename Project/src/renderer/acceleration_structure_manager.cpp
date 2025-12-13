@@ -369,6 +369,22 @@ void ASManager::UI(const Event& event)
             ImGui::Text("Normal      : %5.2f %5.2f %5.2f", hitNormal.x, hitNormal.y, hitNormal.z);
         }
         ImGui::End();
+
+        if (ImGui::Begin("Lighting")) {
+            bool value = (ShaderManager::getInstance()->getMacro("SHADOW_RAY").value_or(" ") == "");
+            bool prevValue = value;
+            ImGui::Checkbox("Shadow ray", &value);
+
+            if (prevValue != value) {
+                if (value) {
+                    ShaderManager::getInstance()->defineMacro("SHADOW_RAY");
+                } else {
+                    ShaderManager::getInstance()->removeMacro("SHADOW_RAY");
+                }
+                m_CurrentAS->updateShaders();
+            }
+        }
+        ImGui::End();
     }
 }
 
