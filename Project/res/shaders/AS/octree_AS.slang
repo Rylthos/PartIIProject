@@ -1,10 +1,10 @@
-#include "ray.slang"
-#include "hit_record.slang"
-#include "hit_data.slang"
-#include "lighting.slang"
-#include "default_defines.slang"
-#include "render_descriptor.slang"
-#include "intersection_colour.slang"
+#include "../ray.slang"
+#include "../hit_record.slang"
+#include "../hit_data.slang"
+#include "../lighting.slang"
+#include "../default_defines.slang"
+#include "../render_descriptor.slang"
+#include "../intersection_colour.slang"
 
 struct PushConstants {
   float3 camera_position;

@@ -1,12 +1,12 @@
 #define EPS 1e-4
 
-#include "ray.slang"
-#include "hit_record.slang"
-#include "default_defines.slang"
-#include "lighting.slang"
-#include "render_descriptor.slang"
-#include "hit_data.slang"
-#include "intersection_colour.slang"
+#include "../ray.slang"
+#include "../hit_record.slang"
+#include "../default_defines.slang"
+#include "../lighting.slang"
+#include "../render_descriptor.slang"
+#include "../hit_data.slang"
+#include "../intersection_colour.slang"
 
 struct PushConstants {
   float3 camera_position;
