@@ -1,3 +1,4 @@
+#pragma once
 #include "hit_record.slang"
 
 #include "default_defines.slang"

@@ -1,10 +1,8 @@
 #include "../ray.slang"
 #include "../hit_record.slang"
-#include "../hit_data.slang"
-#include "../lighting.slang"
 #include "../default_defines.slang"
 #include "../render_descriptor.slang"
-#include "../intersection_colour.slang"
+#include "general.slang"
 
 struct PushConstants {
   float3 camera_position;
@@ -91,7 +89,8 @@ func calculateChildIndex(float3 position, int3 step_dir, uint scale_exp) -> uint
   return mask.x * octant_mask.x + mask.y * octant_mask.y + mask.z * octant_mask.z;
 }
 
-func traverse(in ray_original : Ray) -> HitRecord {
+struct OctreeRayMarch : IRayMarch {
+static func traverse(in ray_original : Ray) -> HitRecord {
   const float3 min_bound = float3(1);
   const float3 max_bound = float3(2);
   const float3 dimensions = max_bound - min_bound;
@@ -201,54 +200,13 @@ func traverse(in ray_original : Ray) -> HitRecord {
 
   return hit;
 }
+}
 
 [shader("compute")]
 [numthreads(8, 8, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
-#ifdef CYCLES
-  uint64_t start_cycles = clockARB();
-#endif
-  int2 pixelCoord = int2(dispatchThreadID.xy);
-
-  Ray ray = Ray(push_constants.camera_position, i_RayDirectionImage[pixelCoord].xyz);
-
-  HitRecord hit;
-#ifdef OCTREE_GENERATION_FINISHED
-    hit = traverse(ray);
-#endif
-
-
-#ifdef CYCLES
-uint64_t end_cycles = clockARB();
-#endif
-
-#ifdef HEATMAP
-  if (hit.intersection_checks != 0) {
-    o_Image[pixelCoord] = float4(viridis(hit.intersection_checks), 1.);
-  } else {
-    o_Image[pixelCoord] = float4(0);
-  }
-#elif defined(CYCLES)
-  float3 mix = lerp(MIN_CYCLE_COLOUR, MAX_CYCLE_COLOUR, float3((end_cycles - start_cycles) / float(CYCLE_MAX)));
-  o_Image[pixelCoord] = float4(mix, 1.);
-#else
+  int2 pixel_coord = dispatchThreadID.xy;
   int width, height;
   i_RayDirectionImage.GetDimensions(width, height);
-  if (pixelCoord.x == width / 2 && pixelCoord.y == height / 2) {
-    setHitRecord((HitData*)push_constants.hit_data_address, hit);
-  }
-
-  if (hit.hit) {
-#ifdef SHADOW_RAY
-    Ray shadowRay = createShadowRay(hit, LightPos);
-    HitRecord shadow = traverse(shadowRay);
-
-    o_Image[pixelCoord] = calculateColour(hit, shadow.hit);
-#else
-    o_Image[pixelCoord] = calculateColour(hit);
-#endif
-  } else {
-    o_Image[pixelCoord] = missColour();
-  }
-#endif
+  o_Image[pixel_coord] = render<OctreeRayMarch>(pixel_coord, push_constants.camera_position, i_RayDirectionImage[pixel_coord].xyz, int2(width, height), push_constants.hit_data_address);
 }
