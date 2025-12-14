@@ -9,7 +9,8 @@ struct HitData {
   int hit;
 };
 
-func setHitRecord(in data: HitData*, in hit: HitRecord) -> void {
+func setHitRecord(in data : HitData *, in hit : HitRecord) -> void
+{
   data.hit_position = float4(hit.hit_position, 1);
   data.voxel_index = int4(hit.voxel_index, 1);
   data.normal = float4(hit.normal, 1);

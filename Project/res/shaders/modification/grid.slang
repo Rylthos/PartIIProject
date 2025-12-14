@@ -15,18 +15,20 @@ RWStructuredBuffer<uint32_t> i_Occupancy;
 [[vk::binding(1, 0)]]
 RWStructuredBuffer<float> i_Colour;
 
-func getIndex(in voxel_index: int3) -> uint {
-  return voxel_index.x +
-    voxel_index.z * push_constants.dimensions.x +
+func getIndex(in voxel_index : int3) -> uint {
+  return voxel_index.x + voxel_index.z * push_constants.dimensions.x +
     voxel_index.y * push_constants.dimensions.x * push_constants.dimensions.z;
 }
 
-struct GridModification : IModification {
-  static func validIndex(in voxel_index: int3) -> bool {
+struct GridModification : IModification
+{
+  static func validIndex(in voxel_index : int3) -> bool
+  {
     return all(voxel_index >= 0) && all(voxel_index < push_constants.dimensions);
   }
 
-  static func setVoxel(in voxel_index: int3, in colour: float3, in place: bool) -> void {
+  static func setVoxel(in voxel_index : int3, in colour : float3, in place : bool) -> void
+  {
     uint index = getIndex(voxel_index);
 
     uint array_index = index / 32;
@@ -45,19 +47,21 @@ struct GridModification : IModification {
   }
 }
 
-
 [shader("compute")]
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
+void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+{
   uint3 voxel_index = push_constants.mod.voxel_index;
 
   if (!GridModification::validIndex(voxel_index))
     return;
 
   bool place = push_constants.mod.place == 1;
+
   if (push_constants.mod.shape == SHAPE_VOXEL) {
     GridModification::setVoxel(voxel_index, push_constants.mod.colour, place);
   } else if (push_constants.mod.shape == SHAPE_SPHERE) {
-    sphere<GridModification>(voxel_index, int(push_constants.mod.additional.x), push_constants.mod.colour, place);
+    sphere<GridModification>(voxel_index, int(push_constants.mod.additional.x),
+        push_constants.mod.colour, place);
   }
 }

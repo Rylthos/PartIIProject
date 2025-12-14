@@ -3,22 +3,32 @@
 
 #include "default_defines.slang"
 
-struct Ray {
+struct Ray
+{
   float3 origin;
   float3 direction;
   float3 inverse_direction;
 
-  __init(float3 o, float3 d) { origin = o; direction = d; inverse_direction = 1. / direction; }
+  __init(float3 o, float3 d) {
+    origin = o;
+    direction = d;
+    inverse_direction = 1. / direction;
+  }
 
-
-  __init(float aspect, float2 uv, float3 camera_pos, float3 camera_front, float3 camera_right, float3 camera_up) {
+  __init(float aspect,
+         float2 uv,
+         float3 camera_pos,
+         float3 camera_front,
+         float3 camera_right,
+         float3 camera_up)
+  {
     const float viewport_width = 2.0;
     const float viewport_height = viewport_width / aspect;
     const float viewport_distance = 1.0;
 
-    const float3 top_left = viewport_distance * camera_front
-                          - camera_right * (viewport_width / 2.)
-                          + camera_up * (viewport_height / 2.);
+    const float3 top_left = viewport_distance * camera_front -
+                            camera_right * (viewport_width / 2.) +
+                            camera_up * (viewport_height / 2.);
 
     const float3 right_length = camera_right * viewport_width;
     const float3 down_length = -camera_up * viewport_height;
@@ -28,11 +38,15 @@ struct Ray {
     inverse_direction = 1. / direction;
   }
 
-  float3 calculate(float t) {
-    return origin + direction * t;
-  }
+  float3 calculate(float t) { return origin + direction * t; }
 
-  bool aabb(float3 minBound, float3 maxBound, out float tMin, out float tMax, in float minT, in float maxT) {
+  bool aabb(float3 minBound,
+            float3 maxBound,
+            out float tMin,
+            out float tMax,
+            in float minT,
+            in float maxT)
+  {
     float3 t_bot = this.inverse_direction * (minBound - this.origin);
     float3 t_top = this.inverse_direction * (maxBound - this.origin);
 
@@ -50,7 +64,8 @@ struct Ray {
     return t1 > max(t0, 0.) && tMax > minT && tMin < maxT;
   }
 
-  float aabb(float3 minBound, float3 maxBound) {
+  float aabb(float3 minBound, float3 maxBound)
+  {
     float3 t_all_min = (minBound - this.origin) * inverse_direction;
     float3 t_all_max = (maxBound - this.origin) * inverse_direction;
 
@@ -74,19 +89,20 @@ struct Ray {
   }
 };
 
-func createShadowRay(in hit: HitRecord, in light_pos: float3) -> Ray {
+func createShadowRay(in hit : HitRecord, in light_pos : float3) -> Ray
+{
   const float3 origin = hit.voxel_index + float3(0.5) + hit.normal / 2.;
   return Ray(origin, light_pos - origin);
 }
 
-HitRecord sphereIntersection(Ray ray, float3 center, float radius) {
-
+HitRecord sphereIntersection(Ray ray, float3 center, float radius)
+{
   float3 p = ray.origin - center;
   float a = dot(ray.direction, ray.direction);
   float b = dot(p, ray.direction);
   float c = dot(p, p) - radius * radius;
 
-  float disc = b*b - a*c;
+  float disc = b * b - a * c;
 
   HitRecord record;
   record.hit = false;
@@ -110,7 +126,8 @@ HitRecord sphereIntersection(Ray ray, float3 center, float radius) {
   return record;
 }
 
-float3 calculateNormal(float3 position, float3 minBound, float3 maxBound) {
+float3 calculateNormal(float3 position, float3 minBound, float3 maxBound)
+{
   float3 minSide = abs(position - minBound);
   float3 maxSide = abs(position - maxBound);
 

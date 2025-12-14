@@ -1,15 +1,17 @@
 #pragma once
 
-struct HitRecord {
+struct HitRecord
+{
   bool hit;
   float3 colour;
   float3 hit_position;
   int3 voxel_index;
   float3 normal;
   float t;
-#ifdef HEATMAP
-  int intersection_checks;
-#endif
+
+  #ifdef HEATMAP
+    int intersection_checks;
+  #endif
 
   __init() {
     hit = false;
@@ -18,8 +20,8 @@ struct HitRecord {
     normal = float3(0);
     voxel_index = int3(-1);
     t = 1.0 / 0.;
-#ifdef HEATMAP
-    intersection_checks = 0;
-#endif
+    #ifdef HEATMAP
+      intersection_checks = 0;
+    #endif
   }
 }

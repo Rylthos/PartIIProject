@@ -3,15 +3,15 @@
 static const float3 LightColour = float3(1.);
 static const float3 LightPos = float3(0, -1, 0);
 
-func missColour() -> float4 {
-  return float4(float3(0.2), 1.);
-}
+func missColour() -> float4 { return float4(float3(0.2), 1.); }
 
-func calculateColour(in hit: HitRecord) -> float4 {
+func calculateColour(in hit : HitRecord) -> float4
+{
   return calculateColour(hit, false);
 }
 
-func calculateColour(in hit: HitRecord, in shadow: bool) -> float4 {
+func calculateColour(in hit : HitRecord, in shadow : bool) -> float4
+{
   const float ambient_strength = 0.3;
 
   const float3 ambient = ambient_strength * LightColour;
