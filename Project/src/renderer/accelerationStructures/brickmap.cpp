@@ -46,7 +46,7 @@ void BrickmapAS::init(ASStructInfo info)
 
     createDescriptorLayout();
 
-    ShaderManager::getInstance()->removeMacro("BRICKMAP_FINISHED_GENERATION");
+    ShaderManager::getInstance()->removeMacro("GENERATION_FINISHED");
 
     createRenderPipelineLayout();
     ShaderManager::getInstance()->addModule("AS/brickmap_AS",
@@ -65,7 +65,7 @@ void BrickmapAS::fromLoader(std::unique_ptr<Loader>&& loader)
 {
     p_FinishedGeneration = false;
 
-    ShaderManager::getInstance()->removeMacro("BRICKMAP_FINISHED_GENERATION");
+    ShaderManager::getInstance()->removeMacro("GENERATION_FINISHED");
     updateShaders();
 
     p_GenerationThread.request_stop();
@@ -172,7 +172,7 @@ void BrickmapAS::update(float dt)
         freeBuffers();
         freeDescriptorSet();
 
-        ShaderManager::getInstance()->defineMacro("BRICKMAP_GENERATION_FINISHED");
+        ShaderManager::getInstance()->defineMacro("GENERATION_FINISHED");
         updateShaders();
 
         createBuffers();

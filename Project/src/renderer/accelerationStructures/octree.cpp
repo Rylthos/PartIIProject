@@ -58,7 +58,7 @@ void OctreeAS::init(ASStructInfo info)
 
     createRenderPipelineLayout();
 
-    ShaderManager::getInstance()->removeMacro("OCTREE_GENERATION_FINISHED");
+    ShaderManager::getInstance()->removeMacro("GENERATION_FINISHED");
     ShaderManager::getInstance()->addModule("AS/octree_AS",
         std::bind(&OctreeAS::createRenderPipeline, this),
         std::bind(&OctreeAS::destroyRenderPipeline, this));
@@ -70,7 +70,7 @@ void OctreeAS::fromLoader(std::unique_ptr<Loader>&& loader)
 {
     p_FinishedGeneration = false;
 
-    ShaderManager::getInstance()->removeMacro("OCTREE_GENERATION_FINISHED");
+    ShaderManager::getInstance()->removeMacro("GENERATION_FINISHED");
     updateShaders();
 
     p_GenerationThread.request_stop();
@@ -152,7 +152,7 @@ void OctreeAS::update(float dt)
         freeBuffers();
         freeDescriptorSet();
 
-        ShaderManager::getInstance()->defineMacro("OCTREE_GENERATION_FINISHED");
+        ShaderManager::getInstance()->defineMacro("GENERATION_FINISHED");
         updateShaders();
 
         createBuffers();

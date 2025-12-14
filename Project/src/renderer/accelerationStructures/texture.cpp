@@ -49,7 +49,7 @@ void TextureAS::init(ASStructInfo info)
     createRenderPipelineLayout();
     createModPipelineLayout();
 
-    ShaderManager::getInstance()->removeMacro("TEXTURE_GENERATION_FINISHED");
+    ShaderManager::getInstance()->removeMacro("GENERATION_FINISHED");
     ShaderManager::getInstance()->addModule("AS/texture_AS",
         std::bind(&TextureAS::createRenderPipeline, this),
         std::bind(&TextureAS::destroyRenderPipeline, this));
@@ -66,7 +66,7 @@ void TextureAS::fromLoader(std::unique_ptr<Loader>&& loader)
 {
     p_FinishedGeneration = false;
 
-    ShaderManager::getInstance()->removeMacro("TEXTURE_GENERATION_FINISHED");
+    ShaderManager::getInstance()->removeMacro("GENERATION_FINISHED");
     updateShaders();
 
     p_GenerationThread.request_stop();
@@ -164,7 +164,7 @@ void TextureAS::update(float dt)
         destroyImages();
         freeDescriptorSets();
 
-        ShaderManager::getInstance()->defineMacro("TEXTURE_GENERATION_FINISHED");
+        ShaderManager::getInstance()->defineMacro("GENERATION_FINISHED");
         updateShaders();
 
         createImages();
