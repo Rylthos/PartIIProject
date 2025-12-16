@@ -12,6 +12,7 @@
 #include "../shader_manager.hpp"
 
 #include "acceleration_structure.hpp"
+#include "logger/logger.hpp"
 #include "serializers/brickmap.hpp"
 
 #include "spdlog/spdlog.h"
@@ -20,6 +21,11 @@ struct PushConstants {
     alignas(16) glm::vec3 cameraPosition;
     alignas(16) glm::uvec3 brickgridSize;
     VkDeviceAddress hitDataAddress;
+};
+
+struct ModPushConstants {
+    alignas(16) glm::uvec3 brickgridSize;
+    alignas(16) ModInfo mod;
 };
 
 BrickmapAS::BrickmapAS() { }
@@ -31,6 +37,9 @@ BrickmapAS::~BrickmapAS()
     destroyRequestPipeline();
     destroyRequestPipelineLayout();
 
+    destroyModPipeline();
+    destroyModPipelineLayout();
+
     destroyRenderPipeline();
     destroyRenderPipelineLayout();
 
@@ -38,6 +47,7 @@ BrickmapAS::~BrickmapAS()
 
     ShaderManager::getInstance()->removeModule("AS/brickmap_AS");
     ShaderManager::getInstance()->removeModule("AS/brickmap_AS_req");
+    ShaderManager::getInstance()->removeModule("modification/brickmap");
 }
 
 void BrickmapAS::init(ASStructInfo info)
@@ -53,6 +63,12 @@ void BrickmapAS::init(ASStructInfo info)
         std::bind(&BrickmapAS::createRenderPipeline, this),
         std::bind(&BrickmapAS::destroyRenderPipeline, this));
     createRenderPipeline();
+
+    createModPipelineLayout();
+    ShaderManager::getInstance()->addModule("modification/brickmap",
+        std::bind(&BrickmapAS::createModPipeline, this),
+        std::bind(&BrickmapAS::destroyModPipeline, this));
+    createModPipeline();
 
     createRequestPipelineLayout();
     ShaderManager::getInstance()->addModule("AS/brickmap_AS_req",
@@ -133,6 +149,49 @@ void BrickmapAS::render(
     vkCmdDispatch(cmd, std::ceil(imageSize.width / 8.f), std::ceil(imageSize.height / 8.f), 1);
 
     Debug::endCmdDebugLabel(cmd);
+
+    if (p_Mods.size() != 0 && p_FinishedGeneration) {
+        VkBufferMemoryBarrier barrier = {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+            .pNext = nullptr,
+            .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+            .srcQueueFamilyIndex = p_Info.graphicsQueueIndex,
+            .dstQueueFamilyIndex = p_Info.graphicsQueueIndex,
+            .buffer = m_RequestBuffer.getBuffer(),
+            .offset = 0,
+            .size = VK_WHOLE_SIZE,
+        };
+
+        std::vector<VkBufferMemoryBarrier> barriers = {
+            barrier,
+        };
+        vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, barriers.size(), barriers.data(),
+            0, nullptr);
+
+        Debug::beginCmdDebugLabel(cmd, "Grid mod AS render", { 0.0f, 0.0f, 1.0f, 1.0f });
+
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_ModPipeline);
+        std::vector<VkDescriptorSet> descriptorSets = {
+            m_BufferSet,
+        };
+
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_ModPipelineLayout, 0,
+            descriptorSets.size(), descriptorSets.data(), 0, nullptr);
+
+        for (const auto& mod : p_Mods) {
+            ModPushConstants pushConstant { .brickgridSize = m_BrickgridSize, .mod = mod };
+            vkCmdPushConstants(cmd, m_ModPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
+                sizeof(ModPushConstants), &pushConstant);
+
+            vkCmdDispatch(cmd, 1, 1, 1);
+        }
+
+        p_Mods.clear();
+
+        Debug::endCmdDebugLabel(cmd);
+    }
 
     if (p_FinishedGeneration) {
         VkBufferMemoryBarrier barrier = {
@@ -366,6 +425,31 @@ void BrickmapAS::destroyRenderPipeline()
 {
     vkDestroyPipeline(p_Info.device, m_RenderPipeline, nullptr);
 }
+
+void BrickmapAS::createModPipelineLayout()
+{
+    m_ModPipelineLayout
+        = PipelineLayoutGenerator::start(p_Info.device)
+              .addDescriptorLayouts({ m_BufferSetLayout })
+              .addPushConstant(VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ModPushConstants))
+              .setDebugName("Brickmap mod pipeline layout")
+              .build();
+}
+
+void BrickmapAS::destroyModPipelineLayout()
+{
+    vkDestroyPipelineLayout(p_Info.device, m_ModPipelineLayout, nullptr);
+}
+
+void BrickmapAS::createModPipeline()
+{
+    m_ModPipeline = ComputePipelineGenerator::start(p_Info.device, m_ModPipelineLayout)
+                        .setShader("modification/brickmap")
+                        .setDebugName("Brickmap mod pipeline")
+                        .build();
+}
+
+void BrickmapAS::destroyModPipeline() { vkDestroyPipeline(p_Info.device, m_ModPipeline, nullptr); }
 
 void BrickmapAS::createRequestPipelineLayout()
 {

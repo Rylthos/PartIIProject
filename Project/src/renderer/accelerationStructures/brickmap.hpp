@@ -46,6 +46,11 @@ class BrickmapAS : public IAccelerationStructure {
     void createRenderPipeline();
     void destroyRenderPipeline();
 
+    void createModPipelineLayout();
+    void destroyModPipelineLayout();
+    void createModPipeline();
+    void destroyModPipeline();
+
     void createRequestPipelineLayout();
     void destroyRequestPipelineLayout();
     void createRequestPipeline();
@@ -57,6 +62,9 @@ class BrickmapAS : public IAccelerationStructure {
 
     VkPipelineLayout m_RenderPipelineLayout;
     VkPipeline m_RenderPipeline;
+
+    VkPipelineLayout m_ModPipelineLayout;
+    VkPipeline m_ModPipeline;
 
     VkPipelineLayout m_RequestPipelineLayout;
     VkPipeline m_RequestPipeline;
