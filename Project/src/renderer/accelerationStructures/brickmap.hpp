@@ -65,9 +65,9 @@ class BrickmapAS : public IAccelerationStructure {
     Buffer m_BrickmapsBuffer;
     Buffer m_ColourBuffer;
 
-    uint32_t m_Requests = 128;
+    uint32_t m_Requests = 1024;
     Buffer m_RequestBuffer;
-    uint32_t* m_MappedRequests = nullptr;
+    uint32_t* m_MappedRequestBuffer = nullptr;
 
     glm::uvec3 m_BrickgridSize;
 

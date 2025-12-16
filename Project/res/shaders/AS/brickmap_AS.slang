@@ -135,14 +135,14 @@ struct BrickmapRayMarch : IRayMarch
           uint32_t prev;
           InterlockedCompareExchange(i_Brickgrid[index].data, grid.data, data, prev);
           if (prev == grid.data) {
-            int index = i_Request[0];
-            InterlockedAdd(i_Request[0], 1, index);
+            int request_index;
+            InterlockedAdd(i_Request[0], 1, request_index);
 
             uint size, stride;
             i_Request.GetDimensions(size, stride);
 
-            if (index < size - 1) {
-              i_Request[index + 1] = index;
+            if (request_index < size - 1) {
+              i_Request[request_index + 1] = index;
             } else {
               InterlockedCompareExchange(i_Brickgrid[index].data, data, prev, prev);
             }
@@ -150,6 +150,7 @@ struct BrickmapRayMarch : IRayMarch
         }
 
         hit.hit = true;
+        hit.normal.x = grid.isRequested ? 1 : 0;
         return hit;
       }
 

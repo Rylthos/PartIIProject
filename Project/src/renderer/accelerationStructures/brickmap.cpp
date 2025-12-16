@@ -119,11 +119,14 @@ void BrickmapAS::render(
     std::vector<VkDescriptorSet> descriptorSets = {
         renderSet,
     };
+
     if (p_FinishedGeneration) {
         descriptorSets.push_back(m_BufferSet);
     }
+
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_RenderPipelineLayout, 0,
         descriptorSets.size(), descriptorSets.data(), 0, nullptr);
+
     vkCmdPushConstants(cmd, m_RenderPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
         sizeof(PushConstants), &pushConstant);
 
@@ -131,24 +134,27 @@ void BrickmapAS::render(
 
     Debug::endCmdDebugLabel(cmd);
 
-    if (p_FinishedGeneration && m_MappedRequests[0] != 0) {
-        Debug::beginCmdDebugLabel(cmd, "Brickmap Requests", { 0.0f, 0.0f, 1.0f, 1.0f });
-        {
-            VkBufferMemoryBarrier memoryBarrier {
-                .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-                .pNext = nullptr,
-                .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
-                .dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT,
-                .srcQueueFamilyIndex = p_Info.graphicsQueueIndex,
-                .dstQueueFamilyIndex = p_Info.graphicsQueueIndex,
-                .buffer = m_RequestBuffer.getBuffer(),
-                .offset = 0,
-                .size = VK_WHOLE_SIZE,
-            };
+    if (p_FinishedGeneration) {
+        VkBufferMemoryBarrier barrier = {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+            .pNext = nullptr,
+            .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT,
+            .srcQueueFamilyIndex = p_Info.graphicsQueueIndex,
+            .dstQueueFamilyIndex = p_Info.graphicsQueueIndex,
+            .buffer = m_RequestBuffer.getBuffer(),
+            .offset = 0,
+            .size = VK_WHOLE_SIZE,
+        };
 
-            vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 1, &memoryBarrier, 0, nullptr);
-        }
+        std::vector<VkBufferMemoryBarrier> barriers = {
+            barrier,
+        };
+        vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, barriers.size(), barriers.data(),
+            0, nullptr);
+
+        Debug::beginCmdDebugLabel(cmd, "Brickmap Requests", { 0.0f, 0.0f, 1.0f, 1.0f });
 
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_RequestPipeline);
         std::vector<VkDescriptorSet> descriptorSets = {
@@ -157,10 +163,9 @@ void BrickmapAS::render(
         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_RequestPipelineLayout, 0,
             descriptorSets.size(), descriptorSets.data(), 0, nullptr);
 
-        LOG_INFO("Dispatching {}", m_MappedRequests[0]);
-        uint32_t requests = std::min(m_MappedRequests[0], m_Requests);
+        uint32_t requests = std::ceil(m_Requests / 32.f);
         vkCmdDispatch(cmd, requests, 1, 1);
-        m_MappedRequests[0] = 0;
+        m_MappedRequestBuffer[0] = 0;
 
         Debug::endCmdDebugLabel(cmd);
     }
@@ -236,6 +241,7 @@ void BrickmapAS::createBuffers()
     m_RequestBuffer.init(p_Info.device, p_Info.allocator, requestSize,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT,
         VMA_MEMORY_USAGE_AUTO);
+    m_MappedRequestBuffer = (uint32_t*)m_RequestBuffer.mapMemory();
 
     auto gridBufferIndex
         = FrameCommands::getInstance()->createStaging(gridSize, [=, this](void* ptr) {
@@ -298,21 +304,19 @@ void BrickmapAS::createBuffers()
             };
             vkCmdCopyBuffer(cmd, buffer.buffer, m_ColourBuffer.getBuffer(), 1, &region);
         });
-
-    m_MappedRequests = (uint32_t*)m_RequestBuffer.mapMemory();
 }
 
 void BrickmapAS::freeBuffers()
 {
-    if (m_MappedRequests) {
+    if (m_MappedRequestBuffer) {
+        m_MappedRequestBuffer = nullptr;
         m_RequestBuffer.unmapMemory();
-        m_MappedRequests = nullptr;
+        m_RequestBuffer.cleanup();
     }
 
     m_ColourBuffer.cleanup();
     m_BrickmapsBuffer.cleanup();
     m_BrickgridBuffer.cleanup();
-    m_RequestBuffer.cleanup();
 }
 
 void BrickmapAS::createDescriptorSet()
@@ -366,7 +370,7 @@ void BrickmapAS::destroyRenderPipeline()
 void BrickmapAS::createRequestPipelineLayout()
 {
     m_RequestPipelineLayout = PipelineLayoutGenerator::start(p_Info.device)
-                                  .addDescriptorLayout(m_BufferSetLayout)
+                                  .addDescriptorLayouts({ m_BufferSetLayout })
                                   .setDebugName("Brickmap request pipeline layout")
                                   .build();
 }
