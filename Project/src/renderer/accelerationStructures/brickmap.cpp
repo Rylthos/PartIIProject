@@ -1,5 +1,6 @@
 #include "brickmap.hpp"
 
+#include <cstdlib>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
@@ -175,6 +176,7 @@ void BrickmapAS::render(
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_ModPipeline);
         std::vector<VkDescriptorSet> descriptorSets = {
             m_BufferSet,
+            m_ModSet,
         };
 
         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_ModPipelineLayout, 0,
@@ -263,11 +265,17 @@ void BrickmapAS::createDescriptorLayout()
                             .addStorageBufferBinding(VK_SHADER_STAGE_COMPUTE_BIT, 3)
                             .setDebugName("Brickmap descriptor set layout")
                             .build();
+
+    m_ModSetLayout = DescriptorLayoutGenerator::start(p_Info.device)
+                         .addStorageBufferBinding(VK_SHADER_STAGE_COMPUTE_BIT, 0)
+                         .setDebugName("Brickmap mod set layout")
+                         .build();
 }
 
 void BrickmapAS::destroyDescriptorLayout()
 {
     vkDestroyDescriptorSetLayout(p_Info.device, m_BufferSetLayout, nullptr);
+    vkDestroyDescriptorSetLayout(p_Info.device, m_ModSetLayout, nullptr);
 }
 
 void BrickmapAS::createBuffers()
@@ -279,11 +287,23 @@ void BrickmapAS::createBuffers()
         VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
     m_BrickgridBuffer.setDebugName("Brickgrid Buffer");
 
-    VkDeviceSize brickmapSize = m_Brickmaps.size() * (sizeof(uint64_t) * 9);
+    m_BrickmapCount = std::pow(2, std::ceil(std::log2(m_Brickmaps.size())));
+
+    uint32_t freeBrickCount
+        = std::pow(2, std::ceil(std::log2(m_BrickmapCount - m_Brickmaps.size())));
+    LOG_INFO("Free bricks: {}", freeBrickCount);
+
+    VkDeviceSize brickmapSize = m_BrickmapCount * (sizeof(uint64_t) * 9);
     m_BrickmapsBuffer.init(p_Info.device, p_Info.allocator, brickmapSize,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
         VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
     m_BrickmapsBuffer.setDebugName("Brickmap Buffer");
+
+    VkDeviceSize freeBrickSize = (freeBrickCount + 1) * sizeof(uint32_t);
+    m_FreeBricks.init(p_Info.device, p_Info.allocator, freeBrickSize,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
+        VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
+    m_FreeBricks.setDebugName("Free bricks");
 
     size_t colourCount = 0;
     for (const auto& brickmap : m_Brickmaps) {
@@ -323,7 +343,7 @@ void BrickmapAS::createBuffers()
     auto mapBufferIndex
         = FrameCommands::getInstance()->createStaging(brickmapSize, [=, this](void* ptr) {
               uint64_t* data = (uint64_t*)ptr;
-              const uint64_t nodeSize = 9; // Number of uint32_t
+              const uint64_t nodeSize = 9; // Number of uint64_t
               for (size_t i = 0; i < m_Brickmaps.size(); i++) {
                   *(data + i * nodeSize) = m_Brickmaps[i].colourPtr;
                   memcpy(data + i * nodeSize + 1, m_Brickmaps[i].occupancy, sizeof(uint64_t) * 8);
@@ -363,6 +383,27 @@ void BrickmapAS::createBuffers()
             };
             vkCmdCopyBuffer(cmd, buffer.buffer, m_ColourBuffer.getBuffer(), 1, &region);
         });
+
+    auto freeBricksIndex
+        = FrameCommands::getInstance()->createStaging(freeBrickSize, [=, this](void* ptr) {
+              memset(ptr, 0, sizeof(uint32_t) * freeBrickCount);
+
+              uint32_t* data = (uint32_t*)ptr;
+              data[0] = freeBrickCount;
+              for (size_t i = 0; i < freeBrickCount; i++) {
+                  data[i + 1] = m_Brickmaps.size() + i + 1;
+              }
+          });
+
+    FrameCommands::getInstance()->stagingEval(
+        freeBricksIndex, [=, this](VkCommandBuffer cmd, FrameCommands::StagingBuffer buffer) {
+            VkBufferCopy region {
+                .srcOffset = buffer.offset,
+                .dstOffset = 0,
+                .size = freeBrickSize,
+            };
+            vkCmdCopyBuffer(cmd, buffer.buffer, m_FreeBricks.getBuffer(), 1, &region);
+        });
 }
 
 void BrickmapAS::freeBuffers()
@@ -373,6 +414,7 @@ void BrickmapAS::freeBuffers()
         m_RequestBuffer.cleanup();
     }
 
+    m_FreeBricks.cleanup();
     m_ColourBuffer.cleanup();
     m_BrickmapsBuffer.cleanup();
     m_BrickgridBuffer.cleanup();
@@ -388,6 +430,11 @@ void BrickmapAS::createDescriptorSet()
               .addBufferDescriptor(3, m_RequestBuffer)
               .setDebugName("Brickmap descriptor set")
               .build();
+
+    m_ModSet = DescriptorSetGenerator::start(p_Info.device, p_Info.descriptorPool, m_ModSetLayout)
+                   .addBufferDescriptor(0, m_FreeBricks)
+                   .setDebugName("Brickmap mod descriptor set")
+                   .build();
 }
 
 void BrickmapAS::freeDescriptorSet()
@@ -430,7 +477,7 @@ void BrickmapAS::createModPipelineLayout()
 {
     m_ModPipelineLayout
         = PipelineLayoutGenerator::start(p_Info.device)
-              .addDescriptorLayouts({ m_BufferSetLayout })
+              .addDescriptorLayouts({ m_BufferSetLayout, m_ModSetLayout })
               .addPushConstant(VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ModPushConstants))
               .setDebugName("Brickmap mod pipeline layout")
               .build();
@@ -454,7 +501,7 @@ void BrickmapAS::destroyModPipeline() { vkDestroyPipeline(p_Info.device, m_ModPi
 void BrickmapAS::createRequestPipelineLayout()
 {
     m_RequestPipelineLayout = PipelineLayoutGenerator::start(p_Info.device)
-                                  .addDescriptorLayouts({ m_BufferSetLayout })
+                                  .addDescriptorLayouts({ m_BufferSetLayout, m_ModSetLayout })
                                   .setDebugName("Brickmap request pipeline layout")
                                   .build();
 }

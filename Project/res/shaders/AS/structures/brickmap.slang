@@ -19,16 +19,20 @@ struct Brickgrid
   property bool isEmpty
   {
     get { return (data >> 2) == 0; }
+    set { if (newValue == true) { data &= 0x3; } }
   }
 
   property uint32_t getPtr
   {
     get { return (data >> 2) - 1; }
+    set {
+      data &= 0x3;
+      data |= ((newValue + 1) << 2); }
   }
 }
 
 struct Brickmap
 {
-  uint32_t colourPtr;
+  uint64_t colourPtr;
   uint64_t data[8];
 }

@@ -57,7 +57,7 @@ func traverse_brick(in ray : Ray,
     if (((brick.data[index] >> offset) & 1) != 0) {
       hit.hit = true;
 
-      uint ptr = brick.colourPtr;
+      uint64_t ptr = brick.colourPtr;
       for (int i = 0; i < index; i++) {
         ptr += countbits(brick.data[i]);
       }

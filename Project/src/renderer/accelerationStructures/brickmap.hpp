@@ -60,6 +60,9 @@ class BrickmapAS : public IAccelerationStructure {
     VkDescriptorSetLayout m_BufferSetLayout;
     VkDescriptorSet m_BufferSet = VK_NULL_HANDLE;
 
+    VkDescriptorSetLayout m_ModSetLayout;
+    VkDescriptorSet m_ModSet = VK_NULL_HANDLE;
+
     VkPipelineLayout m_RenderPipelineLayout;
     VkPipeline m_RenderPipeline;
 
@@ -73,9 +76,13 @@ class BrickmapAS : public IAccelerationStructure {
     Buffer m_BrickmapsBuffer;
     Buffer m_ColourBuffer;
 
+    uint32_t m_BrickmapCount;
+
     uint32_t m_Requests = 1024;
     Buffer m_RequestBuffer;
     uint32_t* m_MappedRequestBuffer = nullptr;
+
+    Buffer m_FreeBricks;
 
     glm::uvec3 m_BrickgridSize;
 
