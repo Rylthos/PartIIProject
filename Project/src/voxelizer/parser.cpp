@@ -54,8 +54,11 @@ std::vector<std::string> split(std::string str, std::string delim)
         std::string sect = str.substr(pos, newPos - pos);
         pos = newPos + 1;
 
-        if (sect.length() != 0)
+        if (sect.length() != 0) {
             components.push_back(sect);
+        } else {
+            components.push_back("");
+        }
     }
 
     return components;
