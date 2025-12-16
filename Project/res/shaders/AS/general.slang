@@ -4,6 +4,7 @@
 #include "../hit_record.slang"
 #include "../lighting.slang"
 #include "../ray.slang"
+#include "../intersection_colour.slang"
 
 interface IRayMarch
 {
