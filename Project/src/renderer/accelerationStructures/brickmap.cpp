@@ -247,7 +247,7 @@ void BrickmapAS::createBuffers()
         = FrameCommands::getInstance()->createStaging(gridSize, [=, this](void* ptr) {
               Generators::BrickgridPtr* data = (Generators::BrickgridPtr*)ptr;
               for (size_t i = 0; i < m_Brickgrid.size(); i++) {
-                  data[i] = m_Brickgrid[i] & 0xFFFFFFFE;
+                  data[i] = m_Brickgrid[i];
               }
           });
 
