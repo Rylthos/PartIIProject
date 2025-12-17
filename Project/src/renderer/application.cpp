@@ -1026,6 +1026,8 @@ void Application::render()
         }
 
         {
+            Debug::beginCmdDebugLabel(commandBuffer, "UI Rendering", { 0.f, 0.f, 1.f, 1.f });
+
             vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_VkUIPipeline);
             std::vector<VkDescriptorSet> descriptorSets = {
                 currentFrame.renderDescriptorSet,
@@ -1036,6 +1038,8 @@ void Application::render()
 
             vkCmdDispatch(commandBuffer, std::ceil(imageSize.width / 8.f),
                 std::ceil(imageSize.height / 8.f), 1);
+
+            Debug::endCmdDebugLabel(commandBuffer);
         }
 
         currentFrame.drawImage.transition(
