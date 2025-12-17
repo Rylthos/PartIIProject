@@ -46,9 +46,9 @@ struct BrickmapModification : IModification
 
   static func setVoxel(in mod_index : int3, in colour : float3, in place : bool) -> void
   {
-    uint index = getBrickIndex(mod_index);
+    uint brickgrid_index = getBrickIndex(mod_index);
 
-    Brickgrid grid = i_Brickgrid[index];
+    Brickgrid grid = i_Brickgrid[brickgrid_index];
 
     if (!grid.isValid || grid.isEmpty) {
       int freeIndex = -1;
@@ -66,44 +66,51 @@ struct BrickmapModification : IModification
         }
       }
 
-      i_Brickgrid[index].getPtr = freeIndex;
+      i_Brickgrid[brickgrid_index].getPtr = freeIndex;
+
+      grid = i_Brickgrid[brickgrid_index];
 
       for (int i = 0; i < 8; i++) {
         i_Brickmap[grid.getPtr].data[i] = 0;
       }
 
-      i_Brickgrid[index].isValid = true;
+      i_Brickgrid[brickgrid_index].isValid = true;
     }
 
-    if (grid.isValid && !grid.isEmpty) {
+    if (grid.isValid) {
       uint3 voxel_index = getVoxelIndex(mod_index);
 
       uint mask_index = voxel_index.x + voxel_index.z * 8;
 
+      bool possiblyEmpty = false;
       if (place) {
         i_Brickmap[grid.getPtr].data[voxel_index.y] |= ((uint64_t)1 << mask_index);
       } else {
         i_Brickmap[grid.getPtr].data[voxel_index.y] &= ~((uint64_t)1 << mask_index);
+        possiblyEmpty = (i_Brickmap[grid.getPtr].data[voxel_index.y] == 0);
       }
 
-      uint count = 0;
-      for (int i = 0; i < 8; i++) {
-        count += countbits(i_Brickmap[grid.getPtr].data[i]);
-      }
+      if (possiblyEmpty) {
+        uint count = 0;
+        for (int i = 0; i < 8; i++) {
+          count += countbits(i_Brickmap[grid.getPtr].data[i]);
+        }
 
-      if (count == 0) {
-        uint index = i_Brickgrid[index].getPtr;
+        if (count == 0) {
+          uint brick_index = i_Brickgrid[brickgrid_index].getPtr;
+          i_Brickgrid[brickgrid_index].isEmpty = true;
 
-        i_Brickgrid[index].isEmpty = true;
+          int size, stride;
+          i_FreeBricks.GetDimensions(size, stride);
 
-        int size, stride;
-        i_FreeBricks.GetDimensions(size, stride);
+          for (int i = 1; i < size; i++) {
+            if (i_FreeBricks[i] == 0) {
 
-        for (int i = 0; i < size - 1; i++) {
-          if (i_FreeBricks[i + 1] == 0) {
+              i_FreeBricks[i] = brick_index + 1;
+              i_FreeBricks[0] += 1;
 
-            i_FreeBricks[i + 1] = index + 1;
-            i_FreeBricks[0] += 1;
+              break;
+            }
           }
         }
       }
