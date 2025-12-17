@@ -21,7 +21,7 @@ func calculateColour(in hit : HitRecord, in shadow : bool) -> float4
   float3 diffuse = diffuse_strength * LightColour;
 
   if (shadow) {
-    diffuse = float3(0.);
+    diffuse *= 0.1;
   }
 
   return float4(float3(hit.colour * (ambient + diffuse)), 1.0);
