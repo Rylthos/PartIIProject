@@ -34,6 +34,10 @@ func render<T>(in pixel_coord : int2,
     uint64_t end_cycles = clockARB();
   #endif
 
+  if (pixel_coord.x == image_size.x / 2 && pixel_coord.y == image_size.y / 2) {
+    setHitRecord((HitData*)hit_data_address, hit);
+  }
+
   #ifdef HEATMAP
     if (hit.intersection_checks != 0) {
       return float4(viridis(hit.intersection_checks), 1.);
@@ -45,10 +49,6 @@ func render<T>(in pixel_coord : int2,
         MIN_CYCLE_COLOUR, MAX_CYCLE_COLOUR, float3((end_cycles - start_cycles) / float(CYCLE_MAX)));
     return float4(mix, 1.);
   #else
-    if (pixel_coord.x == image_size.x / 2 && pixel_coord.y == image_size.y / 2) {
-      setHitRecord((HitData*)hit_data_address, hit);
-    }
-
     if (hit.hit) {
       #ifdef SHADOW_RAY
         Ray shadowRay = createShadowRay(hit, LightPos);
