@@ -17,6 +17,7 @@
 #include "serializers/brickmap.hpp"
 
 #include "spdlog/spdlog.h"
+#include "vulkan/vulkan.hpp"
 
 struct PushConstants {
     alignas(16) glm::vec3 cameraPosition;
@@ -124,6 +125,114 @@ void BrickmapAS::fromFile(std::filesystem::path path)
 void BrickmapAS::render(
     VkCommandBuffer cmd, Camera camera, VkDescriptorSet renderSet, VkExtent2D imageSize)
 {
+    mainRender(cmd, camera, renderSet, imageSize);
+
+    if (p_FinishedGeneration) {
+        if (p_Mods.size() != 0) {
+            modRender(cmd);
+        }
+
+        requestRender(cmd);
+    }
+}
+
+void BrickmapAS::update(float dt)
+{
+    if (p_FinishedGeneration) {
+        if (m_MappedFreeBricks[0] > m_FreeBrickCount * 0.875) {
+            m_DoubleFree = true;
+        }
+
+        if (m_MappedFreeBricks[0] < m_FreeBrickCount * 0.125) {
+            m_DoubleBricks = true;
+
+            if (m_MappedFreeBricks[0] + m_BrickmapCount < m_FreeBrickCount) {
+                m_DoubleFree = true;
+            }
+        }
+
+        if (m_ReallocFree) {
+            vkQueueWaitIdle(p_Info.graphicsQueue);
+
+            m_FreeBricks.unmapMemory();
+            m_FreeBricks.cleanup();
+            m_FreeBricks = m_TempBuffer;
+            m_MappedFreeBricks = (uint32_t*)m_FreeBricks.mapMemory();
+
+            freeDescriptorSet();
+            createDescriptorSet();
+
+            LOG_INFO("Resize free buffer");
+
+            m_ReallocFree = false;
+        } else if (m_ReallocBricks) {
+            vkQueueWaitIdle(p_Info.graphicsQueue);
+
+            m_BrickmapsBuffer.cleanup();
+            m_BrickmapsBuffer = m_TempBuffer;
+
+            uint32_t previousBrickCount = m_BrickmapCount / 2;
+            uint32_t index = previousBrickCount;
+
+            uint32_t count = 0;
+            for (int i = 1; i < m_FreeBrickCount + 1; i++) {
+                if (m_MappedFreeBricks[i] == 0) {
+                    m_MappedFreeBricks[i] = index + 1;
+                    index++;
+                    count++;
+                }
+
+                if (index == m_BrickmapCount) {
+                    break;
+                }
+            }
+
+            m_MappedFreeBricks[0] += count;
+
+            freeDescriptorSet();
+            createDescriptorSet();
+
+            LOG_INFO("Resize brick buffer");
+
+            m_ReallocBricks = false;
+        }
+    }
+
+    if (m_UpdateBuffers) {
+        freeBuffers();
+        freeDescriptorSet();
+
+        ShaderManager::getInstance()->defineMacro("GENERATION_FINISHED");
+        updateShaders();
+
+        createBuffers();
+        createDescriptorSet();
+
+        p_FinishedGeneration = true;
+        m_UpdateBuffers = false;
+        p_Generating = false;
+    }
+}
+
+void BrickmapAS::updateShaders()
+{
+    ShaderManager::getInstance()->moduleUpdated("AS/brickmap_AS");
+    ShaderManager::getInstance()->moduleUpdated("AS/brickmap_AS_req");
+}
+
+void BrickmapAS::mainRender(
+    VkCommandBuffer cmd, Camera camera, VkDescriptorSet renderSet, VkExtent2D imageSize)
+{
+    if (m_DoubleFree) {
+        resizeFree(cmd);
+        m_DoubleFree = false;
+        m_ReallocFree = true;
+    } else if (m_DoubleBricks) {
+        resizeBricks(cmd);
+        m_DoubleBricks = false;
+        m_ReallocBricks = true;
+    }
+
     Debug::beginCmdDebugLabel(cmd, "Brickmap AS render", { 0.0f, 0.0f, 1.0f, 1.0f });
 
     PushConstants pushConstant = {
@@ -150,110 +259,88 @@ void BrickmapAS::render(
     vkCmdDispatch(cmd, std::ceil(imageSize.width / 8.f), std::ceil(imageSize.height / 8.f), 1);
 
     Debug::endCmdDebugLabel(cmd);
-
-    if (p_Mods.size() != 0 && p_FinishedGeneration) {
-        VkBufferMemoryBarrier barrier = {
-            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-            .pNext = nullptr,
-            .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
-            .dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
-            .srcQueueFamilyIndex = p_Info.graphicsQueueIndex,
-            .dstQueueFamilyIndex = p_Info.graphicsQueueIndex,
-            .buffer = m_RequestBuffer.getBuffer(),
-            .offset = 0,
-            .size = VK_WHOLE_SIZE,
-        };
-
-        std::vector<VkBufferMemoryBarrier> barriers = {
-            barrier,
-        };
-        vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, barriers.size(), barriers.data(),
-            0, nullptr);
-
-        Debug::beginCmdDebugLabel(cmd, "Grid mod AS render", { 0.0f, 0.0f, 1.0f, 1.0f });
-
-        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_ModPipeline);
-        std::vector<VkDescriptorSet> descriptorSets = {
-            m_BufferSet,
-            m_ModSet,
-        };
-
-        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_ModPipelineLayout, 0,
-            descriptorSets.size(), descriptorSets.data(), 0, nullptr);
-
-        for (const auto& mod : p_Mods) {
-            ModPushConstants pushConstant { .brickgridSize = m_BrickgridSize, .mod = mod };
-            vkCmdPushConstants(cmd, m_ModPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
-                sizeof(ModPushConstants), &pushConstant);
-
-            vkCmdDispatch(cmd, 1, 1, 1);
-        }
-
-        p_Mods.clear();
-
-        Debug::endCmdDebugLabel(cmd);
-    }
-
-    if (p_FinishedGeneration) {
-        VkBufferMemoryBarrier barrier = {
-            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-            .pNext = nullptr,
-            .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
-            .dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT,
-            .srcQueueFamilyIndex = p_Info.graphicsQueueIndex,
-            .dstQueueFamilyIndex = p_Info.graphicsQueueIndex,
-            .buffer = m_RequestBuffer.getBuffer(),
-            .offset = 0,
-            .size = VK_WHOLE_SIZE,
-        };
-
-        std::vector<VkBufferMemoryBarrier> barriers = {
-            barrier,
-        };
-        vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, barriers.size(), barriers.data(),
-            0, nullptr);
-
-        Debug::beginCmdDebugLabel(cmd, "Brickmap Requests", { 0.0f, 0.0f, 1.0f, 1.0f });
-
-        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_RequestPipeline);
-        std::vector<VkDescriptorSet> descriptorSets = {
-            m_BufferSet,
-        };
-        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_RequestPipelineLayout, 0,
-            descriptorSets.size(), descriptorSets.data(), 0, nullptr);
-
-        uint32_t requests = std::ceil(m_Requests / 32.f);
-        vkCmdDispatch(cmd, requests, 1, 1);
-        m_MappedRequestBuffer[0] = 0;
-
-        Debug::endCmdDebugLabel(cmd);
-    }
 }
 
-void BrickmapAS::update(float dt)
+void BrickmapAS::modRender(VkCommandBuffer cmd)
 {
-    if (m_UpdateBuffers) {
-        freeBuffers();
-        freeDescriptorSet();
+    VkBufferMemoryBarrier barrier = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+        .pNext = nullptr,
+        .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+        .dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+        .srcQueueFamilyIndex = p_Info.graphicsQueueIndex,
+        .dstQueueFamilyIndex = p_Info.graphicsQueueIndex,
+        .buffer = m_RequestBuffer.getBuffer(),
+        .offset = 0,
+        .size = VK_WHOLE_SIZE,
+    };
 
-        ShaderManager::getInstance()->defineMacro("GENERATION_FINISHED");
-        updateShaders();
+    std::vector<VkBufferMemoryBarrier> barriers = {
+        barrier,
+    };
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, barriers.size(), barriers.data(), 0,
+        nullptr);
 
-        createBuffers();
-        createDescriptorSet();
+    Debug::beginCmdDebugLabel(cmd, "Grid mod AS render", { 0.0f, 0.0f, 1.0f, 1.0f });
 
-        p_FinishedGeneration = true;
-        m_UpdateBuffers = false;
-        p_Generating = false;
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_ModPipeline);
+    std::vector<VkDescriptorSet> descriptorSets = {
+        m_BufferSet,
+        m_ModSet,
+    };
+
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_ModPipelineLayout, 0,
+        descriptorSets.size(), descriptorSets.data(), 0, nullptr);
+
+    for (const auto& mod : p_Mods) {
+        ModPushConstants pushConstant { .brickgridSize = m_BrickgridSize, .mod = mod };
+        vkCmdPushConstants(cmd, m_ModPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
+            sizeof(ModPushConstants), &pushConstant);
+
+        vkCmdDispatch(cmd, 1, 1, 1);
     }
+
+    p_Mods.clear();
+
+    Debug::endCmdDebugLabel(cmd);
 }
 
-void BrickmapAS::updateShaders()
+void BrickmapAS::requestRender(VkCommandBuffer cmd)
 {
-    ShaderManager::getInstance()->moduleUpdated("AS/brickmap_AS");
-    ShaderManager::getInstance()->moduleUpdated("AS/brickmap_AS_req");
+    VkBufferMemoryBarrier barrier = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+        .pNext = nullptr,
+        .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+        .dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT,
+        .srcQueueFamilyIndex = p_Info.graphicsQueueIndex,
+        .dstQueueFamilyIndex = p_Info.graphicsQueueIndex,
+        .buffer = m_RequestBuffer.getBuffer(),
+        .offset = 0,
+        .size = VK_WHOLE_SIZE,
+    };
+
+    std::vector<VkBufferMemoryBarrier> barriers = {
+        barrier,
+    };
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, barriers.size(), barriers.data(), 0,
+        nullptr);
+
+    Debug::beginCmdDebugLabel(cmd, "Brickmap Requests", { 0.0f, 0.0f, 1.0f, 1.0f });
+
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_RequestPipeline);
+    std::vector<VkDescriptorSet> descriptorSets = {
+        m_BufferSet,
+    };
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_RequestPipelineLayout, 0,
+        descriptorSets.size(), descriptorSets.data(), 0, nullptr);
+
+    uint32_t requests = std::ceil(m_Requests / 32.f);
+    vkCmdDispatch(cmd, requests, 1, 1);
+    m_MappedRequestBuffer[0] = 0;
+
+    Debug::endCmdDebugLabel(cmd);
 }
 
 void BrickmapAS::createDescriptorLayout()
@@ -296,8 +383,9 @@ void BrickmapAS::createBrickgridBuffers()
     m_BrickmapCount = std::pow(2, std::ceil(std::log2(m_Brickmaps.size())));
     VkDeviceSize brickmapSize = m_BrickmapCount * (sizeof(uint64_t) * 9);
     m_BrickmapsBuffer.init(p_Info.device, p_Info.allocator, brickmapSize,
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
-        VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
+            | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        0, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
     m_BrickmapsBuffer.setDebugName("Brickmap Buffer");
 
     size_t colourCount = 0;
@@ -380,7 +468,8 @@ void BrickmapAS::createHelperBuffers()
 
     VkDeviceSize freeBrickSize = (m_FreeBrickCount + 1) * sizeof(uint32_t);
     m_FreeBricks.init(p_Info.device, p_Info.allocator, freeBrickSize,
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
+            | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
         VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT, VMA_MEMORY_USAGE_AUTO);
     m_FreeBricks.setDebugName("Free bricks");
     m_MappedFreeBricks = (uint32_t*)m_FreeBricks.mapMemory();
@@ -434,6 +523,28 @@ void BrickmapAS::freeBuffers()
     m_ColourBuffer.cleanup();
     m_BrickmapsBuffer.cleanup();
     m_BrickgridBuffer.cleanup();
+}
+
+void BrickmapAS::resizeFree(VkCommandBuffer cmd)
+{
+    m_FreeBrickCount *= 2;
+    m_TempBuffer.init(p_Info.device, p_Info.allocator, (m_FreeBrickCount + 1) * sizeof(uint32_t),
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
+            | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT, VMA_MEMORY_USAGE_AUTO);
+
+    m_TempBuffer.copyFromBuffer(cmd, m_FreeBricks, m_FreeBricks.getSize(), 0, 0);
+}
+
+void BrickmapAS::resizeBricks(VkCommandBuffer cmd)
+{
+    m_BrickmapCount *= 2;
+    m_TempBuffer.init(p_Info.device, p_Info.allocator, m_BrickmapCount * sizeof(uint64_t) * 9,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
+            | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        0, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
+
+    m_TempBuffer.copyFromBuffer(cmd, m_BrickmapsBuffer, m_BrickmapsBuffer.getSize(), 0, 0);
 }
 
 void BrickmapAS::createDescriptorSet()

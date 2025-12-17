@@ -32,6 +32,11 @@ class BrickmapAS : public IAccelerationStructure {
     glm::uvec3 getDimensions() override { return m_BrickgridSize * 8u; }
 
   private:
+    void mainRender(
+        VkCommandBuffer cmd, Camera camera, VkDescriptorSet renderSet, VkExtent2D imageSize);
+    void modRender(VkCommandBuffer cmd);
+    void requestRender(VkCommandBuffer cmd);
+
     void createDescriptorLayout();
     void destroyDescriptorLayout();
 
@@ -41,6 +46,9 @@ class BrickmapAS : public IAccelerationStructure {
     void createHelperBuffers();
 
     void freeBuffers();
+
+    void resizeFree(VkCommandBuffer cmd);
+    void resizeBricks(VkCommandBuffer cmd);
 
     void createDescriptorSet();
     void freeDescriptorSet();
@@ -96,4 +104,12 @@ class BrickmapAS : public IAccelerationStructure {
     std::vector<Generators::Brickmap> m_Brickmaps;
 
     bool m_UpdateBuffers = false;
+
+    bool m_DoubleFree = false;
+    bool m_DoubleBricks = false;
+
+    Buffer m_TempBuffer;
+
+    bool m_ReallocFree = false;
+    bool m_ReallocBricks = false;
 };
