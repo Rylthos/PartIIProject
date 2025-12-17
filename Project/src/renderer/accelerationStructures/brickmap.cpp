@@ -291,7 +291,6 @@ void BrickmapAS::createBuffers()
 
     uint32_t freeBrickCount
         = std::pow(2, std::ceil(std::log2(m_BrickmapCount - m_Brickmaps.size())));
-    LOG_INFO("Free bricks: {}", freeBrickCount);
 
     VkDeviceSize brickmapSize = m_BrickmapCount * (sizeof(uint64_t) * 9);
     m_BrickmapsBuffer.init(p_Info.device, p_Info.allocator, brickmapSize,
@@ -386,11 +385,14 @@ void BrickmapAS::createBuffers()
 
     auto freeBricksIndex
         = FrameCommands::getInstance()->createStaging(freeBrickSize, [=, this](void* ptr) {
-              memset(ptr, 0, sizeof(uint32_t) * freeBrickCount);
-
               uint32_t* data = (uint32_t*)ptr;
-              data[0] = freeBrickCount;
-              for (size_t i = 0; i < freeBrickCount; i++) {
+
+              memset(ptr, 0, sizeof(uint32_t) * (freeBrickCount + 1));
+
+              uint32_t diff = m_BrickmapCount - m_Brickmaps.size();
+              data[0] = diff;
+
+              for (size_t i = 0; i < diff; i++) {
                   data[i + 1] = m_Brickmaps.size() + i + 1;
               }
           });
