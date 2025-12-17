@@ -78,6 +78,24 @@ void ASManager::update(float dt)
     assert(m_CurrentAS);
 
     m_CurrentAS->update(dt);
+
+    m_PreviousPlacement += dt;
+
+    if (m_ShouldEdit && m_PreviousPlacement > ModificationManager::getManager()->getDelay()) {
+        m_PreviousPlacement = 0.f;
+
+        glm::ivec3 index = glm::ivec3(m_MappedHitData->voxelIndex);
+
+        if (m_CurrentModification == ModificationType::PLACE) {
+            index += glm::ivec3(m_MappedHitData->normal);
+        }
+
+        auto shape = ModificationManager::getManager()->getShape();
+        auto colour = ModificationManager::getManager()->getSelectedColour();
+
+        m_CurrentAS->addMod(
+            { shape.shape, m_CurrentModification, glm::uvec3(index), colour, shape.additional });
+    }
 }
 
 void ASManager::setAS(ASType type)
@@ -398,21 +416,22 @@ void ASManager::mouse(const Event& event)
         if (!m_MappedHitData->hit)
             return;
 
-        if (clickEvent.button == GLFW_MOUSE_BUTTON_1 || clickEvent.button == GLFW_MOUSE_BUTTON_2) {
+        if ((clickEvent.button == GLFW_MOUSE_BUTTON_1 || clickEvent.button == GLFW_MOUSE_BUTTON_2)
+            && !m_PressedButton.has_value()) {
+            m_ShouldEdit = true;
+            m_PressedButton = clickEvent.button;
 
-            ModificationType type = (clickEvent.button == GLFW_MOUSE_BUTTON_1)
+            m_CurrentModification = (clickEvent.button == GLFW_MOUSE_BUTTON_1)
                 ? ModificationType::PLACE
                 : ModificationType::ERASE;
-            glm::ivec3 index = glm::ivec3(m_MappedHitData->voxelIndex);
+        }
+    }
 
-            if (type == ModificationType::PLACE) {
-                index += glm::ivec3(m_MappedHitData->normal);
-            }
-
-            auto shape = ModificationManager::getManager()->getShape();
-            auto colour = ModificationManager::getManager()->getSelectedColour();
-
-            m_CurrentAS->addMod({ shape.shape, type, glm::uvec3(index), colour, shape.additional });
+    if (mouseEvent.type() == MouseEventType::LIFT && m_ShouldEdit && m_PressedButton.has_value()) {
+        const MouseClickEvent& clickEvent = static_cast<const MouseClickEvent&>(event);
+        if (clickEvent.button == m_PressedButton.value()) {
+            m_PressedButton.reset();
+            m_ShouldEdit = false;
         }
     }
 }

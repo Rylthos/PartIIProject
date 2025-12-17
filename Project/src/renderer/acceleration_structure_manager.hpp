@@ -87,4 +87,10 @@ class ASManager {
 
     HitData* m_MappedHitData;
     Buffer m_HitDataBuffer;
+
+    bool m_ShouldEdit;
+    ModificationType m_CurrentModification;
+    std::optional<uint32_t> m_PressedButton;
+
+    float m_PreviousPlacement = 0.f;
 };

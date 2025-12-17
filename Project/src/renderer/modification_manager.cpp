@@ -27,6 +27,11 @@ void ModificationManager::UI(const Event& event)
             int currentlySelectedID = static_cast<int>(m_CurrentShape);
             const char* previewValue = shapeToString[m_CurrentShape];
 
+            ImGui::Text("Placement delay");
+            ImGui::PushItemWidth(-1.0f);
+            ImGui::SliderFloat("##PlacementDelay", &m_PlacementDelay, 0.01f, 2.0f);
+            ImGui::PopItemWidth();
+
             ImGui::Text("Current Shape");
             ImGui::PushItemWidth(-1.f);
             if (ImGui::BeginCombo("##CurrentShape", previewValue)) {

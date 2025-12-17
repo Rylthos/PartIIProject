@@ -39,6 +39,7 @@ class ModificationManager {
     {
         return { .shape = m_CurrentShape, .additional = m_CurrentAdditional };
     }
+    float getDelay() { return m_PlacementDelay; }
 
   private:
     ModificationManager() { }
@@ -49,4 +50,6 @@ class ModificationManager {
     ModificationShape m_CurrentShape = ModificationShape::VOXEL;
     glm::vec4 m_CurrentAdditional;
     glm::vec3 m_SelectedColour = glm::vec3(1.f);
+
+    float m_PlacementDelay = 0.1f;
 };
