@@ -69,5 +69,5 @@ void Buffer::copyToBuffer(VkCommandBuffer cmd, Buffer buffer, VkDeviceSize size,
 void Buffer::copyFromBuffer(VkCommandBuffer cmd, Buffer buffer, VkDeviceSize size,
     VkDeviceSize srcOffset, VkDeviceSize dstOffset)
 {
-    buffer.copyToBuffer(cmd, buffer, size, srcOffset, dstOffset);
+    buffer.copyToBuffer(cmd, *this, size, srcOffset, dstOffset);
 }
