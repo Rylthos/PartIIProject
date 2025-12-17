@@ -280,6 +280,12 @@ void BrickmapAS::destroyDescriptorLayout()
 
 void BrickmapAS::createBuffers()
 {
+    createBrickgridBuffers();
+    createHelperBuffers();
+}
+
+void BrickmapAS::createBrickgridBuffers()
+{
     VkDeviceSize gridSize = m_BrickgridSize.x * m_BrickgridSize.y * m_BrickgridSize.z
         * sizeof(Generators::BrickgridPtr);
     m_BrickgridBuffer.init(p_Info.device, p_Info.allocator, gridSize,
@@ -288,21 +294,11 @@ void BrickmapAS::createBuffers()
     m_BrickgridBuffer.setDebugName("Brickgrid Buffer");
 
     m_BrickmapCount = std::pow(2, std::ceil(std::log2(m_Brickmaps.size())));
-
-    uint32_t freeBrickCount
-        = std::pow(2, std::ceil(std::log2(m_BrickmapCount - m_Brickmaps.size())));
-
     VkDeviceSize brickmapSize = m_BrickmapCount * (sizeof(uint64_t) * 9);
     m_BrickmapsBuffer.init(p_Info.device, p_Info.allocator, brickmapSize,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
         VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
     m_BrickmapsBuffer.setDebugName("Brickmap Buffer");
-
-    VkDeviceSize freeBrickSize = (freeBrickCount + 1) * sizeof(uint32_t);
-    m_FreeBricks.init(p_Info.device, p_Info.allocator, freeBrickSize,
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
-        VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
-    m_FreeBricks.setDebugName("Free bricks");
 
     size_t colourCount = 0;
     for (const auto& brickmap : m_Brickmaps) {
@@ -314,12 +310,6 @@ void BrickmapAS::createBuffers()
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
         VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
     m_ColourBuffer.setDebugName("Colour Buffer");
-
-    VkDeviceSize requestSize = 1 + m_Requests;
-    m_RequestBuffer.init(p_Info.device, p_Info.allocator, requestSize,
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT,
-        VMA_MEMORY_USAGE_AUTO);
-    m_MappedRequestBuffer = (uint32_t*)m_RequestBuffer.mapMemory();
 
     auto gridBufferIndex
         = FrameCommands::getInstance()->createStaging(gridSize, [=, this](void* ptr) {
@@ -382,12 +372,31 @@ void BrickmapAS::createBuffers()
             };
             vkCmdCopyBuffer(cmd, buffer.buffer, m_ColourBuffer.getBuffer(), 1, &region);
         });
+}
+
+void BrickmapAS::createHelperBuffers()
+{
+    m_FreeBrickCount = std::pow(2, std::ceil(std::log2(m_BrickmapCount - m_Brickmaps.size())));
+
+    VkDeviceSize freeBrickSize = (m_FreeBrickCount + 1) * sizeof(uint32_t);
+    m_FreeBricks.init(p_Info.device, p_Info.allocator, freeBrickSize,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT, VMA_MEMORY_USAGE_AUTO);
+    m_FreeBricks.setDebugName("Free bricks");
+    m_MappedFreeBricks = (uint32_t*)m_FreeBricks.mapMemory();
+
+    VkDeviceSize requestSize = 1 + m_Requests;
+    m_RequestBuffer.init(p_Info.device, p_Info.allocator, requestSize,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT,
+        VMA_MEMORY_USAGE_AUTO);
+    m_RequestBuffer.setDebugName("Requests");
+    m_MappedRequestBuffer = (uint32_t*)m_RequestBuffer.mapMemory();
 
     auto freeBricksIndex
         = FrameCommands::getInstance()->createStaging(freeBrickSize, [=, this](void* ptr) {
               uint32_t* data = (uint32_t*)ptr;
 
-              memset(ptr, 0, sizeof(uint32_t) * (freeBrickCount + 1));
+              memset(ptr, 0, sizeof(uint32_t) * (m_FreeBrickCount + 1));
 
               uint32_t diff = m_BrickmapCount - m_Brickmaps.size();
               data[0] = diff;
@@ -416,7 +425,12 @@ void BrickmapAS::freeBuffers()
         m_RequestBuffer.cleanup();
     }
 
-    m_FreeBricks.cleanup();
+    if (m_MappedFreeBricks) {
+        m_MappedFreeBricks = nullptr;
+        m_FreeBricks.unmapMemory();
+        m_FreeBricks.cleanup();
+    }
+
     m_ColourBuffer.cleanup();
     m_BrickmapsBuffer.cleanup();
     m_BrickgridBuffer.cleanup();

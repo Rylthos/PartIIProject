@@ -36,6 +36,10 @@ class BrickmapAS : public IAccelerationStructure {
     void destroyDescriptorLayout();
 
     void createBuffers();
+
+    void createBrickgridBuffers();
+    void createHelperBuffers();
+
     void freeBuffers();
 
     void createDescriptorSet();
@@ -77,12 +81,14 @@ class BrickmapAS : public IAccelerationStructure {
     Buffer m_ColourBuffer;
 
     uint32_t m_BrickmapCount;
+    uint32_t m_FreeBrickCount;
 
     uint32_t m_Requests = 1024;
     Buffer m_RequestBuffer;
     uint32_t* m_MappedRequestBuffer = nullptr;
 
     Buffer m_FreeBricks;
+    uint32_t* m_MappedFreeBricks = nullptr;
 
     glm::uvec3 m_BrickgridSize;
 
