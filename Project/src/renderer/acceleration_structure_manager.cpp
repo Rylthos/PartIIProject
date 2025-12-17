@@ -400,18 +400,19 @@ void ASManager::mouse(const Event& event)
 
         if (clickEvent.button == GLFW_MOUSE_BUTTON_1 || clickEvent.button == GLFW_MOUSE_BUTTON_2) {
 
-            bool place = (clickEvent.button == GLFW_MOUSE_BUTTON_1);
+            ModificationType type = (clickEvent.button == GLFW_MOUSE_BUTTON_1)
+                ? ModificationType::PLACE
+                : ModificationType::ERASE;
             glm::ivec3 index = glm::ivec3(m_MappedHitData->voxelIndex);
 
-            if (place) {
+            if (type == ModificationType::PLACE) {
                 index += glm::ivec3(m_MappedHitData->normal);
             }
 
             auto shape = ModificationManager::getManager()->getShape();
             auto colour = ModificationManager::getManager()->getSelectedColour();
 
-            m_CurrentAS->addMod(
-                { shape.shape, glm::uvec3(index), colour, shape.additional, place });
+            m_CurrentAS->addMod({ shape.shape, type, glm::uvec3(index), colour, shape.additional });
         }
     }
 }

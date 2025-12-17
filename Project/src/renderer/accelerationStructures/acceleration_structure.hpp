@@ -28,17 +28,17 @@ struct ASStructInfo {
 
 struct ModInfo {
     uint32_t shape;
-    uint32_t place;
+    uint32_t type;
     uint32_t _1;
     uint32_t _2;
     alignas(16) glm::uvec3 voxelIndex;
     alignas(16) glm::vec3 colour;
     alignas(16) glm::vec4 additional;
 
-    ModInfo(ModificationShape shape, glm::uvec3 index, glm::vec3 colour, glm::vec4 additional,
-        bool place)
+    ModInfo(ModificationShape shape, ModificationType type, glm::uvec3 index, glm::vec3 colour,
+        glm::vec4 additional)
         : shape(static_cast<int>(shape))
-        , place(place)
+        , type(static_cast<int>(type))
         , voxelIndex(index)
         , colour(colour)
         , additional(additional)

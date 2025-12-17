@@ -10,6 +10,12 @@ enum class ModificationShape : int {
     MAX_SHAPE,
 };
 
+enum class ModificationType : int {
+    ERASE = 0,
+    PLACE = 1,
+    MAX_TYPE,
+};
+
 struct ModificationShapeInfo {
     ModificationShape shape;
     glm::vec4 additional;

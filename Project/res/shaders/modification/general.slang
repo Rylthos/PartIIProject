@@ -1,17 +1,23 @@
 #pragma once
 
-enum
+enum Shape
 {
-  SHAPE_VOXEL  = 0,
-  SHAPE_SPHERE = 1,
-  SHAPE_CUBE   = 2,
-  SHAPE_CUBOID = 3,
+  VOXEL  = 0,
+  SPHERE = 1,
+  CUBE   = 2,
+  CUBOID = 3,
+};
+
+enum Type
+{
+  PLACE = 0,
+  ERASE = 1,
 };
 
 struct ModStruct
 {
   int shape;
-  int place;
+  Type type;
   uint3 voxel_index;
   float3 colour;
   float4 additional;
@@ -20,13 +26,13 @@ struct ModStruct
 interface IModification
 {
   static bool validIndex(in int3);
-  static void setVoxel(in int3, in float3, in bool);
+  static void setVoxel(in int3, in float3, in Type);
 }
 
 func sphere<T>(in center : uint3,
                in radius : int,
                in colour : float3,
-               in place : bool) -> void
+               in type : Type) -> void
     where T : IModification
 {
   for (int y = -radius; y < radius; y++) {
@@ -39,7 +45,7 @@ func sphere<T>(in center : uint3,
         float dist = length(float3(newIndex));
 
         if (dist <= radius) {
-          T.setVoxel(center + newIndex, colour, place);
+          T.setVoxel(center + newIndex, colour, type);
         }
       }
     }
@@ -49,7 +55,7 @@ func sphere<T>(in center : uint3,
 func cuboid<T>(in center: uint3,
                in side_length: int3,
                in colour: float3,
-               in place: bool,
+               in type: Type,
                in forward: float3) -> void
   where T : IModification
 {
@@ -68,7 +74,7 @@ func cuboid<T>(in center: uint3,
         if (!T.validIndex(center + newIndex))
           continue;
 
-        T.setVoxel(center + newIndex, colour, place);
+        T.setVoxel(center + newIndex, colour, type);
       }
     }
   }
@@ -80,18 +86,23 @@ func run_shape<T>(in voxel_index: uint3, in forward: float3, in mod: ModStruct) 
   if (!T::validIndex(voxel_index))
     return;
 
-  bool place = mod.place == 1;
+  Type type = Type::ERASE;
+  if (mod.type == 1) {
+    type = Type::PLACE;
+  }
 
-  if (mod.shape == SHAPE_VOXEL) {
-    T::setVoxel(voxel_index, mod.colour, place);
-  } else if (mod.shape == SHAPE_SPHERE) {
-    sphere<T>(voxel_index, int(mod.additional.x),
-        mod.colour, place);
-  } else if (mod.shape == SHAPE_CUBE) {
-    cuboid<T>(voxel_index, int3(mod.additional.x),
-        mod.colour, place, forward);
-  } else if (mod.shape == SHAPE_CUBOID) {
-    cuboid<T>(voxel_index, int3(mod.additional.xyz),
-        mod.colour, place, forward);
+  switch (mod.shape) {
+    case Shape::VOXEL:
+      T::setVoxel(voxel_index, mod.colour, type);
+      break;
+    case Shape::SPHERE:
+      sphere<T>(voxel_index, int(mod.additional.x), mod.colour, type);
+      break;
+    case Shape::CUBE:
+      cuboid<T>(voxel_index, int3(mod.additional.x), mod.colour, type, forward);
+      break;
+    case Shape::CUBOID:
+      cuboid<T>(voxel_index, int3(mod.additional.xyz), mod.colour, type, forward);
+      break;
   }
 }

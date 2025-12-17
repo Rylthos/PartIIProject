@@ -28,22 +28,25 @@ struct GridModification : IModification
     return all(voxel_index >= 0) && all(voxel_index < push_constants.dimensions);
   }
 
-  static func setVoxel(in voxel_index : int3, in colour : float3, in place : bool) -> void
+  static func setVoxel(in voxel_index : int3, in colour : float3, in type : Type) -> void
   {
     uint index = getIndex(voxel_index);
 
     uint array_index = index / 32;
     uint bit_index = index % 32;
 
-    if (place) {
-      i_Occupancy[array_index] |= 1 << bit_index;
+    switch (type) {
+      case Type::PLACE:
+        i_Occupancy[array_index] |= 1 << bit_index;
 
-      float3 colour = push_constants.mod.colour;
-      i_Colour[index * 3 + 0] = colour.r;
-      i_Colour[index * 3 + 1] = colour.g;
-      i_Colour[index * 3 + 2] = colour.b;
-    } else {
-      i_Occupancy[array_index] &= ~(1 << bit_index);
+        float3 colour = push_constants.mod.colour;
+        i_Colour[index * 3 + 0] = colour.r;
+        i_Colour[index * 3 + 1] = colour.g;
+        i_Colour[index * 3 + 2] = colour.b;
+        break;
+      case Type::ERASE:
+        i_Occupancy[array_index] &= ~(1 << bit_index);
+        break;
     }
   }
 }

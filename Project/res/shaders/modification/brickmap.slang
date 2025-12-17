@@ -46,7 +46,7 @@ struct BrickmapModification : IModification
     return all(voxel_index >= 0) && all(voxel_index < push_constants.dimensions * 8);
   }
 
-  static func setVoxel(in mod_index : int3, in colour : float3, in place : bool) -> void
+  static func setVoxel(in mod_index : int3, in colour : float3, in type : Type) -> void
   {
     uint brickgrid_index = getBrickIndex(mod_index);
 
@@ -85,11 +85,14 @@ struct BrickmapModification : IModification
       uint mask_index = voxel_index.x + voxel_index.z * 8;
 
       bool possiblyEmpty = false;
-      if (place) {
-        i_Brickmap[grid.getPtr].data[voxel_index.y] |= ((uint64_t)1 << mask_index);
-      } else {
-        i_Brickmap[grid.getPtr].data[voxel_index.y] &= ~((uint64_t)1 << mask_index);
-        possiblyEmpty = (i_Brickmap[grid.getPtr].data[voxel_index.y] == 0);
+      switch (type) {
+        case Type::PLACE:
+          i_Brickmap[grid.getPtr].data[voxel_index.y] |= ((uint64_t)1 << mask_index);
+          break;
+        case Type::ERASE:
+          i_Brickmap[grid.getPtr].data[voxel_index.y] &= ~((uint64_t)1 << mask_index);
+          possiblyEmpty = (i_Brickmap[grid.getPtr].data[voxel_index.y] == 0);
+          break;
       }
 
       if (possiblyEmpty) {

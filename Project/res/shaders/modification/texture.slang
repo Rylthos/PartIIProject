@@ -19,15 +19,18 @@ struct TextureModification : IModification
     return all(voxel_index >= 0) && all(voxel_index < push_constants.dimensions);
   }
 
-  static func setVoxel(in voxel_index : int3, in colour : float3, in place : bool) -> void
+  static func setVoxel(in voxel_index : int3, in colour : float3, in type : Type) -> void
   {
-    if (place) {
-      i_VoxelData[voxel_index].a = 1;
+    switch (type) {
+      case Type::PLACE:
+        i_VoxelData[voxel_index].a = 1;
 
-      float3 colour = push_constants.mod.colour;
-      i_VoxelData[voxel_index].rgb = colour;
-    } else {
-      i_VoxelData[voxel_index].a = 0;
+        float3 colour = push_constants.mod.colour;
+        i_VoxelData[voxel_index].rgb = colour;
+        break;
+      case Type::ERASE:
+        i_VoxelData[voxel_index].a = 0;
+        break;
     }
   }
 }
