@@ -7,13 +7,13 @@ struct Brickgrid
   property bool isValid
   {
     get { return (data & 0x1) != 0; }
-    set { data = (data & ~(0x1)) | ((newValue == true) ? 1 : 0) << 0; }
+    set { data = (data & ~0x1) | ((newValue == true) ? 1 : 0); }
   }
 
   property bool isRequested
   {
     get { return (data & 0x2) != 0; }
-    set { data = (data & ~(0x2)) | ((newValue == true) ? 1 : 0) << 1; }
+    set { data = (data & ~0x2) | (((newValue == true) ? 1 : 0) << 1); }
   }
 
   property bool isEmpty
