@@ -27,6 +27,7 @@ struct PushConstants {
 
 struct ModPushConstants {
     alignas(16) glm::uvec3 dimensions;
+    alignas(16) glm::vec3 cameraFacing;
     alignas(16) ModInfo mod;
 };
 
@@ -156,7 +157,11 @@ void GridAS::render(
             descriptorSets.size(), descriptorSets.data(), 0, nullptr);
 
         for (const auto& mod : p_Mods) {
-            ModPushConstants pushConstant { .dimensions = m_Dimensions, .mod = mod };
+            ModPushConstants pushConstant {
+                .dimensions = m_Dimensions,
+                .cameraFacing = camera.getForwardVector(),
+                .mod = mod,
+            };
             vkCmdPushConstants(cmd, m_ModPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
                 sizeof(ModPushConstants), &pushConstant);
 

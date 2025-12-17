@@ -2,6 +2,7 @@
 
 struct PushConstants {
   uint3 dimensions;
+  float3 camera_forward;
   ModStruct mod;
 }
 
@@ -37,14 +38,5 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
   uint3 voxel_index = push_constants.mod.voxel_index;
 
-  if (!TextureModification::validIndex(voxel_index))
-    return;
-
-  bool place = push_constants.mod.place == 1;
-  if (push_constants.mod.shape == SHAPE_VOXEL) {
-    TextureModification::setVoxel(voxel_index, push_constants.mod.colour, place);
-  } else if (push_constants.mod.shape == SHAPE_SPHERE) {
-    sphere<TextureModification>(voxel_index, int(push_constants.mod.additional.x),
-        push_constants.mod.colour, place);
-  }
+  run_shape<TextureModification>(voxel_index, push_constants.camera_forward, push_constants.mod);
 }

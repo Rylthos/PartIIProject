@@ -34,7 +34,7 @@ class BrickmapAS : public IAccelerationStructure {
   private:
     void mainRender(
         VkCommandBuffer cmd, Camera camera, VkDescriptorSet renderSet, VkExtent2D imageSize);
-    void modRender(VkCommandBuffer cmd);
+    void modRender(VkCommandBuffer cmd, Camera& camera);
     void requestRender(VkCommandBuffer cmd);
 
     void createDescriptorLayout();

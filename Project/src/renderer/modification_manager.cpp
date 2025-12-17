@@ -9,6 +9,8 @@
 static std::map<ModificationShape, const char*> shapeToString {
     { ModificationShape::VOXEL,  "Single Voxel" },
     { ModificationShape::SPHERE, "Sphere"       },
+    { ModificationShape::CUBE,   "Cube"         },
+    { ModificationShape::CUBOID, "Cuboid"       },
 };
 
 void ModificationManager::UI(const Event& event)
@@ -52,6 +54,28 @@ void ModificationManager::UI(const Event& event)
 
                 if (ImGui::SliderInt("Radius", &radius, 1, 25)) {
                     m_CurrentAdditional.x = radius;
+                }
+                break;
+            }
+            case ModificationShape::CUBE: {
+                int sideLength = int(m_CurrentAdditional.x);
+
+                if (ImGui::SliderInt("Side length", &sideLength, 1, 25)) {
+                    m_CurrentAdditional.x = sideLength;
+                }
+                break;
+            }
+            case ModificationShape::CUBOID: {
+                glm::ivec3 currentAddtional = glm::ivec3(m_CurrentAdditional);
+
+                if (ImGui::SliderInt("Forward", &currentAddtional.x, 1, 25)) {
+                    m_CurrentAdditional.x = currentAddtional.x;
+                }
+                if (ImGui::SliderInt("Up", &currentAddtional.y, 1, 25)) {
+                    m_CurrentAdditional.y = currentAddtional.y;
+                }
+                if (ImGui::SliderInt("Sideways", &currentAddtional.z, 1, 25)) {
+                    m_CurrentAdditional.z = currentAddtional.z;
                 }
                 break;
             }

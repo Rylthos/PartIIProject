@@ -27,6 +27,7 @@ struct PushConstants {
 
 struct ModPushConstants {
     alignas(16) glm::uvec3 brickgridSize;
+    alignas(16) glm::vec3 cameraFacing;
     alignas(16) ModInfo mod;
 };
 
@@ -129,7 +130,7 @@ void BrickmapAS::render(
 
     if (p_FinishedGeneration) {
         if (p_Mods.size() != 0) {
-            modRender(cmd);
+            modRender(cmd, camera);
         }
 
         requestRender(cmd);
@@ -261,7 +262,7 @@ void BrickmapAS::mainRender(
     Debug::endCmdDebugLabel(cmd);
 }
 
-void BrickmapAS::modRender(VkCommandBuffer cmd)
+void BrickmapAS::modRender(VkCommandBuffer cmd, Camera& camera)
 {
     VkBufferMemoryBarrier barrier = {
         .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
@@ -294,7 +295,11 @@ void BrickmapAS::modRender(VkCommandBuffer cmd)
         descriptorSets.size(), descriptorSets.data(), 0, nullptr);
 
     for (const auto& mod : p_Mods) {
-        ModPushConstants pushConstant { .brickgridSize = m_BrickgridSize, .mod = mod };
+        ModPushConstants pushConstant {
+            .brickgridSize = m_BrickgridSize,
+            .cameraFacing = camera.getForwardVector(),
+            .mod = mod,
+        };
         vkCmdPushConstants(cmd, m_ModPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
             sizeof(ModPushConstants), &pushConstant);
 

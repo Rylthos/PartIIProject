@@ -2,7 +2,6 @@
 
 #include "../default_defines.slang"
 #include "../hit_record.slang"
-#include "../intersection_colour.slang"
 #include "../ray.slang"
 #include "../render_descriptor.slang"
 #include "general.slang"

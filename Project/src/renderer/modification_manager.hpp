@@ -2,7 +2,13 @@
 
 #include "events/events.hpp"
 
-enum class ModificationShape : int { VOXEL = 0, SPHERE = 1, MAX_SHAPE };
+enum class ModificationShape : int {
+    VOXEL = 0,
+    SPHERE = 1,
+    CUBE = 2,
+    CUBOID = 3,
+    MAX_SHAPE,
+};
 
 struct ModificationShapeInfo {
     ModificationShape shape;
