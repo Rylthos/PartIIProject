@@ -52,6 +52,13 @@ struct Colour {
     get { return (data & 0x80) != 0; }
     set { data &= ~0x80; data |= (uint8_t)((newValue == true) ? 0x80 : 0x00); }
   }
+
+  [mutating]
+  func copyFrom(in colour: Colour) {
+    r = colour.r;
+    g = colour.g;
+    b = colour.b;
+  }
 };
 
 inline func getTypeSize(uint8_t type) -> uint {

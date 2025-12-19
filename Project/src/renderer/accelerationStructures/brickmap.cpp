@@ -262,25 +262,6 @@ void BrickmapAS::mainRender(
 
 void BrickmapAS::modRender(VkCommandBuffer cmd, Camera& camera)
 {
-    VkBufferMemoryBarrier barrier = {
-        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-        .pNext = nullptr,
-        .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
-        .dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
-        .srcQueueFamilyIndex = p_Info.graphicsQueueIndex,
-        .dstQueueFamilyIndex = p_Info.graphicsQueueIndex,
-        .buffer = m_RequestBuffer.getBuffer(),
-        .offset = 0,
-        .size = VK_WHOLE_SIZE,
-    };
-
-    std::vector<VkBufferMemoryBarrier> barriers = {
-        barrier,
-    };
-    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, barriers.size(), barriers.data(), 0,
-        nullptr);
-
     Debug::beginCmdDebugLabel(cmd, "Grid mod AS render", { 0.0f, 0.0f, 1.0f, 1.0f });
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_ModPipeline);
@@ -305,6 +286,25 @@ void BrickmapAS::modRender(VkCommandBuffer cmd, Camera& camera)
     }
 
     p_Mods.clear();
+
+    VkBufferMemoryBarrier barrier = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+        .pNext = nullptr,
+        .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+        .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+        .srcQueueFamilyIndex = p_Info.graphicsQueueIndex,
+        .dstQueueFamilyIndex = p_Info.graphicsQueueIndex,
+        .buffer = m_ColourBuffer.getBuffer(),
+        .offset = 0,
+        .size = VK_WHOLE_SIZE,
+    };
+
+    std::vector<VkBufferMemoryBarrier> barriers = {
+        barrier,
+    };
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, barriers.size(), barriers.data(), 0,
+        nullptr);
 
     Debug::endCmdDebugLabel(cmd);
 }
