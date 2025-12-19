@@ -30,9 +30,16 @@ uint32_t getFreeColour(std::array<uint8_t, 8 * 8 * 8 * 3>& brickColours, uint32_
 
     // Traverse colours
     for (uint32_t i = start_index; i < colours.size();) {
-        if (colours[i].getUsed() || colours[i].getType() > type) {
-            i += getOffset(type);
+        if (colours[i].getType() > type) {
+            int skip = getOffset(colours[i].getType());
+            // Can improve by skipping based on the parent index to skip over entire block
 
+            i += skip;
+            continue;
+        }
+
+        if (colours[i].getUsed()) {
+            i += getOffset(colours[i].getType());
             continue;
         }
 
