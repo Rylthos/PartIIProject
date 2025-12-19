@@ -1,9 +1,84 @@
 #include "brickmap.hpp"
+#include <optional>
 
 namespace Generators {
-std::pair<std::vector<BrickgridPtr>, std::vector<Brickmap>> generateBrickmap(std::stop_token stoken,
-    std::unique_ptr<Loader>&& loader, GenerationInfo& info, glm::uvec3& brickgridDim,
-    bool& finished)
+uint32_t getOffset(uint32_t type)
+{
+    switch (type) {
+    case 3:
+        return 1;
+    case 2:
+        return 8;
+    case 1:
+        return 64;
+    case 0:
+        return 512;
+    default:
+        assert(false && "Type out of range");
+    }
+}
+
+uint32_t getFreeColour(std::array<uint8_t, 8 * 8 * 8 * 3>& brickColours, uint32_t usedColours,
+    std::vector<BrickmapColour>& colours, uint32_t start_index = 0)
+{
+    uint32_t type;
+    if (usedColours == 1) {
+        type = 3;
+    } else if (usedColours <= 2 * 2 * 2) {
+        type = 2;
+    } else if (usedColours <= 4 * 4 * 4) {
+        type = 1;
+    } else {
+        type = 0;
+    }
+
+    int32_t ptr = -1;
+
+    // Traverse colours
+    for (uint32_t i = start_index; i < colours.size();) {
+        if (colours[i].components.used || colours[i].components.type > type) {
+            i += getOffset(type);
+
+            continue;
+        }
+
+        if (colours[i].components.type == type) { // Can use
+            colours[i].components.used = true;
+
+            for (uint32_t j = 0; j < usedColours; j++) {
+                colours[i + j].components.r = brickColours[j * 3 + 0];
+                colours[i + j].components.g = brickColours[j * 3 + 1];
+                colours[i + j].components.b = brickColours[j * 3 + 2];
+            }
+
+            ptr = i;
+            break;
+        } else if (colours[i].components.type < type) { // Split node
+            uint32_t newType = colours[i].components.type + 1;
+            uint32_t offset = getOffset(newType);
+            colours[i].components.type = newType;
+            for (int j = 0; j < 8; j++) {
+                colours[i + j * offset].components.type = newType;
+            }
+        } else {
+            assert(false && "Should not be reachable");
+        }
+    }
+
+    if (ptr == -1) {
+        uint32_t end = colours.size();
+        colours.resize(end + 512);
+        colours[end].components.type = 0;
+        colours[end].components.used = false;
+        return getFreeColour(brickColours, usedColours, colours, end);
+    }
+
+    return ptr;
+}
+
+std::tuple<std::vector<BrickgridPtr>, std::vector<Brickmap>, std::vector<BrickmapColour>>
+generateBrickmap(std::stop_token stoken, std::unique_ptr<Loader>&& loader, GenerationInfo& info,
+    glm::uvec3& brickgridDim, bool& finished)
 {
     std::chrono::steady_clock timer;
     auto start = timer.now();
@@ -15,27 +90,28 @@ std::pair<std::vector<BrickgridPtr>, std::vector<Brickmap>> generateBrickmap(std
 
     std::vector<BrickgridPtr> brickgrid;
     std::vector<Brickmap> brickmaps;
+    std::vector<BrickmapColour> colours;
+
+    colours.resize(512);
+    colours[0].components.used = false;
+    colours[0].components.type = 0;
 
     brickgrid.assign(totalNodes, 0x1);
 
     info.voxelCount = 0;
 
     size_t index = 0;
-    size_t totalColours = 0;
-    std::vector<uint8_t> colours;
-    colours.resize(8 * 8 * 8 * 3);
+    std::array<uint8_t, 8 * 8 * 8 * 3> brickColours;
     for (uint32_t bY = 0; bY < brickgridDim.y; bY++) {
         for (uint32_t bZ = 0; bZ < brickgridDim.z; bZ++) {
             for (uint32_t bX = 0; bX < brickgridDim.x; bX++) {
                 if (stoken.stop_requested())
-                    return { brickgrid, brickmaps };
+                    return { brickgrid, brickmaps, colours };
 
                 glm::ivec3 brickWorld = glm::ivec3(bX, bY, bZ) * 8;
 
                 uint32_t usedColours = 0;
                 uint64_t occupancy[8];
-
-                uint64_t colourPtr = totalColours;
 
                 {
                     info.completionPercent = (index + 1) / (float)totalNodes;
@@ -57,11 +133,10 @@ std::pair<std::vector<BrickgridPtr>, std::vector<Brickmap>> generateBrickmap(std
 
                                 glm::vec3 colour = voxel.value();
 
-                                colours[usedColours * 3 + 0] = std::ceil(colour.r * 255);
-                                colours[usedColours * 3 + 1] = std::ceil(colour.g * 255);
-                                colours[usedColours * 3 + 2] = std::ceil(colour.b * 255);
+                                brickColours[usedColours * 3 + 0] = std::ceil(colour.r * 255);
+                                brickColours[usedColours * 3 + 1] = std::ceil(colour.g * 255);
+                                brickColours[usedColours * 3 + 2] = std::ceil(colour.b * 255);
                                 usedColours++;
-                                totalColours++;
                             }
                         }
                     }
@@ -69,16 +144,10 @@ std::pair<std::vector<BrickgridPtr>, std::vector<Brickmap>> generateBrickmap(std
 
                 if (usedColours > 0) {
                     Brickmap brick;
-                    brick.colourPtr = colourPtr;
+                    brick.colourPtr = getFreeColour(brickColours, usedColours, colours);
                     memcpy(&brick.occupancy, occupancy, sizeof(uint64_t) * 8);
-                    brick.colour.resize(usedColours * 3);
-                    std::copy(
-                        colours.begin(), colours.begin() + (usedColours * 3), brick.colour.begin());
-
                     brickmaps.push_back(brick);
-
                     brickgrid[index] = 0x1 | (brickmaps.size() << 2);
-
                     info.voxelCount += 8 * 8 * 8;
                 }
 
@@ -95,6 +164,6 @@ std::pair<std::vector<BrickgridPtr>, std::vector<Brickmap>> generateBrickmap(std
 
     finished = true;
 
-    return { brickgrid, brickmaps };
+    return { brickgrid, brickmaps, colours };
 }
 };

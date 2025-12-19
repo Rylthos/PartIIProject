@@ -13,11 +13,9 @@
 #include "../shader_manager.hpp"
 
 #include "acceleration_structure.hpp"
+#include "generators/brickmap.hpp"
 #include "logger/logger.hpp"
 #include "serializers/brickmap.hpp"
-
-#include "spdlog/spdlog.h"
-#include "vulkan/vulkan.hpp"
 
 struct PushConstants {
     alignas(16) glm::vec3 cameraPosition;
@@ -92,7 +90,7 @@ void BrickmapAS::fromLoader(std::unique_ptr<Loader>&& loader)
     p_Generating = true;
     p_GenerationThread
         = std::jthread([this, loader = std::move(loader)](std::stop_token stoken) mutable {
-              std::tie(m_Brickgrid, m_Brickmaps) = Generators::generateBrickmap(
+              std::tie(m_Brickgrid, m_Brickmaps, m_Colours) = Generators::generateBrickmap(
                   stoken, std::move(loader), p_GenerationInfo, m_BrickgridSize, m_UpdateBuffers);
           });
 }
@@ -109,7 +107,7 @@ void BrickmapAS::fromFile(std::filesystem::path path)
             return;
         }
 
-        std::tie(info, m_Brickgrid, m_Brickmaps) = data.value();
+        std::tie(info, m_Brickgrid, m_Brickmaps, m_Colours) = data.value();
 
         m_BrickgridSize = info.dimensions;
 
@@ -393,12 +391,7 @@ void BrickmapAS::createBrickgridBuffers()
         0, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
     m_BrickmapsBuffer.setDebugName("Brickmap Buffer");
 
-    size_t colourCount = 0;
-    for (const auto& brickmap : m_Brickmaps) {
-        colourCount += brickmap.colour.size();
-    }
-
-    VkDeviceSize colourSize = colourCount * sizeof(uint8_t) * 3;
+    VkDeviceSize colourSize = m_Colours.size() * sizeof(Generators::BrickmapColour);
     m_ColourBuffer.init(p_Info.device, p_Info.allocator, colourSize,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
         VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
@@ -445,14 +438,12 @@ void BrickmapAS::createBrickgridBuffers()
     auto colourBufferIndex
         = FrameCommands::getInstance()->createStaging(colourSize, [=, this](void* ptr) {
               uint8_t* data = (uint8_t*)ptr;
-              size_t offset = 0;
-              for (size_t i = 0; i < m_Brickmaps.size(); i++) {
-                  const auto& brickmap = m_Brickmaps[i];
-                  for (size_t j = 0; j < brickmap.colour.size(); j++) {
-                      const uint8_t c = brickmap.colour.at(j);
-                      data[offset + j] = c;
-                  }
-                  offset += brickmap.colour.size();
+              for (size_t i = 0; i < m_Colours.size(); i++) {
+                  const auto& colour = m_Colours[i];
+                  data[i * 4 + 0] = colour.data[0];
+                  data[i * 4 + 1] = colour.data[1];
+                  data[i * 4 + 2] = colour.data[2];
+                  data[i * 4 + 3] = colour.data[3];
               }
           });
 

@@ -2,8 +2,6 @@
 
 #include "parser.hpp"
 
-#include <optional>
-
 int main(int argc, char** argv)
 {
     CLI::App app { "Convert Meshes into Voxel formats" };

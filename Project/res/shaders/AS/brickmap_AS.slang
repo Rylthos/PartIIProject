@@ -66,10 +66,10 @@ func traverse_brick(in ray : Ray,
       // FIX: Re add colours
       hit.colour = float3(1);
 
-      // uint8_t r = i_Colours[ptr * 3 + 0];
-      // uint8_t g = i_Colours[ptr * 3 + 1];
-      // uint8_t b = i_Colours[ptr * 3 + 2];
-      // hit.colour = float3(float(r) / 255., float(g) / 255., float(b) / 255.);
+      uint8_t r = i_Colours[ptr * 4 + 1];
+      uint8_t g = i_Colours[ptr * 4 + 2];
+      uint8_t b = i_Colours[ptr * 4 + 3];
+      hit.colour = float3(float(r) / 255., float(g) / 255., float(b) / 255.);
 
       hit.voxel_index = int3(min_bound * 8) + voxel_pos;
 

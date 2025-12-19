@@ -9,7 +9,7 @@
 namespace Serializers {
 
 std::optional<std::tuple<SerialInfo, std::vector<Generators::BrickgridPtr>,
-    std::vector<Generators::Brickmap>>>
+    std::vector<Generators::Brickmap>, std::vector<Generators::BrickmapColour>>>
 loadBrickmap(std::filesystem::path directory)
 {
     std::string foldername = directory.filename();
@@ -27,6 +27,9 @@ loadBrickmap(std::filesystem::path directory)
     serialInfo.voxels = Serializers::readUint64(inputStream);
     serialInfo.nodes = Serializers::readUint64(inputStream);
 
+    size_t numBrickmaps = Serializers::readUint64(inputStream);
+    size_t numColours = Serializers::readUint64(inputStream);
+
     glm::uvec3 brickgridSize = serialInfo.dimensions;
 
     std::vector<Generators::BrickgridPtr> brickgrid;
@@ -34,34 +37,39 @@ loadBrickmap(std::filesystem::path directory)
     brickgrid.reserve(totalNodes);
 
     std::vector<Generators::Brickmap> brickmaps;
-    size_t nodes = serialInfo.nodes - totalNodes;
-    brickmaps.reserve(nodes);
+    brickmaps.reserve(numBrickmaps);
+
+    std::vector<Generators::BrickmapColour> colours;
+    brickmaps.reserve(numColours);
 
     for (size_t i = 0; i < totalNodes; i++) {
         brickgrid.push_back(Serializers::readUint32(inputStream));
     }
 
-    for (size_t j = 0; j < nodes; j++) {
+    for (size_t j = 0; j < numBrickmaps; j++) {
         Generators::Brickmap brickmap;
         brickmap.colourPtr = Serializers::readUint64(inputStream);
         for (int i = 0; i < 8; i++) {
             brickmap.occupancy[i] = Serializers::readUint64(inputStream);
         }
-        uint64_t colours = Serializers::readUint64(inputStream);
-        assert(colours <= 8 * 8 * 8 * 3);
-        brickmap.colour.resize(colours);
-        for (size_t i = 0; i < colours; i++) {
-            brickmap.colour[i] = Serializers::readByte(inputStream);
-        }
         brickmaps.push_back(brickmap);
     }
 
-    return std::make_tuple(serialInfo, brickgrid, brickmaps);
+    for (size_t j = 0; j < numColours; j++) {
+        Generators::BrickmapColour colour;
+        for (int k = 0; k < 4; k++) {
+            colour.data[k] = Serializers::readByte(inputStream);
+        }
+
+        colours.push_back(colour);
+    }
+
+    return std::make_tuple(serialInfo, brickgrid, brickmaps, colours);
 }
 
 void storeBrickmap(std::filesystem::path output, const std::string& name, glm::uvec3 dimensions,
     std::vector<Generators::BrickgridPtr> brickgrid, std::vector<Generators::Brickmap> brickmaps,
-    Generators::GenerationInfo generationInfo)
+    std::vector<Generators::BrickmapColour> colours, Generators::GenerationInfo generationInfo)
 {
     std::filesystem::path target = output / name / (name + ".voxbrick");
 
@@ -75,6 +83,9 @@ void storeBrickmap(std::filesystem::path output, const std::string& name, glm::u
     writeUint64(generationInfo.voxelCount, outputStream);
     writeUint64(generationInfo.nodes, outputStream);
 
+    writeUint64(brickmaps.size(), outputStream);
+    writeUint64(colours.size(), outputStream);
+
     for (const uint32_t& ptr : brickgrid) {
         Serializers::writeUint32(ptr, outputStream);
     }
@@ -84,9 +95,11 @@ void storeBrickmap(std::filesystem::path output, const std::string& name, glm::u
         for (uint8_t i = 0; i < 8; i++) {
             Serializers::writeUint64(brickmap.occupancy[i], outputStream);
         }
-        Serializers::writeUint64(brickmap.colour.size(), outputStream);
-        for (size_t i = 0; i < brickmap.colour.size(); i++) {
-            Serializers::writeByte(brickmap.colour[i], outputStream);
+    }
+
+    for (const Generators::BrickmapColour& colour : colours) {
+        for (uint8_t i = 0; i < 4; i++) {
+            Serializers::writeByte(colour.data[i], outputStream);
         }
     }
 

@@ -9,10 +9,10 @@
 
 namespace Serializers {
 std::optional<std::tuple<SerialInfo, std::vector<Generators::BrickgridPtr>,
-    std::vector<Generators::Brickmap>>>
+    std::vector<Generators::Brickmap>, std::vector<Generators::BrickmapColour>>>
 loadBrickmap(std::filesystem::path directory);
 
 void storeBrickmap(std::filesystem::path output, const std::string& name, glm::uvec3 dimensions,
     std::vector<Generators::BrickgridPtr> brickgrid, std::vector<Generators::Brickmap> brickmap,
-    Generators::GenerationInfo generationInfo);
+    std::vector<Generators::BrickmapColour> colours, Generators::GenerationInfo generationInfo);
 }

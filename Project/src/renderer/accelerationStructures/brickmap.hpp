@@ -102,6 +102,7 @@ class BrickmapAS : public IAccelerationStructure {
 
     std::vector<Generators::BrickgridPtr> m_Brickgrid;
     std::vector<Generators::Brickmap> m_Brickmaps;
+    std::vector<Generators::BrickmapColour> m_Colours;
 
     bool m_UpdateBuffers = false;
 

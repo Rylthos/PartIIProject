@@ -460,11 +460,12 @@ void Parser::generateStructures()
             glm::uvec3 dimensions;
             std::vector<Generators::BrickgridPtr> brickgrid;
             std::vector<Generators::Brickmap> brickmaps;
-            std::tie(brickgrid, brickmaps) = Generators::generateBrickmap(
+            std::vector<Generators::BrickmapColour> colours;
+            std::tie(brickgrid, brickmaps, colours) = Generators::generateBrickmap(
                 stoken, std::move(loader), info[BRICKMAP], dimensions, finished[BRICKMAP]);
 
-            Serializers::storeBrickmap(
-                outputDirectory, outputName, dimensions, brickgrid, brickmaps, info[BRICKMAP]);
+            Serializers::storeBrickmap(outputDirectory, outputName, dimensions, brickgrid,
+                brickmaps, colours, info[BRICKMAP]);
         });
     }
 
