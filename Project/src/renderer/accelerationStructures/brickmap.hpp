@@ -90,6 +90,7 @@ class BrickmapAS : public IAccelerationStructure {
 
     uint32_t m_BrickmapCount;
     uint32_t m_FreeBrickCount;
+    uint32_t m_ColourBlockCount;
 
     uint32_t m_Requests = 1024;
     Buffer m_RequestBuffer;

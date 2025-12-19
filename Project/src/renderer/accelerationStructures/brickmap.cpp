@@ -391,7 +391,8 @@ void BrickmapAS::createBrickgridBuffers()
         0, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
     m_BrickmapsBuffer.setDebugName("Brickmap Buffer");
 
-    VkDeviceSize colourSize = m_Colours.size() * sizeof(Generators::BrickmapColour);
+    m_ColourBlockCount = (m_Colours.size() / 512) + 10;
+    VkDeviceSize colourSize = m_ColourBlockCount * 512 * sizeof(Generators::BrickmapColour);
     m_ColourBuffer.init(p_Info.device, p_Info.allocator, colourSize,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
         VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
@@ -438,6 +439,7 @@ void BrickmapAS::createBrickgridBuffers()
     auto colourBufferIndex
         = FrameCommands::getInstance()->createStaging(colourSize, [=, this](void* ptr) {
               uint8_t* data = (uint8_t*)ptr;
+              memset(ptr, 0, m_ColourBlockCount * 512 * sizeof(Generators::BrickmapColour));
               for (size_t i = 0; i < m_Colours.size(); i++) {
                   const auto& colour = m_Colours[i];
                   data[i * 4 + 0] = colour.data;
