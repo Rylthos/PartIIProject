@@ -21,7 +21,7 @@ RWStructuredBuffer<Brickgrid> i_Brickgrid;
 RWStructuredBuffer<Brickmap> i_Brickmap;
 
 [[vk::binding(2, 0)]]
-StructuredBuffer<uint8_t> i_Colours;
+RWStructuredBuffer<Colour> i_Colours;
 
 [[vk::binding(3, 0)]]
 RWStructuredBuffer<uint32_t> i_Request;
@@ -37,6 +37,23 @@ func getBrickIndex(in index : int3) -> uint {
 
 func getVoxelIndex(in index: int3) -> uint3 {
   return index % 8;
+}
+
+func insertColour(in colour: float3, in target_index: uint, in colour_ptr: uint64_t, in total_colours: uint) -> void {
+  for (int i = total_colours - 1; i >= target_index; i--) {
+    uint64_t index = colour_ptr + i;
+    i_Colours[index + 1] = i_Colours[index];
+  }
+  i_Colours[colour_ptr + target_index].r = (uint8_t)floor(colour.r * 255.);
+  i_Colours[colour_ptr + target_index].g = (uint8_t)floor(colour.g * 255.);
+  i_Colours[colour_ptr + target_index].b = (uint8_t)floor(colour.b * 255.);
+}
+
+func eraseColour(in target_index: uint, in colour_ptr: uint64_t, in total_colours: uint) -> void {
+  for (int i = target_index; i < total_colours; i++) {
+    uint64_t index = colour_ptr + i;
+    i_Colours[index] = i_Colours[index + 1];
+  }
 }
 
 struct BrickmapModification : IModification
@@ -80,18 +97,42 @@ struct BrickmapModification : IModification
     }
 
     if (grid.isValid) {
+      Brickmap brick = i_Brickmap[grid.getPtr];
+
       uint3 voxel_index = getVoxelIndex(mod_index);
 
       uint mask_index = voxel_index.x + voxel_index.z * 8;
+
+      uint totalcount = getSetBits(brick, int3(8));
+      uint bitcount = getSetBits(brick, voxel_index);
 
       bool possiblyEmpty = false;
       switch (type) {
         case Type::PLACE:
           i_Brickmap[grid.getPtr].data[voxel_index.y] |= ((uint64_t)1 << mask_index);
+          uint64_t colour_ptr = i_Brickmap[grid.getPtr].colourPtr;
+          // Change Colour
+
+          // Enough space
+          uint new_count = totalcount + 1;
+
+          uint8_t type = i_Colours[colour_ptr].type;
+          uint type_size = getTypeSize(type);
+
+          if (new_count <= type_size) {
+            // We have enough space to use current position
+            insertColour(colour, bitcount, brick.colourPtr, totalcount);
+          } else {
+            // We need to reassign the colours to elsewhere
+            // Search through colour list for sufficiently next size
+          }
+
           break;
         case Type::ERASE:
           i_Brickmap[grid.getPtr].data[voxel_index.y] &= ~((uint64_t)1 << mask_index);
           possiblyEmpty = (i_Brickmap[grid.getPtr].data[voxel_index.y] == 0);
+
+          eraseColour(bitcount, brick.colourPtr, totalcount);
           break;
       }
 
@@ -107,6 +148,10 @@ struct BrickmapModification : IModification
 
           int size, stride;
           i_FreeBricks.GetDimensions(size, stride);
+
+          // Mark colour as free
+          uint64_t colour_ptr = i_Brickmap[grid.getPtr].colourPtr;
+          i_Colours[colour_ptr].isUsed = false;
 
           for (int i = 1; i < size; i++) {
             if (i_FreeBricks[i] == 0) {

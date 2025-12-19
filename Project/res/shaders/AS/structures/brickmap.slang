@@ -36,3 +36,44 @@ struct Brickmap
   uint64_t colourPtr;
   uint64_t data[8];
 }
+
+struct Colour {
+  uint8_t data;
+  uint8_t r;
+  uint8_t g;
+  uint8_t b;
+
+  property uint8_t type {
+    get { return data & 0x3; }
+    set { data &= ~0x3; data |= (newValue & 0x3); }
+  }
+
+  property bool isUsed {
+    get { return (data & 0x70) != 0; }
+    set { data &= ~0x70; data |= (uint8_t)((newValue == true) ? 0x70 : 0x00); }
+  }
+};
+
+inline func getTypeSize(uint8_t type) -> uint {
+  switch (type) {
+    case 0: return 8*8*8;
+    case 1: return 4*4*4;
+    case 2: return 2*2*2;
+  }
+  return 0;
+}
+
+inline func getSetBits(in brick: Brickmap, in index: int3) -> uint {
+  uint ptr = 0;
+  for (int i = 0; i < index.y; i++) {
+    ptr += countbits(brick.data[i]);
+  }
+
+  if (index.y != 8) {
+    uint offset = index.x + index.z * 8;
+    uint64_t mask = ((uint64_t)1 << offset) - 1;
+    ptr += countbits(brick.data[index.y] & mask);
+  }
+
+  return ptr;
+}

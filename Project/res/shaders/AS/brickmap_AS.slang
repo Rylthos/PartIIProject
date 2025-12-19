@@ -22,7 +22,7 @@ RWStructuredBuffer<Brickgrid> i_Brickgrid;
 StructuredBuffer<Brickmap> i_Brickmap;
 
 [[vk::binding(2, 1)]]
-StructuredBuffer<uint8_t> i_Colours;
+StructuredBuffer<Colour> i_Colours;
 
 [[vk::binding(3, 1)]]
 RWStructuredBuffer<uint32_t> i_Request;
@@ -57,18 +57,14 @@ func traverse_brick(in ray : Ray,
     if (((brick.data[index] >> offset) & 1) != 0) {
       hit.hit = true;
 
-      uint64_t ptr = brick.colourPtr;
-      for (int i = 0; i < index; i++) {
-        ptr += countbits(brick.data[i]);
-      }
-      ptr += countbits(brick.data[index] & ((((uint64_t)1) << (offset)) - 1));
+      uint64_t ptr = brick.colourPtr + getSetBits(brick, voxel_pos);
 
       // FIX: Re add colours
       hit.colour = float3(1);
 
-      uint8_t r = i_Colours[ptr * 4 + 1];
-      uint8_t g = i_Colours[ptr * 4 + 2];
-      uint8_t b = i_Colours[ptr * 4 + 3];
+      uint8_t r = i_Colours[ptr].r;
+      uint8_t g = i_Colours[ptr].g;
+      uint8_t b = i_Colours[ptr].b;
       hit.colour = float3(float(r) / 255., float(g) / 255., float(b) / 255.);
 
       hit.voxel_index = int3(min_bound * 8) + voxel_pos;
