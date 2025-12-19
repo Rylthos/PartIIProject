@@ -32,7 +32,6 @@ def stat_frames(data):
     q3 = median + q1
 
     frames_ms = frames_ms[q1:q3]
-    print(frames_ms)
 
     total = sum(frames_ms)
 
@@ -117,5 +116,5 @@ def memory_per_voxel():
 
 # scatter()
 errorbar()
-# memory_use()
-# memory_per_voxel()
+memory_use()
+memory_per_voxel()
