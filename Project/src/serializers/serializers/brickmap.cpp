@@ -57,9 +57,10 @@ loadBrickmap(std::filesystem::path directory)
 
     for (size_t j = 0; j < numColours; j++) {
         Generators::BrickmapColour colour;
-        for (int k = 0; k < 4; k++) {
-            colour.data[k] = Serializers::readByte(inputStream);
-        }
+        colour.data = Serializers::readByte(inputStream);
+        colour.r = Serializers::readByte(inputStream);
+        colour.g = Serializers::readByte(inputStream);
+        colour.b = Serializers::readByte(inputStream);
 
         colours.push_back(colour);
     }
@@ -98,9 +99,10 @@ void storeBrickmap(std::filesystem::path output, const std::string& name, glm::u
     }
 
     for (const Generators::BrickmapColour& colour : colours) {
-        for (uint8_t i = 0; i < 4; i++) {
-            Serializers::writeByte(colour.data[i], outputStream);
-        }
+        Serializers::writeByte(colour.data, outputStream);
+        Serializers::writeByte(colour.r, outputStream);
+        Serializers::writeByte(colour.g, outputStream);
+        Serializers::writeByte(colour.b, outputStream);
     }
 
     outputStream.close();

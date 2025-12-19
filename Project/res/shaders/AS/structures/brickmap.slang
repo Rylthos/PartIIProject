@@ -49,8 +49,8 @@ struct Colour {
   }
 
   property bool isUsed {
-    get { return (data & 0x70) != 0; }
-    set { data &= ~0x70; data |= (uint8_t)((newValue == true) ? 0x70 : 0x00); }
+    get { return (data & 0x80) != 0; }
+    set { data &= ~0x80; data |= (uint8_t)((newValue == true) ? 0x80 : 0x00); }
   }
 };
 

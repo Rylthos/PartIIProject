@@ -23,16 +23,32 @@ struct Brickmap {
 //  0 -> 8x8x8
 //  1 -> 4x4x4
 //  2 -> 2x2x2
-union BrickmapColour {
-    uint8_t data[4];
-    struct {
-        uint8_t used   : 1;
-        uint8_t parent : 5;
-        uint8_t type   : 2;
-        uint8_t r;
-        uint8_t g;
-        uint8_t b;
-    } components;
+struct BrickmapColour {
+    uint8_t data;
+    uint8_t r;
+    uint8_t g;
+    uint8_t b;
+
+    bool getUsed() { return (data & 0x80) != 0; }
+    void setUsed(bool v)
+    {
+        data &= ~0x80;
+        data |= v ? 0x80 : 0x00;
+    }
+
+    uint8_t getParent() { return (data & 0x7C) != 0; }
+    void setParent(uint8_t v)
+    {
+        data &= ~0x7C;
+        data |= ((v & 0x1F) << 2);
+    }
+
+    uint8_t getType() { return data & 0x3; }
+    void setType(uint8_t type)
+    {
+        data &= ~0x3;
+        data |= (type & 0x3);
+    }
 };
 
 std::tuple<std::vector<BrickgridPtr>, std::vector<Brickmap>, std::vector<BrickmapColour>>

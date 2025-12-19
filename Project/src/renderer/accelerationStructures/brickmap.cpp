@@ -440,10 +440,10 @@ void BrickmapAS::createBrickgridBuffers()
               uint8_t* data = (uint8_t*)ptr;
               for (size_t i = 0; i < m_Colours.size(); i++) {
                   const auto& colour = m_Colours[i];
-                  data[i * 4 + 0] = colour.data[0];
-                  data[i * 4 + 1] = colour.data[1];
-                  data[i * 4 + 2] = colour.data[2];
-                  data[i * 4 + 3] = colour.data[3];
+                  data[i * 4 + 0] = colour.data;
+                  data[i * 4 + 1] = colour.r;
+                  data[i * 4 + 2] = colour.g;
+                  data[i * 4 + 3] = colour.b;
               }
           });
 

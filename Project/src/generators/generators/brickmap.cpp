@@ -30,28 +30,28 @@ uint32_t getFreeColour(std::array<uint8_t, 8 * 8 * 8 * 3>& brickColours, uint32_
 
     // Traverse colours
     for (uint32_t i = start_index; i < colours.size();) {
-        if (colours[i].components.used || colours[i].components.type > type) {
+        if (colours[i].getUsed() || colours[i].getType() > type) {
             i += getOffset(type);
 
             continue;
         }
 
-        if (colours[i].components.type == type) { // Can use
-            colours[i].components.used = true;
+        if (colours[i].getType() == type) { // Can use
+            colours[i].setUsed(true);
 
             for (uint32_t j = 0; j < usedColours; j++) {
-                colours[i + j].components.r = brickColours[j * 3 + 0];
-                colours[i + j].components.g = brickColours[j * 3 + 1];
-                colours[i + j].components.b = brickColours[j * 3 + 2];
+                colours[i + j].r = brickColours[j * 3 + 0];
+                colours[i + j].g = brickColours[j * 3 + 1];
+                colours[i + j].b = brickColours[j * 3 + 2];
             }
 
             return i;
-        } else if (colours[i].components.type < type) { // Split node
-            uint32_t newType = colours[i].components.type + 1;
+        } else if (colours[i].getType() < type) { // Split node
+            uint32_t newType = colours[i].getType() + 1;
             uint32_t offset = getOffset(newType);
-            colours[i].components.type = newType;
+            colours[i].setType(newType);
             for (int j = 0; j < 8; j++) {
-                colours[i + j * offset].components.type = newType;
+                colours[i + j * offset].setType(newType);
             }
         } else {
             assert(false && "Should not be reachable");
@@ -61,8 +61,8 @@ uint32_t getFreeColour(std::array<uint8_t, 8 * 8 * 8 * 3>& brickColours, uint32_
     // Didn't find anything free so resize
     uint32_t end = colours.size();
     colours.resize(end + 512);
-    colours[end].components.type = 0;
-    colours[end].components.used = false;
+    colours[end].setType(0);
+    colours[end].setUsed(false);
     return getFreeColour(brickColours, usedColours, colours, end);
 }
 
@@ -83,8 +83,8 @@ generateBrickmap(std::stop_token stoken, std::unique_ptr<Loader>&& loader, Gener
     std::vector<BrickmapColour> colours;
 
     colours.resize(512);
-    colours[0].components.used = false;
-    colours[0].components.type = 0;
+    colours[0].setUsed(false);
+    colours[0].setType(0);
 
     brickgrid.assign(totalNodes, 0x1);
 
