@@ -5,8 +5,6 @@ namespace Generators {
 uint32_t getOffset(uint32_t type)
 {
     switch (type) {
-    case 3:
-        return 1;
     case 2:
         return 8;
     case 1:
@@ -22,17 +20,13 @@ uint32_t getFreeColour(std::array<uint8_t, 8 * 8 * 8 * 3>& brickColours, uint32_
     std::vector<BrickmapColour>& colours, uint32_t start_index = 0)
 {
     uint32_t type;
-    if (usedColours == 1) {
-        type = 3;
-    } else if (usedColours <= 2 * 2 * 2) {
+    if (usedColours <= 2 * 2 * 2) {
         type = 2;
     } else if (usedColours <= 4 * 4 * 4) {
         type = 1;
     } else {
         type = 0;
     }
-
-    int32_t ptr = -1;
 
     // Traverse colours
     for (uint32_t i = start_index; i < colours.size();) {
@@ -51,8 +45,7 @@ uint32_t getFreeColour(std::array<uint8_t, 8 * 8 * 8 * 3>& brickColours, uint32_
                 colours[i + j].components.b = brickColours[j * 3 + 2];
             }
 
-            ptr = i;
-            break;
+            return i;
         } else if (colours[i].components.type < type) { // Split node
             uint32_t newType = colours[i].components.type + 1;
             uint32_t offset = getOffset(newType);
@@ -65,15 +58,12 @@ uint32_t getFreeColour(std::array<uint8_t, 8 * 8 * 8 * 3>& brickColours, uint32_
         }
     }
 
-    if (ptr == -1) {
-        uint32_t end = colours.size();
-        colours.resize(end + 512);
-        colours[end].components.type = 0;
-        colours[end].components.used = false;
-        return getFreeColour(brickColours, usedColours, colours, end);
-    }
-
-    return ptr;
+    // Didn't find anything free so resize
+    uint32_t end = colours.size();
+    colours.resize(end + 512);
+    colours[end].components.type = 0;
+    colours[end].components.used = false;
+    return getFreeColour(brickColours, usedColours, colours, end);
 }
 
 std::tuple<std::vector<BrickgridPtr>, std::vector<Brickmap>, std::vector<BrickmapColour>>

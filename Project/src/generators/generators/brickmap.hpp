@@ -23,7 +23,6 @@ struct Brickmap {
 //  0 -> 8x8x8
 //  1 -> 4x4x4
 //  2 -> 2x2x2
-//  3 -> 1x1x1
 union BrickmapColour {
     uint8_t data[4];
     struct {
