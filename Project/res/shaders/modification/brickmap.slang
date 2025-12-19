@@ -56,6 +56,91 @@ func eraseColour(in target_index: uint, in colour_ptr: uint64_t, in total_colour
   }
 }
 
+func tryMerge(in input_index: uint64_t) -> void {
+  uint8_t type = i_Colours[input_index].type;
+  if (type == 0) return; // Cannot merge
+
+  uint8_t type_stack[2];
+  uint64_t index_stack[2];
+  int stack_ptr = 0;
+  type_stack[stack_ptr] = type;
+  index_stack[stack_ptr] = input_index;
+
+  uint64_t index;
+
+  while (stack_ptr >= 0) {
+    type = type_stack[stack_ptr];
+    index = index_stack[stack_ptr];
+
+    uint size = getTypeSize(type);
+    uint block_size = size;
+    if (type != 0) {
+      block_size *= 8;
+    }
+
+    uint64_t start = uint64_t(index / block_size) * block_size;
+
+    for (int i = 0; i < 8;) {
+      if (i_Colours[start + i * size].isUsed) { // Not able to merge
+        return;
+      } else if (i_Colours[start + i * size].type > type) { // Smaller so try merge that first
+        stack_ptr++;
+        type_stack[stack_ptr] = i_Colours[start + i * size].type;
+        index_stack[stack_ptr] = start + i * size;
+      } else {
+        i++;
+      }
+    }
+
+    // We are able to merge
+    for (int i = 0; i < 8; i++) {
+      i_Colours[start + i * size].type = 0;
+    }
+
+    i_Colours[start].type = type - 1;
+
+    stack_ptr -= 1;
+  }
+}
+
+func findBlock(in size: uint) -> uint {
+  uint8_t type;
+  if (size <= 2*2*2) {
+    type = 2;
+  } else if (size <= 4*4*4) {
+    type = 1;
+  } else {
+    type = 0;
+  }
+
+  uint colour_size, stride;
+  i_Colours.GetDimensions(colour_size, stride);
+
+  for (uint32_t i = 0; i < colour_size;) {
+    Colour c = i_Colours[i];
+    if (c.type > type) {
+      i += getTypeSize(c.type);
+    }
+
+    if (c.isUsed) {
+      i += getTypeSize(c.type);
+    }
+
+    if (c.type == type) { // Use as is
+      return i;
+    } else if (c.type < type) { // Split
+      uint8_t newType = c.type + 1;
+      uint type_size = getTypeSize(newType);
+      i_Colours[i].type = newType;
+      for (int j = 0; j < 8; j++) {
+        i_Colours[i + j * type_size].type = newType;
+      }
+    }
+  }
+
+  return 0;
+}
+
 struct BrickmapModification : IModification
 {
   static func validIndex(in voxel_index : int3) -> bool
@@ -68,6 +153,9 @@ struct BrickmapModification : IModification
     uint brickgrid_index = getBrickIndex(mod_index);
 
     Brickgrid grid = i_Brickgrid[brickgrid_index];
+
+    if ((!grid.isValid || grid.isEmpty) && type != Type::PLACE)
+      return;
 
     if (!grid.isValid || grid.isEmpty) {
       int freeIndex = -1;
@@ -94,6 +182,10 @@ struct BrickmapModification : IModification
       }
 
       i_Brickgrid[brickgrid_index].isValid = true;
+
+      uint colour_ptr = findBlock(1);
+      i_Brickmap[grid.getPtr].colourPtr = colour_ptr;
+      i_Colours[colour_ptr].isUsed = true;
     }
 
     if (grid.isValid) {
@@ -111,20 +203,29 @@ struct BrickmapModification : IModification
         case Type::PLACE:
           i_Brickmap[grid.getPtr].data[voxel_index.y] |= ((uint64_t)1 << mask_index);
           uint64_t colour_ptr = i_Brickmap[grid.getPtr].colourPtr;
-          // Change Colour
 
-          // Enough space
           uint new_count = totalcount + 1;
 
           uint8_t type = i_Colours[colour_ptr].type;
           uint type_size = getTypeSize(type);
 
           if (new_count <= type_size) {
-            // We have enough space to use current position
+            // We have enough space to remain using current position
             insertColour(colour, bitcount, brick.colourPtr, totalcount);
           } else {
-            // We need to reassign the colours to elsewhere
-            // Search through colour list for sufficiently next size
+            uint newLocation = findBlock(new_count);
+
+            for (int i = 0; i < bitcount; i++) {
+              i_Colours[newLocation + i] = i_Colours[colour_ptr + i];
+            }
+            i_Colours[newLocation + bitcount].r = (uint8_t)floor(colour.r * 255.f);
+            i_Colours[newLocation + bitcount].g = (uint8_t)floor(colour.g * 255.f);
+            i_Colours[newLocation + bitcount].b = (uint8_t)floor(colour.b * 255.f);
+            for (int i = bitcount + 1; i < totalcount; i++) {
+              i_Colours[newLocation + i] = i_Colours[colour_ptr + i];
+            }
+
+            i_Brickmap[grid.getPtr].colourPtr = newLocation;
           }
 
           break;
@@ -152,6 +253,9 @@ struct BrickmapModification : IModification
           // Mark colour as free
           uint64_t colour_ptr = i_Brickmap[grid.getPtr].colourPtr;
           i_Colours[colour_ptr].isUsed = false;
+
+          // Attempt to merge colours
+          tryMerge(colour_ptr);
 
           for (int i = 1; i < size; i++) {
             if (i_FreeBricks[i] == 0) {
