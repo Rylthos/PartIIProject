@@ -120,7 +120,9 @@ func findBlock(in size: uint) -> uint64_t {
   uint colour_size, stride;
   i_Colours.GetDimensions(colour_size, stride);
 
-  for (uint64_t i = 0; i < colour_size;) {
+  uint64_t start = ((colour_size / 512) - 1) * 512;
+
+  for (uint64_t i = start; i < colour_size;) {
     Colour c = i_Colours[i];
     if (c.type > type) {
       i += getTypeSize(c.type);
@@ -160,122 +162,128 @@ struct BrickmapModification : IModification
 
     Brickgrid grid = i_Brickgrid[brickgrid_index];
 
-    if ((!grid.isValid || grid.isEmpty) && type != Type::PLACE)
+    // if ((!grid.isValid || grid.isEmpty) && type != Type::PLACE)
+    if ((!grid.isValid || grid.isEmpty))
       return;
 
     if (!grid.isValid || grid.isEmpty) {
-      int freeIndex = -1;
-
-      int size = i_FreeBricks[0];
-
-      for (int i = 0; i < size; i++) {
-        if (i_FreeBricks[i + 1] != 0) {
-
-          freeIndex = i_FreeBricks[i + 1] - 1;
-          i_FreeBricks[i + 1] = 0;
-          i_FreeBricks[0] -= 1;
-
-          break;
-        }
-      }
-
-      i_Brickgrid[brickgrid_index].getPtr = freeIndex;
-
-      grid = i_Brickgrid[brickgrid_index];
-
-      for (int i = 0; i < 8; i++) {
-        i_Brickmap[grid.getPtr].data[i] = 0;
-      }
-
-      i_Brickgrid[brickgrid_index].isValid = true;
-
-      uint64_t colour_ptr = findBlock(1);
-      i_Colours[colour_ptr].isUsed = true;
-      i_Brickmap[grid.getPtr].colourPtr = colour_ptr;
+      return;
+      // uint32_t freeIndex = 0;
+      // int size = i_FreeBricks[0];
+      //
+      // for (int i = 0; i < size; i++) {
+      //   if (i_FreeBricks[i + 1] != 0) {
+      //
+      //     freeIndex = i_FreeBricks[i + 1] - 1;
+      //     i_FreeBricks[i + 1] = 0;
+      //     i_FreeBricks[0] -= 1;
+      //
+      //     break;
+      //   }
+      // }
+      //
+      // i_Brickgrid[brickgrid_index].getPtr = freeIndex;
+      //
+      // for (int i = 0; i < 8; i++) {
+      //   i_Brickmap[freeIndex].data[i] = 0;
+      // }
+      //
+      // i_Brickgrid[brickgrid_index].isValid = true;
+      //
+      // uint64_t colour_ptr = findBlock(1);
+      // i_Colours[colour_ptr].isUsed = true;
+      // i_Brickmap[freeIndex].colourPtr = colour_ptr;
+      //
+      // grid = i_Brickgrid[brickgrid_index];
     }
 
-    if (grid.isValid) {
-      Brickmap brick = i_Brickmap[grid.getPtr];
+    Brickmap brick = i_Brickmap[grid.getPtr];
 
-      uint3 voxel_index = getVoxelIndex(mod_index);
+    uint3 voxel_index = getVoxelIndex(mod_index);
 
-      uint mask_index = voxel_index.x + voxel_index.z * 8;
+    uint mask_index = voxel_index.x + voxel_index.z * 8;
 
-      uint totalcount = getSetBits(brick, int3(8));
-      uint bitcount = getSetBits(brick, voxel_index);
+    uint totalcount = getAllSet(brick);
 
-      bool possiblyEmpty = false;
-      switch (type) {
-        case Type::PLACE:
-          i_Brickmap[grid.getPtr].data[voxel_index.y] |= ((uint64_t)1 << mask_index);
-          uint64_t colour_ptr = i_Brickmap[grid.getPtr].colourPtr;
+    bool possiblyEmpty = false;
+    switch (type) {
+      case Type::PLACE: {
+                          i_Brickmap[grid.getPtr].data[voxel_index.y] |= ((uint64_t)1 << mask_index);
 
-          uint new_count = totalcount + 1;
+                          uint bitcount = getSetBits(i_Brickmap[grid.getPtr], voxel_index);
 
-          uint8_t type = i_Colours[colour_ptr].type;
-          uint type_size = getTypeSize(type);
+                          uint new_count = totalcount + 1;
 
-          if (new_count <= type_size) {
-            // We have enough space to remain using current position
-            insertColour(colour, bitcount, brick.colourPtr, totalcount);
-          } else {
-            uint64_t newLocation = findBlock(new_count);
+                          uint64_t colour_ptr = i_Brickmap[grid.getPtr].colourPtr;
+                          uint8_t type = i_Colours[colour_ptr].type;
+                          uint type_size = getTypeSize(type);
 
-            for (int i = 0; i < bitcount; i++) {
-              i_Colours[newLocation + i].copyFrom(i_Colours[colour_ptr + i]);
-            }
-            i_Colours[newLocation + bitcount].r = (uint8_t)floor(colour.r * 255.f);
-            i_Colours[newLocation + bitcount].g = (uint8_t)floor(colour.g * 255.f);
-            i_Colours[newLocation + bitcount].b = (uint8_t)floor(colour.b * 255.f);
-            for (int i = bitcount + 1; i < totalcount; i++) {
-              i_Colours[newLocation + i].copyFrom(i_Colours[colour_ptr + i]);
-            }
+                          if (new_count <= type_size) {
+                            // We have enough space to remain using current position
+                            insertColour(colour, bitcount, i_Brickmap[grid.getPtr].colourPtr, totalcount);
+                          } else {
+                            // // Find a new location
+                            // uint64_t newLocation = findBlock(new_count);
+                            //
+                            // for (int i = 0; i < bitcount; i++) {
+                            //   i_Colours[newLocation + i].copyFrom(i_Colours[colour_ptr + i]);
+                            // }
+                            // i_Colours[newLocation + bitcount].r = (uint8_t)floor(colour.r * 255.f);
+                            // i_Colours[newLocation + bitcount].g = (uint8_t)floor(colour.g * 255.f);
+                            // i_Colours[newLocation + bitcount].b = (uint8_t)floor(colour.b * 255.f);
+                            // for (int i = bitcount + 1; i < totalcount; i++) {
+                            //   i_Colours[newLocation + i].copyFrom(i_Colours[colour_ptr + i]);
+                            // }
+                            //
+                            // i_Brickmap[grid.getPtr].colourPtr = newLocation;
+                            // i_Colours[colour_ptr].isUsed = true;
+                            return;
+                          }
 
-            i_Brickmap[grid.getPtr].colourPtr = newLocation;
-            i_Colours[colour_ptr].isUsed = true;
-          }
+                          break;
+                        }
+      case Type::ERASE: {
+                          i_Brickmap[grid.getPtr].data[voxel_index.y] &= ~((uint64_t)1 << mask_index);
+                          possiblyEmpty = (i_Brickmap[grid.getPtr].data[voxel_index.y] == 0);
 
-          break;
-        case Type::ERASE:
-          i_Brickmap[grid.getPtr].data[voxel_index.y] &= ~((uint64_t)1 << mask_index);
-          possiblyEmpty = (i_Brickmap[grid.getPtr].data[voxel_index.y] == 0);
+                          uint bitcount = getSetBits(i_Brickmap[grid.getPtr], voxel_index);
 
-          eraseColour(bitcount, brick.colourPtr, totalcount);
-          break;
-      }
-
-      if (possiblyEmpty) {
-        uint count = 0;
-        for (int i = 0; i < 8; i++) {
-          count += countbits(i_Brickmap[grid.getPtr].data[i]);
-        }
-
-        if (count == 0) {
-          uint brick_index = i_Brickgrid[brickgrid_index].getPtr;
-          i_Brickgrid[brickgrid_index].isEmpty = true;
-
-          int size, stride;
-          i_FreeBricks.GetDimensions(size, stride);
-
-          // Mark colour as free
-          uint64_t colour_ptr = i_Brickmap[grid.getPtr].colourPtr;
-          i_Colours[colour_ptr].isUsed = false;
-
-          // Attempt to merge colours
-          tryMerge(colour_ptr);
-
-          for (int i = 1; i < size; i++) {
-            if (i_FreeBricks[i] == 0) {
-
-              i_FreeBricks[i] = brick_index + 1;
-              i_FreeBricks[0] += 1;
-
-              break;
-            }
-          }
-        }
-      }
+                          eraseColour(bitcount, brick.colourPtr, totalcount);
+                          break;
+                        }
     }
+
+    // if (possiblyEmpty) {
+    //   uint count = 0;
+    //   for (int i = 0; i < 8; i++) {
+    //     count += countbits(i_Brickmap[grid.getPtr].data[i]);
+    //   }
+    //
+    //   if (count == 0) {
+    //     uint brick_index = i_Brickgrid[brickgrid_index].getPtr;
+    //     i_Brickgrid[brickgrid_index].isEmpty = true;
+    //
+    //     int size, stride;
+    //     i_FreeBricks.GetDimensions(size, stride);
+    //
+    //     // Mark colour as free
+    //     uint64_t colour_ptr = i_Brickmap[grid.getPtr].colourPtr;
+    //     i_Colours[colour_ptr].isUsed = false;
+    //
+    //     // Attempt to merge colours
+    //     tryMerge(colour_ptr);
+    //
+    //     for (int i = 1; i < size; i++) {
+    //       if (i_FreeBricks[i] == 0) {
+    //
+    //         i_FreeBricks[i] = brick_index + 1;
+    //         i_FreeBricks[0] += 1;
+    //
+    //         break;
+    //       }
+    //     }
+    //   }
+    // }
   }
 }
 

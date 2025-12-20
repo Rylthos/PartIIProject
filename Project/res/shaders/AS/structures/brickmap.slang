@@ -61,7 +61,7 @@ struct Colour {
   }
 };
 
-inline func getTypeSize(uint8_t type) -> uint {
+func getTypeSize(uint8_t type) -> uint {
   switch (type) {
     case 0: return 8*8*8;
     case 1: return 4*4*4;
@@ -70,8 +70,20 @@ inline func getTypeSize(uint8_t type) -> uint {
   return 0;
 }
 
-inline func getSetBits(in brick: Brickmap, in index: int3) -> uint {
+func getAllSet(in brick: Brickmap) -> uint {
+  return countbits(brick.data[0]) +
+         countbits(brick.data[1]) +
+         countbits(brick.data[2]) +
+         countbits(brick.data[3]) +
+         countbits(brick.data[4]) +
+         countbits(brick.data[5]) +
+         countbits(brick.data[6]) +
+         countbits(brick.data[7]);
+}
+
+func getSetBits(inout brick: Brickmap, in index: int3) -> uint {
   uint ptr = 0;
+
   for (int i = 0; i < index.y; i++) {
     ptr += countbits(brick.data[i]);
   }

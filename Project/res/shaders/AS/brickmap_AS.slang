@@ -28,7 +28,7 @@ StructuredBuffer<Colour> i_Colours;
 RWStructuredBuffer<uint32_t> i_Request;
 
 func traverse_brick(in ray : Ray,
-                    in brick : Brickmap,
+                    inout brick : Brickmap,
                     in step_dir : int3,
                     in step_size : float3,
                     in starting_t : float,
