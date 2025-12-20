@@ -358,6 +358,7 @@ void BrickmapAS::createDescriptorLayout()
 
     m_ModSetLayout = DescriptorLayoutGenerator::start(p_Info.device)
                          .addStorageBufferBinding(VK_SHADER_STAGE_COMPUTE_BIT, 0)
+                         .addStorageBufferBinding(VK_SHADER_STAGE_COMPUTE_BIT, 1)
                          .setDebugName("Brickmap mod set layout")
                          .build();
 }
@@ -479,6 +480,13 @@ void BrickmapAS::createHelperBuffers()
     m_RequestBuffer.setDebugName("Requests");
     m_MappedRequestBuffer = (uint32_t*)m_RequestBuffer.mapMemory();
 
+    VkDeviceSize colourFeedbackSize = 2 * sizeof(uint32_t);
+    m_ColourFeedbackBuffer.init(p_Info.device, p_Info.allocator, colourFeedbackSize,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT,
+        VMA_MEMORY_USAGE_AUTO);
+    m_ColourFeedbackBuffer.setDebugName("Requests");
+    m_MappedColourFeedback = (uint32_t*)m_ColourFeedbackBuffer.mapMemory();
+
     auto freeBricksIndex
         = FrameCommands::getInstance()->createStaging(freeBrickSize, [=, this](void* ptr) {
               uint32_t* data = (uint32_t*)ptr;
@@ -502,6 +510,9 @@ void BrickmapAS::createHelperBuffers()
             };
             vkCmdCopyBuffer(cmd, buffer.buffer, m_FreeBricks.getBuffer(), 1, &region);
         });
+
+    m_MappedColourFeedback[0] = m_Colours.size() / 512;
+    m_MappedColourFeedback[1] = m_ColourBlockCount - m_MappedColourFeedback[0];
 }
 
 void BrickmapAS::freeBuffers()
@@ -516,6 +527,12 @@ void BrickmapAS::freeBuffers()
         m_MappedFreeBricks = nullptr;
         m_FreeBricks.unmapMemory();
         m_FreeBricks.cleanup();
+    }
+
+    if (m_MappedColourFeedback) {
+        m_MappedColourFeedback = nullptr;
+        m_ColourFeedbackBuffer.unmapMemory();
+        m_ColourFeedbackBuffer.cleanup();
     }
 
     m_ColourBuffer.cleanup();
@@ -558,6 +575,7 @@ void BrickmapAS::createDescriptorSet()
 
     m_ModSet = DescriptorSetGenerator::start(p_Info.device, p_Info.descriptorPool, m_ModSetLayout)
                    .addBufferDescriptor(0, m_FreeBricks)
+                   .addBufferDescriptor(1, m_ColourFeedbackBuffer)
                    .setDebugName("Brickmap mod descriptor set")
                    .build();
 }

@@ -88,6 +88,9 @@ class BrickmapAS : public IAccelerationStructure {
     Buffer m_BrickmapsBuffer;
     Buffer m_ColourBuffer;
 
+    Buffer m_ColourFeedbackBuffer;
+    uint32_t* m_MappedColourFeedback = nullptr;
+
     uint32_t m_BrickmapCount;
     uint32_t m_FreeBrickCount;
     uint32_t m_ColourBlockCount;

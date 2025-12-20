@@ -29,6 +29,9 @@ RWStructuredBuffer<uint32_t> i_Request;
 [[vk::binding(0, 1)]]
 RWStructuredBuffer<uint32_t> i_FreeBricks;
 
+[[vk::binding(1, 1)]]
+RWStructuredBuffer<uint32_t> i_ColourFeedback;
+
 func getBrickIndex(in index : int3) -> uint {
   uint3 brick = index / 8;
   return brick.x + brick.z * push_constants.dimensions.x +
@@ -128,6 +131,8 @@ func findBlock(in size: uint) -> uint64_t {
     }
 
     if (c.type == type) { // Use as is
+      i_ColourFeedback[0] += 1;
+      i_ColourFeedback[1] -= 1;
       return i;
     } else if (c.type < type) { // Split
       uint8_t newType = c.type + 1;
