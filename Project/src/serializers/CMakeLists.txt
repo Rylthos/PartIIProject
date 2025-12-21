@@ -17,5 +17,4 @@ target_link_libraries(serializers PUBLIC
   logger
 
   glm::glm
-  pgbar
 )
