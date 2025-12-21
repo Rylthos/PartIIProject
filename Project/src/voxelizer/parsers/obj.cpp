@@ -219,6 +219,91 @@ void parseMaterialLib(
         materials[currentMaterial] = material;
 }
 
+ParserRet parseMesh(const std::vector<Triangle>& triangles,
+    const std::unordered_map<std::string, Material>& materials,
+    const std::map<uint32_t, std::string>& indexToMaterial, const ParserArgs& args)
+{
+    std::unordered_map<glm::ivec3, glm::vec3> voxels;
+
+    glm::vec3 minBound(10000000);
+    glm::vec3 maxBound(-10000000);
+
+    for (size_t i = 0; i < triangles.size(); i++) {
+        for (size_t j = 0; j < 3; j++) {
+            maxBound = glm::max(maxBound, triangles[i].positions[j]);
+            minBound = glm::min(minBound, triangles[i].positions[j]);
+        }
+    }
+
+    glm::vec3 size = glm::max(maxBound - minBound, glm::vec3(glm::epsilon<float>()));
+    float maxSide = fmax(size.x, fmax(size.y, size.z));
+    glm::vec3 aspect = size / maxSide;
+
+    // World space to voxel space
+    glm::vec3 scalar = (aspect * (float)args.voxels_per_unit * args.units) / size;
+
+    glm::uvec3 dimensions = glm::max(glm::uvec3(glm::ceil(size * scalar)), glm::uvec3(1));
+
+    glm::vec3 cellSize = glm::vec3(1.f) / scalar;
+    pgbar::ProgressBar<pgbar::Channel::Stderr, pgbar::Policy::Async, pgbar::Region::Relative> bar;
+
+    bar.config().tasks(triangles.size());
+    bar.config().enable().percent().elapsed().countdown();
+    bar.config().disable().speed();
+    bar.config().prefix("Voxelizing triangles");
+
+    for (const auto& t : triangles) {
+        glm::uvec3 triangleMin = glm::floor(
+            (glm::min(t.positions[0], glm::min(t.positions[1], t.positions[2])) - minBound)
+            * scalar);
+        glm::uvec3 triangleMax = glm::max(
+            glm::uvec3(glm::ceil(
+                (glm::max(t.positions[0], glm::max(t.positions[1], t.positions[2])) - minBound)
+                * scalar)),
+            glm::uvec3(1));
+
+        for (int z = triangleMin.z; z < triangleMax.z; z++) {
+            for (int y = triangleMin.y; y < triangleMax.y; y++) {
+                for (int x = triangleMin.x; x < triangleMax.x; x++) {
+                    glm::ivec3 index = glm::ivec3(x, y, z);
+                    glm::vec3 cubeMin = (glm::vec3(index) / scalar) + minBound;
+
+                    if (aabbTriangleIntersection(t, cubeMin, cellSize)) {
+                        if (t.matIndex != -1) {
+                            const Material& mat = materials.at(indexToMaterial.at(t.matIndex));
+                            if (mat.validTexture) {
+                                glm::vec3 tex = calculateTexCoords(t, cubeMin, cellSize);
+
+                                int x = std::clamp((int)(tex.x * mat.width), 0, mat.width - 1);
+                                int y = std::clamp((int)(tex.y * mat.height), 0, mat.height - 1);
+                                size_t colourIndex = (x + y * mat.width) * mat.colourDepth;
+
+                                glm::vec3 colour = {
+                                    mat.data[colourIndex + 0] / 255.f,
+                                    mat.data[colourIndex + 1] / 255.f,
+                                    mat.data[colourIndex + 2] / 255.f,
+                                };
+
+                                voxels[index] = colour;
+                            } else {
+                                voxels[index] = mat.diffuse;
+                            }
+                        } else {
+                            voxels[index] = glm::vec3(1);
+                        }
+                    }
+                }
+            }
+        }
+
+        bar.tick();
+    }
+
+    bar.reset();
+
+    return std::make_tuple(dimensions, voxels);
+}
+
 ParserRet parseObj(std::filesystem::path filepath, const ParserArgs& args)
 {
     std::vector<Triangle> triangles;
@@ -376,91 +461,6 @@ ParserRet parseObj(std::filesystem::path filepath, const ParserArgs& args)
     }
 
     return parseMesh(triangles, materials, indexToMaterial, args);
-}
-
-ParserRet parseMesh(const std::vector<Triangle>& triangles,
-    const std::unordered_map<std::string, Material>& materials,
-    const std::map<uint32_t, std::string>& indexToMaterial, const ParserArgs& args)
-{
-    std::unordered_map<glm::ivec3, glm::vec3> voxels;
-
-    glm::vec3 minBound(10000000);
-    glm::vec3 maxBound(-10000000);
-
-    for (size_t i = 0; i < triangles.size(); i++) {
-        for (size_t j = 0; j < 3; j++) {
-            maxBound = glm::max(maxBound, triangles[i].positions[j]);
-            minBound = glm::min(minBound, triangles[i].positions[j]);
-        }
-    }
-
-    glm::vec3 size = glm::max(maxBound - minBound, glm::vec3(glm::epsilon<float>()));
-    float maxSide = fmax(size.x, fmax(size.y, size.z));
-    glm::vec3 aspect = size / maxSide;
-
-    // World space to voxel space
-    glm::vec3 scalar = (aspect * (float)args.voxels_per_unit * args.units) / size;
-
-    glm::uvec3 dimensions = glm::max(glm::uvec3(glm::ceil(size * scalar)), glm::uvec3(1));
-
-    glm::vec3 cellSize = glm::vec3(1.f) / scalar;
-    pgbar::ProgressBar<pgbar::Channel::Stderr, pgbar::Policy::Async, pgbar::Region::Relative> bar;
-
-    bar.config().tasks(triangles.size());
-    bar.config().enable().percent().elapsed().countdown();
-    bar.config().disable().speed();
-    bar.config().prefix("Voxelizing triangles");
-
-    for (const auto& t : triangles) {
-        glm::uvec3 triangleMin = glm::floor(
-            (glm::min(t.positions[0], glm::min(t.positions[1], t.positions[2])) - minBound)
-            * scalar);
-        glm::uvec3 triangleMax = glm::max(
-            glm::uvec3(glm::ceil(
-                (glm::max(t.positions[0], glm::max(t.positions[1], t.positions[2])) - minBound)
-                * scalar)),
-            glm::uvec3(1));
-
-        for (int z = triangleMin.z; z < triangleMax.z; z++) {
-            for (int y = triangleMin.y; y < triangleMax.y; y++) {
-                for (int x = triangleMin.x; x < triangleMax.x; x++) {
-                    glm::ivec3 index = glm::ivec3(x, y, z);
-                    glm::vec3 cubeMin = (glm::vec3(index) / scalar) + minBound;
-
-                    if (aabbTriangleIntersection(t, cubeMin, cellSize)) {
-                        if (t.matIndex != -1) {
-                            const Material& mat = materials.at(indexToMaterial.at(t.matIndex));
-                            if (mat.validTexture) {
-                                glm::vec3 tex = calculateTexCoords(t, cubeMin, cellSize);
-
-                                int x = std::clamp((int)(tex.x * mat.width), 0, mat.width - 1);
-                                int y = std::clamp((int)(tex.y * mat.height), 0, mat.height - 1);
-                                size_t colourIndex = (x + y * mat.width) * mat.colourDepth;
-
-                                glm::vec3 colour = {
-                                    mat.data[colourIndex + 0] / 255.f,
-                                    mat.data[colourIndex + 1] / 255.f,
-                                    mat.data[colourIndex + 2] / 255.f,
-                                };
-
-                                voxels[index] = colour;
-                            } else {
-                                voxels[index] = mat.diffuse;
-                            }
-                        } else {
-                            voxels[index] = glm::vec3(1);
-                        }
-                    }
-                }
-            }
-        }
-
-        bar.tick();
-    }
-
-    bar.reset();
-
-    return std::make_tuple(dimensions, voxels);
 }
 
 }
