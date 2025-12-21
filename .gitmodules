@@ -28,7 +28,7 @@
 	url = https://github.com/CLIUtils/CLI11.git
 [submodule "Project/vendor/pgbar"]
 	path = Project/vendor/pgbar
-	url = https://github.com/Konvt/pgbar
+	url = https://github.com/Rylthos/pgbar.git
 [submodule "Project/vendor/json"]
 	path = Project/vendor/json
 	url = https://github.com/nlohmann/json.git

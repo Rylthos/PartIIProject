@@ -23,7 +23,7 @@
 #include "parsers/vox.hpp"
 
 #include "pgbar/DynamicBar.hpp"
-#include "pgbar/pgbar.hpp"
+#include "pgbar/ProgressBar.hpp"
 
 #include <cmath>
 #include <cstring>
