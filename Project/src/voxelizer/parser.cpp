@@ -20,6 +20,7 @@
 
 #include "parsers/general.hpp"
 #include "parsers/obj.hpp"
+#include "parsers/vox.hpp"
 
 #include "pgbar/DynamicBar.hpp"
 #include "pgbar/pgbar.hpp"
@@ -75,6 +76,8 @@ ParserImpl::ParserRet Parser::parseFile()
 
     if (!strcmp(extension.c_str(), ".obj")) {
         return ParserImpl::parseObj(path, m_Args);
+    } else if (!strcmp(extension.c_str(), ".vox")) {
+        return ParserImpl::parseVox(path, m_Args);
     } else {
         fprintf(stderr, "Unsupported file\n");
         exit(-1);
