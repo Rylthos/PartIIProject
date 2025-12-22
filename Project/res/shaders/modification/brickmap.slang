@@ -157,8 +157,8 @@ func findBlock(in size: uint) -> uint64_t {
   return 0;
 }
 
-inline func copyColours(uint64_t start, uint64_t end, uint64_t target) -> void {
-  for (uint64_t i = start; i <= end; i++) {
+inline func copyColours(uint64_t start, uint64_t length, uint64_t target) -> void {
+  for (uint64_t i = 0; i <= length; i++) {
     i_Colours[target + i].copyFrom(i_Colours[start + i]);
   }
 }
@@ -243,13 +243,13 @@ struct BrickmapModification : IModification
                             uint64_t newLocation = findBlock(oldcount + 1);
                             i_Colours[newLocation].isUsed = true;
 
-                            copyColours(colour_ptr, colour_ptr + bitcount - 1, newLocation);
+                            copyColours(colour_ptr, bitcount - 1, newLocation);
 
                             i_Colours[newLocation + bitcount].r = (uint8_t)floor(colour.r * 255.f);
                             i_Colours[newLocation + bitcount].g = (uint8_t)floor(colour.g * 255.f);
                             i_Colours[newLocation + bitcount].b = (uint8_t)floor(colour.b * 255.f);
 
-                            copyColours(colour_ptr + bitcount + 1, colour_ptr + oldcount, newLocation + bitcount + 1);
+                            copyColours(colour_ptr + bitcount, oldcount - bitcount, newLocation + bitcount + 1);
 
                             i_Brickmap[grid.getPtr].colourPtr = newLocation;
                             i_Colours[colour_ptr].isUsed = false;
