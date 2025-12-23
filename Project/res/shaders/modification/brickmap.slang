@@ -43,7 +43,7 @@ func getVoxelIndex(in index: int3) -> uint3 {
 }
 
 func insertColour(in colour: float3, in target_index: uint, in colour_ptr: uint64_t, in total_colours: uint) -> void {
-  for (int i = total_colours; i > target_index; i--) {
+  for (int i = total_colours - 1; i > target_index; i--) {
     uint64_t index = colour_ptr + i;
     i_Colours[index].copyFrom(i_Colours[index - 1]);
   }
@@ -141,8 +141,10 @@ func findBlock(in size: uint) -> uint64_t {
     }
 
     if (c.type == type) { // Use as is
-      i_ColourFeedback[0] += 1;
-      i_ColourFeedback[1] -= 1;
+      if (type == 0) {
+        i_ColourFeedback[0] += 1;
+        i_ColourFeedback[1] -= 1;
+      }
       return i;
     } else if (c.type < type) { // Split
       uint8_t newType = c.type + 1;
@@ -234,7 +236,6 @@ struct BrickmapModification : IModification
                           uint8_t type = i_Colours[colour_ptr].type;
                           uint type_size = getTypeSize(type);
 
-
                           if (oldcount + 1 <= type_size) {
                             // We have enough space to remain using current position
                             insertColour(colour, bitcount, i_Brickmap[grid.getPtr].colourPtr, oldcount + 1);
@@ -243,13 +244,8 @@ struct BrickmapModification : IModification
                             uint64_t newLocation = findBlock(oldcount + 1);
                             i_Colours[newLocation].isUsed = true;
 
-                            copyColours(colour_ptr, bitcount - 1, newLocation);
-
-                            i_Colours[newLocation + bitcount].r = (uint8_t)floor(colour.r * 255.f);
-                            i_Colours[newLocation + bitcount].g = (uint8_t)floor(colour.g * 255.f);
-                            i_Colours[newLocation + bitcount].b = (uint8_t)floor(colour.b * 255.f);
-
-                            copyColours(colour_ptr + bitcount, oldcount - bitcount, newLocation + bitcount + 1);
+                            copyColours(colour_ptr, oldcount, newLocation);
+                            insertColour(colour, bitcount, newLocation, oldcount + 1);
 
                             i_Brickmap[grid.getPtr].colourPtr = newLocation;
                             i_Colours[colour_ptr].isUsed = false;
@@ -274,10 +270,7 @@ struct BrickmapModification : IModification
     }
 
     if (possiblyEmpty) {
-      uint count = 0;
-      for (int i = 0; i < 8; i++) {
-        count += countbits(i_Brickmap[grid.getPtr].data[i]);
-      }
+      uint count = getAllSet(i_Brickmap[grid.getPtr]);
 
       if (count == 0) {
         uint brick_index = i_Brickgrid[brickgrid_index].getPtr;
@@ -289,6 +282,10 @@ struct BrickmapModification : IModification
         // Mark colour as free
         uint64_t colour_ptr = i_Brickmap[grid.getPtr].colourPtr;
         i_Colours[colour_ptr].isUsed = false;
+        if (i_Colours[colour_ptr].type == 0) {
+          i_ColourFeedback[0] -= 1;
+          i_ColourFeedback[1] += 1;
+        }
 
         // Attempt to merge colours
         // tryMerge(colour_ptr);
