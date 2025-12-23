@@ -178,14 +178,15 @@ struct BrickmapModification : IModification
       return;
 
     if (!grid.isValid || grid.isEmpty) {
-      uint32_t freeIndex = 0;
-      int size = i_FreeBricks[0];
+      int32_t freeIndex = -1;
 
-      for (int i = 0; i < size; i++) {
-        if (i_FreeBricks[i + 1] != 0) {
+      int size, stride;
+      i_FreeBricks.GetDimensions(size, stride);
 
-          freeIndex = i_FreeBricks[i + 1] - 1;
-          i_FreeBricks[i + 1] = 0;
+      for (int i = 1; i < size; i++) {
+        if (i_FreeBricks[i] != 0) {
+          freeIndex = i_FreeBricks[i] - 1;
+          i_FreeBricks[i] = 0;
           i_FreeBricks[0] -= 1;
 
           break;
@@ -272,9 +273,6 @@ struct BrickmapModification : IModification
         uint brick_index = i_Brickgrid[brickgrid_index].getPtr;
         i_Brickgrid[brickgrid_index].isEmpty = true;
 
-        int size, stride;
-        i_FreeBricks.GetDimensions(size, stride);
-
         // Mark colour as free
         uint64_t colour_ptr = i_Brickmap[grid.getPtr].colourPtr;
         i_Colours[colour_ptr].isUsed = false;
@@ -283,12 +281,11 @@ struct BrickmapModification : IModification
           i_ColourFeedback[1] += 1;
         }
 
-        // Attempt to merge colours
-        // tryMerge(colour_ptr);
+        int size, stride;
+        i_FreeBricks.GetDimensions(size, stride);
 
         for (int i = 1; i < size; i++) {
           if (i_FreeBricks[i] == 0) {
-
             i_FreeBricks[i] = brick_index + 1;
             i_FreeBricks[0] += 1;
 
