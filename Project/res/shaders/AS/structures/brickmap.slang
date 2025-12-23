@@ -88,11 +88,9 @@ func getSetBits(inout brick: Brickmap, in index: int3) -> uint {
     ptr += countbits(brick.data[i]);
   }
 
-  if (index.y != 8) {
-    uint offset = index.x + index.z * 8;
-    uint64_t mask = ((uint64_t)1 << offset) - 1;
-    ptr += countbits(brick.data[index.y] & mask);
-  }
+  uint offset = index.x + index.z * 8;
+  uint64_t mask = ((uint64_t)1 << offset) - 1;
+  ptr += countbits(brick.data[index.y] & mask);
 
   return ptr;
 }
