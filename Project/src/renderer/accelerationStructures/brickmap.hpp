@@ -49,6 +49,7 @@ class BrickmapAS : public IAccelerationStructure {
 
     void resizeFree(VkCommandBuffer cmd);
     void resizeBricks(VkCommandBuffer cmd);
+    void resizeColour(VkCommandBuffer cmd);
 
     void createDescriptorSet();
     void freeDescriptorSet();
@@ -95,6 +96,8 @@ class BrickmapAS : public IAccelerationStructure {
     uint32_t m_FreeBrickCount;
     uint32_t m_ColourBlockCount;
 
+    const uint32_t m_ColourBlockIncrease = 50;
+
     uint32_t m_Requests = 1024;
     Buffer m_RequestBuffer;
     uint32_t* m_MappedRequestBuffer = nullptr;
@@ -112,9 +115,11 @@ class BrickmapAS : public IAccelerationStructure {
 
     bool m_DoubleFree = false;
     bool m_DoubleBricks = false;
+    bool m_IncreaseColour = false;
 
     Buffer m_TempBuffer;
 
     bool m_ReallocFree = false;
     bool m_ReallocBricks = false;
+    bool m_ReallocColour = false;
 };

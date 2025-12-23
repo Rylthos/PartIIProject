@@ -150,6 +150,10 @@ void BrickmapAS::update(float dt)
             }
         }
 
+        if (m_MappedColourFeedback[1] < 50) {
+            m_IncreaseColour = true;
+        }
+
         if (m_ReallocFree) {
             vkQueueWaitIdle(p_Info.graphicsQueue);
 
@@ -194,6 +198,18 @@ void BrickmapAS::update(float dt)
             LOG_INFO("Resize brick buffer");
 
             m_ReallocBricks = false;
+        } else if (m_ReallocColour) {
+            vkQueueWaitIdle(p_Info.graphicsQueue);
+
+            m_ColourBuffer.cleanup();
+            m_ColourBuffer = m_TempBuffer;
+
+            freeDescriptorSet();
+            createDescriptorSet();
+
+            LOG_INFO("Resize colour buffer");
+
+            m_ReallocColour = false;
         }
     }
 
@@ -230,6 +246,10 @@ void BrickmapAS::mainRender(
         resizeBricks(cmd);
         m_DoubleBricks = false;
         m_ReallocBricks = true;
+    } else if (m_IncreaseColour) {
+        resizeColour(cmd);
+        m_IncreaseColour = false;
+        m_ReallocColour = true;
     }
 
     Debug::beginCmdDebugLabel(cmd, "Brickmap AS render", { 0.0f, 0.0f, 1.0f, 1.0f });
@@ -392,11 +412,12 @@ void BrickmapAS::createBrickgridBuffers()
         0, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
     m_BrickmapsBuffer.setDebugName("Brickmap Buffer");
 
-    m_ColourBlockCount = (m_Colours.size() / 512) + 10;
+    m_ColourBlockCount = (m_Colours.size() / 512) + m_ColourBlockIncrease;
     VkDeviceSize colourSize = m_ColourBlockCount * 512 * sizeof(Generators::BrickmapColour);
     m_ColourBuffer.init(p_Info.device, p_Info.allocator, colourSize,
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
-        VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
+            | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        0, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
     m_ColourBuffer.setDebugName("Colour Buffer");
 
     auto gridBufferIndex
@@ -560,6 +581,20 @@ void BrickmapAS::resizeBricks(VkCommandBuffer cmd)
         0, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
 
     m_TempBuffer.copyFromBuffer(cmd, m_BrickmapsBuffer, m_BrickmapsBuffer.getSize(), 0, 0);
+}
+
+void BrickmapAS::resizeColour(VkCommandBuffer cmd)
+{
+    m_ColourBlockCount += m_ColourBlockIncrease;
+    m_TempBuffer.init(p_Info.device, p_Info.allocator,
+        m_ColourBlockCount * sizeof(Generators::BrickmapColour) * 512,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
+            | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        0, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
+
+    m_TempBuffer.copyFromBuffer(cmd, m_ColourBuffer, m_ColourBuffer.getSize(), 0, 0);
+
+    m_MappedColourFeedback[1] += m_ColourBlockIncrease;
 }
 
 void BrickmapAS::createDescriptorSet()
