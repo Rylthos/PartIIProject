@@ -120,15 +120,11 @@ func findBlock(in size: uint) -> uint64_t {
   uint colour_size, stride;
   i_Colours.GetDimensions(colour_size, stride);
 
-  uint64_t start = ((colour_size / 512) - 1) * 512;
-
   for (uint64_t i = 0; i < colour_size;) {
     Colour c = i_Colours[i];
 
     if (c.type > type) {
       int offset = getTypeSize(c.type);
-      if (c.type != 0)
-        offset *= 8;
       i += offset;
 
       continue;
