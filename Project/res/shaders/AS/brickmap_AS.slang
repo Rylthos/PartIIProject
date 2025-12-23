@@ -109,7 +109,7 @@ struct BrickmapRayMarch : IRayMarch
 
     float3 entry_pos = ray.calculate(t + EPS) / 8;
 
-    int3 voxel_pos = clamp(int3(floor(entry_pos)), int3(0), int3(push_constants.brickgrid_dimensions));
+    int3 voxel_pos = int3(clamp(floor(entry_pos), int3(0), int3(push_constants.brickgrid_dimensions - 1)));
 
     int3 step_dir = sign(ray.direction);
     float3 next_dist = abs((voxel_pos + max(step_dir, int3(0)) - entry_pos) * ray.inverse_direction);

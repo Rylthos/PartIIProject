@@ -40,11 +40,7 @@ struct TextureRayMarch : IRayMarch
 
     float3 entry_pos = ray.calculate(startingT + EPS) / VOXEL_SIZE;
 
-    uint3 voxel_pos = uint3(floor(entry_pos));
-    if (any(voxel_pos < 0) || any(voxel_pos >= push_constants.dimensions))
-      return hit;
-
-    voxel_pos = clamp(voxel_pos, int3(0), int3(push_constants.dimensions - 1));
+    int3 voxel_pos = clamp(int3(floor(entry_pos)), int3(0), int3(push_constants.dimensions - 1));
 
     int3 step_dir = sign(ray.direction);
     float3 next_dist = abs((voxel_pos + max(step_dir, int3(0)) - entry_pos) * ray.inverse_direction);
