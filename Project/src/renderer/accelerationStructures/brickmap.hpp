@@ -50,6 +50,7 @@ class BrickmapAS : public IAccelerationStructure {
     void resizeFree(VkCommandBuffer cmd);
     void resizeBricks(VkCommandBuffer cmd);
     void resizeColour(VkCommandBuffer cmd);
+    void resizeFreeColour(VkCommandBuffer cmd);
 
     void createDescriptorSet();
     void freeDescriptorSet();
@@ -89,14 +90,12 @@ class BrickmapAS : public IAccelerationStructure {
     Buffer m_BrickmapsBuffer;
     Buffer m_ColourBuffer;
 
-    Buffer m_ColourFeedbackBuffer;
-    uint32_t* m_MappedColourFeedback = nullptr;
-
     uint32_t m_BrickmapCount;
     uint32_t m_FreeBrickCount;
     uint32_t m_ColourBlockCount;
+    uint32_t m_FreeColourCount;
 
-    const uint32_t m_ColourBlockIncrease = 50;
+    const uint32_t m_ColourBlockIncrease = 100;
 
     uint32_t m_Requests = 1024;
     Buffer m_RequestBuffer;
@@ -104,6 +103,9 @@ class BrickmapAS : public IAccelerationStructure {
 
     Buffer m_FreeBricks;
     uint32_t* m_MappedFreeBricks = nullptr;
+
+    Buffer m_FreeColours;
+    uint32_t* m_MappedFreeColours = nullptr;
 
     glm::uvec3 m_BrickgridSize;
 
@@ -113,13 +115,15 @@ class BrickmapAS : public IAccelerationStructure {
 
     bool m_UpdateBuffers = false;
 
-    bool m_DoubleFree = false;
+    bool m_DoubleFreeBricks = false;
+    bool m_DoubleFreeColours = false;
     bool m_DoubleBricks = false;
     bool m_IncreaseColour = false;
 
     Buffer m_TempBuffer;
 
-    bool m_ReallocFree = false;
+    bool m_ReallocFreeBricks = false;
+    bool m_ReallocFreeColours = false;
     bool m_ReallocBricks = false;
     bool m_ReallocColour = false;
 };

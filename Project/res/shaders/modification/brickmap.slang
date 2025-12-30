@@ -30,7 +30,7 @@ RWStructuredBuffer<uint32_t> i_Request;
 RWStructuredBuffer<uint32_t> i_FreeBricks;
 
 [[vk::binding(1, 1)]]
-RWStructuredBuffer<uint32_t> i_ColourFeedback;
+RWStructuredBuffer<uint32_t> i_FreeColours;
 
 func getBrickIndex(in index : int3) -> uint {
   uint3 brick = index / 8;
@@ -60,53 +60,6 @@ func eraseColour(in target_index: uint, in colour_ptr: uint64_t, in total_colour
   }
 }
 
-// func tryMerge(in input_index: uint64_t) -> void {
-//   uint8_t type = i_Colours[input_index].type;
-//   if (type == 0) return; // Cannot merge
-//
-//   uint8_t type_stack[2];
-//   uint64_t index_stack[2];
-//   int stack_ptr = 0;
-//   type_stack[stack_ptr] = type;
-//   index_stack[stack_ptr] = input_index;
-//
-//   uint64_t index;
-//
-//   while (stack_ptr >= 0) {
-//     type = type_stack[stack_ptr];
-//     index = index_stack[stack_ptr];
-//
-//     uint size = getTypeSize(type);
-//     uint block_size = size;
-//     if (type != 0) {
-//       block_size *= 8;
-//     }
-//
-//     uint64_t start = uint64_t(index / block_size) * block_size;
-//
-//     for (int i = 0; i < 8;) {
-//       if (i_Colours[start + i * size].isUsed) { // Not able to merge
-//         return;
-//       } else if (i_Colours[start + i * size].type > type) { // Smaller so try merge that first
-//         stack_ptr++;
-//         type_stack[stack_ptr] = i_Colours[start + i * size].type;
-//         index_stack[stack_ptr] = start + i * size;
-//       } else {
-//         i++;
-//       }
-//     }
-//
-//     // We are able to merge
-//     for (int i = 0; i < 8; i++) {
-//       i_Colours[start + i * size].type = 0;
-//     }
-//
-//     i_Colours[start].type = type - 1;
-//
-//     stack_ptr -= 1;
-//   }
-// }
-
 func findBlock(in size: uint) -> uint64_t {
   uint8_t type;
   if (size <= 2*2*2) {
@@ -115,6 +68,27 @@ func findBlock(in size: uint) -> uint64_t {
     type = 1;
   } else {
     type = 0;
+  }
+
+  // Traverse free bricks
+  if (type == 0) {
+    int size, stride;
+    i_FreeColours.GetDimensions(size, stride);
+
+    for (int i = 1; i < size; i++) {
+      if (i_FreeColours[i] != 0) {
+        uint64_t colour_ptr = uint64_t(i_FreeColours[i]);
+        i_FreeColours[i] = 0;
+        i_FreeColours[0] -= 1;
+
+        uint64_t final_ptr = (colour_ptr - 1) * 512;
+        if (i_Colours[final_ptr].isUsed || i_Colours[final_ptr].type != type) {
+          continue;
+        }
+
+        return final_ptr;
+      }
+    }
   }
 
   uint colour_size, stride;
@@ -137,10 +111,6 @@ func findBlock(in size: uint) -> uint64_t {
     }
 
     if (c.type == type) { // Use as is
-      if (type == 0) {
-        i_ColourFeedback[0] += 1;
-        i_ColourFeedback[1] -= 1;
-      }
       return i;
     } else if (c.type < type) { // Split
       uint8_t newType = c.type + 1;
@@ -158,6 +128,54 @@ func findBlock(in size: uint) -> uint64_t {
 inline func copyColours(uint64_t start, uint64_t length, uint64_t target) -> void {
   for (uint64_t i = 0; i <= length; i++) {
     i_Colours[target + i].copyFrom(i_Colours[start + i]);
+  }
+}
+
+func tryMerge(in colour_block: uint64_t) -> void {
+
+  uint64_t blocks[2];
+
+  int index = 0;
+  blocks[index] = colour_block;
+
+  while (index >= 0) {
+    uint64_t block = blocks[index];
+
+    if (i_Colours[colour_block].isUsed)
+      return;
+
+    uint8_t type = i_Colours[colour_block].type;
+
+    if (type == 0)
+      return;
+
+    uint64_t block_start = colour_block;
+
+    if (type == 1) { // 64
+      block_start = (colour_block / 512) * 512;
+    } else { // 8
+      block_start = (block_start / 8) * 8;
+    }
+
+    uint offset = getTypeSize(type);
+
+    for (uint8_t i = 0; i < 8; i++) {
+      if (i_Colours[block_start + i * offset].isUsed)
+        return;
+
+      if (i_Colours[block_start + i * offset].type != type) {
+        blocks[index + 1] = block_start + i * offset;
+        continue;
+      }
+    }
+
+    for (uint8_t i = 0; i < 8; i++) {
+      i_Colours[block_start + i * offset].type = 0;
+    }
+
+    i_Colours[block_start].type = type - 1;
+
+    index--;
   }
 }
 
@@ -277,8 +295,17 @@ struct BrickmapModification : IModification
         uint64_t colour_ptr = i_Brickmap[grid.getPtr].colourPtr;
         i_Colours[colour_ptr].isUsed = false;
         if (i_Colours[colour_ptr].type == 0) {
-          i_ColourFeedback[0] -= 1;
-          i_ColourFeedback[1] += 1;
+          int size, stride;
+          i_FreeColours.GetDimensions(size, stride);
+
+          for (int i = 1; i < size; i++) {
+            if (i_FreeColours[i] == 0) {
+              i_FreeColours[i] = uint32_t(colour_ptr) + 1;
+              i_FreeColours[0] += 1;
+
+              break;
+            }
+          }
         }
 
         int size, stride;
@@ -292,6 +319,8 @@ struct BrickmapModification : IModification
             break;
           }
         }
+
+        tryMerge(colour_ptr);
       }
     }
   }

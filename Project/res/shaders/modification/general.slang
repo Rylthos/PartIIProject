@@ -42,9 +42,9 @@ func sphere<T>(in center : uint3,
         if (!T.validIndex(center + newIndex))
           continue;
 
-        float dist = length(float3(newIndex));
+        float dist = dot(float3(newIndex), float3(newIndex));
 
-        if (dist <= radius) {
+        if (dist <= radius * radius) {
           T.setVoxel(center + newIndex, colour, type);
         }
       }

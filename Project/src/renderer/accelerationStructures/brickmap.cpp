@@ -139,22 +139,30 @@ void BrickmapAS::update(float dt)
 {
     if (p_FinishedGeneration) {
         if (m_MappedFreeBricks[0] > m_FreeBrickCount * 0.875) {
-            m_DoubleFree = true;
+            m_DoubleFreeBricks = true;
         }
 
         if (m_MappedFreeBricks[0] < m_FreeBrickCount * 0.125) {
             m_DoubleBricks = true;
 
             if (m_MappedFreeBricks[0] + m_BrickmapCount < m_FreeBrickCount) {
-                m_DoubleFree = true;
+                m_DoubleFreeBricks = true;
             }
         }
 
-        if (m_MappedColourFeedback[1] < 50) {
-            m_IncreaseColour = true;
+        if (m_MappedFreeColours[0] > m_FreeColourCount * 0.875) {
+            m_DoubleFreeColours = true;
         }
 
-        if (m_ReallocFree) {
+        if (m_MappedFreeColours[0] < m_FreeColourCount * 0.125) {
+            m_IncreaseColour = true;
+
+            if (m_MappedFreeColours[0] + m_ColourBlockIncrease > m_FreeColourCount) {
+                m_DoubleFreeColours = true;
+            }
+        }
+
+        if (m_ReallocFreeBricks) {
             vkQueueWaitIdle(p_Info.graphicsQueue);
 
             m_FreeBricks.unmapMemory();
@@ -167,7 +175,7 @@ void BrickmapAS::update(float dt)
 
             LOG_INFO("Resize free buffer");
 
-            m_ReallocFree = false;
+            m_ReallocFreeBricks = false;
         } else if (m_ReallocBricks) {
             vkQueueWaitIdle(p_Info.graphicsQueue);
 
@@ -198,6 +206,20 @@ void BrickmapAS::update(float dt)
             LOG_INFO("Resize brick buffer");
 
             m_ReallocBricks = false;
+        } else if (m_ReallocFreeColours) {
+            vkQueueWaitIdle(p_Info.graphicsQueue);
+
+            m_FreeColours.unmapMemory();
+            m_FreeColours.cleanup();
+            m_FreeColours = m_TempBuffer;
+            m_MappedFreeColours = (uint32_t*)m_FreeColours.mapMemory();
+
+            freeDescriptorSet();
+            createDescriptorSet();
+
+            LOG_INFO("Resize free colour buffer");
+
+            m_ReallocFreeColours = false;
         } else if (m_ReallocColour) {
             vkQueueWaitIdle(p_Info.graphicsQueue);
 
@@ -207,10 +229,31 @@ void BrickmapAS::update(float dt)
             freeDescriptorSet();
             createDescriptorSet();
 
+            uint32_t previousBlockCount = m_ColourBlockCount - m_ColourBlockIncrease;
+            uint32_t index = previousBlockCount;
+
+            uint32_t count = 0;
+            for (int i = 1; i < m_FreeColourCount + 1; i++) {
+                if (m_MappedFreeColours[i] == 0) {
+                    m_MappedFreeColours[i] = index + 1;
+                    index++;
+                    count++;
+                }
+
+                if (index == m_ColourBlockCount) {
+                    break;
+                }
+            }
+
+            m_MappedFreeColours[0] += count;
+
             LOG_INFO("Resize colour buffer");
 
             m_ReallocColour = false;
+            m_IncreaseColour = false;
         }
+
+        LOG_INFO("Free Colours: {}", m_MappedFreeColours[0]);
     }
 
     if (m_UpdateBuffers) {
@@ -238,14 +281,18 @@ void BrickmapAS::updateShaders()
 void BrickmapAS::mainRender(
     VkCommandBuffer cmd, Camera camera, VkDescriptorSet renderSet, VkExtent2D imageSize)
 {
-    if (m_DoubleFree) {
+    if (m_DoubleFreeBricks) {
         resizeFree(cmd);
-        m_DoubleFree = false;
-        m_ReallocFree = true;
+        m_DoubleFreeBricks = false;
+        m_ReallocFreeBricks = true;
     } else if (m_DoubleBricks) {
         resizeBricks(cmd);
         m_DoubleBricks = false;
         m_ReallocBricks = true;
+    } else if (m_DoubleFreeColours) {
+        resizeFreeColour(cmd);
+        m_DoubleFreeColours = false;
+        m_ReallocFreeColours = true;
     } else if (m_IncreaseColour) {
         resizeColour(cmd);
         m_IncreaseColour = false;
@@ -412,7 +459,8 @@ void BrickmapAS::createBrickgridBuffers()
         0, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
     m_BrickmapsBuffer.setDebugName("Brickmap Buffer");
 
-    m_ColourBlockCount = (m_Colours.size() / 512) + m_ColourBlockIncrease;
+    m_FreeColourCount = m_ColourBlockIncrease * 2;
+    m_ColourBlockCount = (m_Colours.size() / 512) + m_FreeColourCount;
     VkDeviceSize colourSize = m_ColourBlockCount * 512 * sizeof(Generators::BrickmapColour);
     m_ColourBuffer.init(p_Info.device, p_Info.allocator, colourSize,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
@@ -494,19 +542,20 @@ void BrickmapAS::createHelperBuffers()
     m_FreeBricks.setDebugName("Free bricks");
     m_MappedFreeBricks = (uint32_t*)m_FreeBricks.mapMemory();
 
+    VkDeviceSize freeColourBrickSize = (m_FreeColourCount + 1) * sizeof(uint32_t);
+    m_FreeColours.init(p_Info.device, p_Info.allocator, freeColourBrickSize,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
+            | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT, VMA_MEMORY_USAGE_AUTO);
+    m_FreeColours.setDebugName("Free colour blocks");
+    m_MappedFreeColours = (uint32_t*)m_FreeColours.mapMemory();
+
     VkDeviceSize requestSize = 1 + m_Requests;
     m_RequestBuffer.init(p_Info.device, p_Info.allocator, requestSize,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT,
         VMA_MEMORY_USAGE_AUTO);
     m_RequestBuffer.setDebugName("Requests");
     m_MappedRequestBuffer = (uint32_t*)m_RequestBuffer.mapMemory();
-
-    VkDeviceSize colourFeedbackSize = 2 * sizeof(uint32_t);
-    m_ColourFeedbackBuffer.init(p_Info.device, p_Info.allocator, colourFeedbackSize,
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT,
-        VMA_MEMORY_USAGE_AUTO);
-    m_ColourFeedbackBuffer.setDebugName("Requests");
-    m_MappedColourFeedback = (uint32_t*)m_ColourFeedbackBuffer.mapMemory();
 
     auto freeBricksIndex
         = FrameCommands::getInstance()->createStaging(freeBrickSize, [=, this](void* ptr) {
@@ -532,8 +581,29 @@ void BrickmapAS::createHelperBuffers()
             vkCmdCopyBuffer(cmd, buffer.buffer, m_FreeBricks.getBuffer(), 1, &region);
         });
 
-    m_MappedColourFeedback[0] = m_Colours.size() / 512;
-    m_MappedColourFeedback[1] = m_ColourBlockCount - m_MappedColourFeedback[0];
+    auto colourBricksIndex
+        = FrameCommands::getInstance()->createStaging(freeColourBrickSize, [=, this](void* ptr) {
+              uint32_t* data = (uint32_t*)ptr;
+
+              memset(ptr, 0, sizeof(uint32_t) * (m_FreeColourCount + 1));
+
+              uint32_t diff = m_ColourBlockCount - (m_Colours.size() / 512);
+              data[0] = diff;
+
+              for (size_t i = 0; i < diff; i++) {
+                  data[i + 1] = (m_ColourBlockCount + i) + 1;
+              }
+          });
+
+    FrameCommands::getInstance()->stagingEval(
+        colourBricksIndex, [=, this](VkCommandBuffer cmd, FrameCommands::StagingBuffer buffer) {
+            VkBufferCopy region {
+                .srcOffset = buffer.offset,
+                .dstOffset = 0,
+                .size = freeColourBrickSize,
+            };
+            vkCmdCopyBuffer(cmd, buffer.buffer, m_FreeColours.getBuffer(), 1, &region);
+        });
 }
 
 void BrickmapAS::freeBuffers()
@@ -550,10 +620,10 @@ void BrickmapAS::freeBuffers()
         m_FreeBricks.cleanup();
     }
 
-    if (m_MappedColourFeedback) {
-        m_MappedColourFeedback = nullptr;
-        m_ColourFeedbackBuffer.unmapMemory();
-        m_ColourFeedbackBuffer.cleanup();
+    if (m_MappedFreeColours) {
+        m_MappedFreeColours = nullptr;
+        m_FreeColours.unmapMemory();
+        m_FreeColours.cleanup();
     }
 
     m_ColourBuffer.cleanup();
@@ -593,8 +663,17 @@ void BrickmapAS::resizeColour(VkCommandBuffer cmd)
         0, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
 
     m_TempBuffer.copyFromBuffer(cmd, m_ColourBuffer, m_ColourBuffer.getSize(), 0, 0);
+}
 
-    m_MappedColourFeedback[1] += m_ColourBlockIncrease;
+void BrickmapAS::resizeFreeColour(VkCommandBuffer cmd)
+{
+    m_FreeColourCount *= 2;
+    m_TempBuffer.init(p_Info.device, p_Info.allocator, (m_FreeColourCount + 1) * sizeof(uint32_t),
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
+            | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
+
+    m_TempBuffer.copyFromBuffer(cmd, m_FreeColours, m_FreeColours.getSize(), 0, 0);
 }
 
 void BrickmapAS::createDescriptorSet()
@@ -610,7 +689,7 @@ void BrickmapAS::createDescriptorSet()
 
     m_ModSet = DescriptorSetGenerator::start(p_Info.device, p_Info.descriptorPool, m_ModSetLayout)
                    .addBufferDescriptor(0, m_FreeBricks)
-                   .addBufferDescriptor(1, m_ColourFeedbackBuffer)
+                   .addBufferDescriptor(1, m_FreeColours)
                    .setDebugName("Brickmap mod descriptor set")
                    .build();
 }
