@@ -590,8 +590,10 @@ void BrickmapAS::createHelperBuffers()
               uint32_t diff = m_ColourBlockCount - (m_Colours.size() / 512);
               data[0] = diff;
 
+              uint32_t start = m_Colours.size() / 512;
+
               for (size_t i = 0; i < diff; i++) {
-                  data[i + 1] = (m_ColourBlockCount + i) + 1;
+                  data[i + 1] = (start + i) + 1;
               }
           });
 
