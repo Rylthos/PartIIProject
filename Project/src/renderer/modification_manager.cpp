@@ -6,13 +6,6 @@
 
 #include <map>
 
-static std::map<ModificationShape, const char*> shapeToString {
-    { ModificationShape::VOXEL,  "Single Voxel" },
-    { ModificationShape::SPHERE, "Sphere"       },
-    { ModificationShape::CUBE,   "Cube"         },
-    { ModificationShape::CUBOID, "Cuboid"       },
-};
-
 void ModificationManager::UI(const Event& event)
 {
     const FrameEvent& frameEvent = static_cast<const FrameEvent&>(event);
@@ -25,7 +18,7 @@ void ModificationManager::UI(const Event& event)
                 "##VoxelColour", (float*)&m_SelectedColour[0], ImGuiColorEditFlags_DisplayHSV);
 
             int currentlySelectedID = static_cast<int>(m_CurrentShape);
-            const char* previewValue = shapeToString[m_CurrentShape];
+            const char* previewValue = Modification::shapeToString[m_CurrentShape];
 
             ImGui::Text("Placement delay");
             ImGui::PushItemWidth(-1.0f);
@@ -35,10 +28,10 @@ void ModificationManager::UI(const Event& event)
             ImGui::Text("Current Shape");
             ImGui::PushItemWidth(-1.f);
             if (ImGui::BeginCombo("##CurrentShape", previewValue)) {
-                for (uint8_t i = 0; i < static_cast<uint8_t>(ModificationShape::MAX_SHAPE); i++) {
+                for (uint8_t i = 0; i < static_cast<uint8_t>(Modification::Shape::MAX_SHAPE); i++) {
                     const bool isSelected = (currentlySelectedID == i);
-                    ModificationShape currentType = static_cast<ModificationShape>(i);
-                    if (ImGui::Selectable(shapeToString[currentType], isSelected)) {
+                    Modification::Shape currentType = static_cast<Modification::Shape>(i);
+                    if (ImGui::Selectable(Modification::shapeToString[currentType], isSelected)) {
                         m_CurrentShape = currentType;
                         m_CurrentAdditional = glm::vec4(1.f);
                     }
@@ -52,9 +45,9 @@ void ModificationManager::UI(const Event& event)
             ImGui::PopItemWidth();
 
             switch (m_CurrentShape) {
-            case ModificationShape::VOXEL:
+            case Modification::Shape::VOXEL:
                 break;
-            case ModificationShape::SPHERE: {
+            case Modification::Shape::SPHERE: {
                 int radius = int(m_CurrentAdditional.x);
 
                 if (ImGui::SliderInt("Radius", &radius, 1, 25)) {
@@ -62,7 +55,7 @@ void ModificationManager::UI(const Event& event)
                 }
                 break;
             }
-            case ModificationShape::CUBE: {
+            case Modification::Shape::CUBE: {
                 int sideLength = int(m_CurrentAdditional.x);
 
                 if (ImGui::SliderInt("Side length", &sideLength, 1, 25)) {
@@ -70,7 +63,7 @@ void ModificationManager::UI(const Event& event)
                 }
                 break;
             }
-            case ModificationShape::CUBOID: {
+            case Modification::Shape::CUBOID: {
                 glm::ivec3 currentAddtional = glm::ivec3(m_CurrentAdditional);
 
                 if (ImGui::SliderInt("Forward", &currentAddtional.x, 1, 25)) {
@@ -84,7 +77,7 @@ void ModificationManager::UI(const Event& event)
                 }
                 break;
             }
-            case ModificationShape::MAX_SHAPE:
+            case Modification::Shape::MAX_SHAPE:
                 assert(false);
             };
         }

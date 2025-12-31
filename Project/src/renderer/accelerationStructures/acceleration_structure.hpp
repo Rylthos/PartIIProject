@@ -35,7 +35,7 @@ struct ModInfo {
     alignas(16) glm::vec3 colour;
     alignas(16) glm::vec4 additional;
 
-    ModInfo(ModificationShape shape, ModificationType type, glm::uvec3 index, glm::vec3 colour,
+    ModInfo(Modification::Shape shape, Modification::Type type, glm::uvec3 index, glm::vec3 colour,
         glm::vec4 additional)
         : shape(static_cast<int>(shape))
         , type(static_cast<int>(type))

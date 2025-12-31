@@ -2,24 +2,7 @@
 
 #include "events/events.hpp"
 
-enum class ModificationShape : int {
-    VOXEL = 0,
-    SPHERE = 1,
-    CUBE = 2,
-    CUBOID = 3,
-    MAX_SHAPE,
-};
-
-enum class ModificationType : int {
-    ERASE = 0,
-    PLACE = 1,
-    MAX_TYPE,
-};
-
-struct ModificationShapeInfo {
-    ModificationShape shape;
-    glm::vec4 additional;
-};
+#include "modification/mod_type.hpp"
 
 class ModificationManager {
   public:
@@ -35,10 +18,7 @@ class ModificationManager {
     }
 
     glm::vec3 getSelectedColour() { return m_SelectedColour; }
-    ModificationShapeInfo getShape()
-    {
-        return { .shape = m_CurrentShape, .additional = m_CurrentAdditional };
-    }
+    Modification::ShapeInfo getShape() { return { m_CurrentShape, m_CurrentAdditional }; }
     float getDelay() { return m_PlacementDelay; }
 
   private:
@@ -47,7 +27,7 @@ class ModificationManager {
     void UI(const Event& event);
 
   private:
-    ModificationShape m_CurrentShape = ModificationShape::VOXEL;
+    Modification::Shape m_CurrentShape = Modification::Shape::VOXEL;
     glm::vec4 m_CurrentAdditional;
     glm::vec3 m_SelectedColour = glm::vec3(1.f);
 

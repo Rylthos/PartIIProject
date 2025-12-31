@@ -86,7 +86,7 @@ void ASManager::update(float dt)
 
         glm::ivec3 index = glm::ivec3(m_MappedHitData->voxelIndex);
 
-        if (m_CurrentModification == ModificationType::PLACE) {
+        if (m_CurrentModification == Modification::Type::PLACE) {
             index += glm::ivec3(m_MappedHitData->normal);
         }
 
@@ -422,8 +422,8 @@ void ASManager::mouse(const Event& event)
             m_PressedButton = clickEvent.button;
 
             m_CurrentModification = (clickEvent.button == GLFW_MOUSE_BUTTON_1)
-                ? ModificationType::PLACE
-                : ModificationType::ERASE;
+                ? Modification::Type::PLACE
+                : Modification::Type::ERASE;
         }
     }
 

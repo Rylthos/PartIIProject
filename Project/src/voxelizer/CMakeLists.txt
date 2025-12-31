@@ -22,6 +22,7 @@ target_compile_definitions(Voxelizer PRIVATE STB_IMAGE_IMPLEMENTATION)
 
 target_link_libraries(Voxelizer PRIVATE
   loaders
+  modification
   generators
   serializers
 

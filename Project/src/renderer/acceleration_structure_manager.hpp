@@ -89,7 +89,7 @@ class ASManager {
     Buffer m_HitDataBuffer;
 
     bool m_ShouldEdit;
-    ModificationType m_CurrentModification;
+    Modification::Type m_CurrentModification;
     std::optional<uint32_t> m_PressedButton;
 
     float m_PreviousPlacement = 0.f;

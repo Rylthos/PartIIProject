@@ -42,6 +42,7 @@ endif()
 target_link_libraries(${PROJECT_NAME} PRIVATE
   loaders
   logger
+  modification
   generators
   events
   serializers
