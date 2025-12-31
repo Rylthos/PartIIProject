@@ -9,6 +9,7 @@
 
 #include "generators/grid.hpp"
 
+#include "modification/diff.hpp"
 #include "serializers/brickmap.hpp"
 #include "serializers/contree.hpp"
 #include "serializers/grid.hpp"
@@ -30,6 +31,7 @@
 #include <filesystem>
 #include <map>
 #include <memory>
+#include <unordered_map>
 #include <vector>
 
 static std::map<Structure, const char*> structureToString {
@@ -56,9 +58,9 @@ Parser::Parser(ParserArgs args) : m_Args(args)
         m_ValidStructures[BRICKMAP] = true;
 
     glm::uvec3 dimensions;
-    std::unordered_map<glm::ivec3, glm::vec3> voxels;
-    std::tie(dimensions, voxels) = parseFile();
-    generateStructures(dimensions, voxels);
+    std::vector<std::unordered_map<glm::ivec3, glm::vec3>> frames;
+    std::tie(dimensions, frames) = parseFile();
+    generateStructures(dimensions, frames);
 }
 
 Parser::~Parser()
@@ -85,8 +87,13 @@ ParserImpl::ParserRet Parser::parseFile()
 }
 
 void Parser::generateStructures(
-    glm::uvec3 dimensions, const std::unordered_map<glm::ivec3, glm::vec3>& voxels)
+    glm::uvec3 dimensions, const std::vector<std::unordered_map<glm::ivec3, glm::vec3>>& frames)
 {
+    std::vector<std::unordered_map<glm::ivec3, Modification::DiffType>> mods;
+    if (m_Args.animation) {
+        mods = generateAnimations(frames, dimensions);
+    }
+
     std::filesystem::path outputDirectory = m_Args.output;
     std::string outputName = m_Args.name;
 
@@ -107,7 +114,7 @@ void Parser::generateStructures(
 
     if (m_ValidStructures[GRID]) {
         threads[GRID] = std::jthread([&](std::stop_token stoken) {
-            std::unique_ptr<Loader> loader = std::make_unique<SparseLoader>(dimensions, voxels);
+            std::unique_ptr<Loader> loader = std::make_unique<SparseLoader>(dimensions, frames[0]);
             glm::uvec3 dimensions;
 
             auto voxels = Generators::generateGrid(
@@ -119,7 +126,7 @@ void Parser::generateStructures(
 
     if (m_ValidStructures[TEXTURE]) {
         threads[TEXTURE] = std::jthread([&](std::stop_token stoken) {
-            std::unique_ptr<Loader> loader = std::make_unique<SparseLoader>(dimensions, voxels);
+            std::unique_ptr<Loader> loader = std::make_unique<SparseLoader>(dimensions, frames[0]);
             glm::uvec3 dimensions;
             auto nodes = Generators::generateTexture(
                 stoken, std::move(loader), info[TEXTURE], dimensions, finished[TEXTURE]);
@@ -131,7 +138,7 @@ void Parser::generateStructures(
 
     if (m_ValidStructures[OCTREE]) {
         threads[OCTREE] = std::jthread([&](std::stop_token stoken) {
-            std::unique_ptr<Loader> loader = std::make_unique<SparseLoader>(dimensions, voxels);
+            std::unique_ptr<Loader> loader = std::make_unique<SparseLoader>(dimensions, frames[0]);
             glm::uvec3 dimensions;
             auto nodes = Generators::generateOctree(
                 stoken, std::move(loader), info[OCTREE], dimensions, finished[OCTREE]);
@@ -142,7 +149,7 @@ void Parser::generateStructures(
 
     if (m_ValidStructures[CONTREE]) {
         threads[CONTREE] = std::jthread([&](std::stop_token stoken) {
-            std::unique_ptr<Loader> loader = std::make_unique<SparseLoader>(dimensions, voxels);
+            std::unique_ptr<Loader> loader = std::make_unique<SparseLoader>(dimensions, frames[0]);
             glm::uvec3 dimensions;
             auto nodes = Generators::generateContree(
                 stoken, std::move(loader), info[CONTREE], dimensions, finished[CONTREE]);
@@ -153,7 +160,7 @@ void Parser::generateStructures(
 
     if (m_ValidStructures[BRICKMAP]) {
         threads[BRICKMAP] = std::jthread([&](std::stop_token stoken) {
-            std::unique_ptr<Loader> loader = std::make_unique<SparseLoader>(dimensions, voxels);
+            std::unique_ptr<Loader> loader = std::make_unique<SparseLoader>(dimensions, frames[0]);
             glm::uvec3 dimensions;
             std::vector<Generators::BrickgridPtr> brickgrid;
             std::vector<Generators::Brickmap> brickmaps;

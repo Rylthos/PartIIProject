@@ -144,7 +144,7 @@ glm::vec3 parseColour(uint32_t c)
 
 ParserRet parseVox(std::filesystem::path filepath, const ParserArgs& args)
 {
-    std::unordered_map<glm::ivec3, glm::vec3> voxels;
+    std::vector<std::unordered_map<glm::ivec3, glm::vec3>> voxels;
     glm::uvec3 dimensions;
 
     std::ifstream file(filepath.c_str());
@@ -167,10 +167,22 @@ ParserRet parseVox(std::filesystem::path filepath, const ParserArgs& args)
 
     for (const auto& child : mainChunk.children) {
         if (compareTag(child.tag, "PACK")) {
-            assert(false && "Multiple models not supported");
+            uint32_t num_models = parseUint32(child.chunkContent, 0);
+
+            if (args.animation) {
+                models.resize(num_models);
+            } else {
+                assert(false && "Multiple models not supported outside animation");
+            }
+
         } else if (compareTag(child.tag, "SIZE")) {
             if (currentModel.has_value()) {
-                assert(false && "Multiple models not supported");
+                if (args.animation) {
+                    models.push_back(currentModel.value());
+                    currentModel = Model();
+                } else {
+                    assert(false && "Multiple models not supported outside animation");
+                }
             } else {
                 currentModel = Model();
             }
@@ -209,12 +221,14 @@ ParserRet parseVox(std::filesystem::path filepath, const ParserArgs& args)
         models.push_back(currentModel.value());
     }
 
-    for (const auto& model : models) {
+    for (size_t frame = 0; frame < models.size(); frame++) {
+        const Model model = models[frame];
         dimensions = model.dimensions;
+        voxels.push_back({});
         for (const auto& vox : model.voxels) {
             glm::u8vec3 pos = vox.first;
             std::uint8_t index = vox.second;
-            voxels[glm::ivec3(pos.x, pos.y, pos.z)] = parseColour(pallete[index]);
+            voxels[frame][glm::ivec3(pos.x, pos.y, pos.z)] = parseColour(pallete[index]);
         }
     }
 

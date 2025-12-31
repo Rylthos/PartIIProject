@@ -5,6 +5,8 @@
 
 #include <unordered_map>
 
+#include "modification/mod_type.hpp"
+
 #include "parser_args.hpp"
 #include "parsers/general.hpp"
 
@@ -18,8 +20,8 @@ class Parser {
   private:
     ParserImpl::ParserRet parseFile();
 
-    void generateStructures(
-        glm::uvec3 dimensions, const std::unordered_map<glm::ivec3, glm::vec3>& voxels);
+    void generateStructures(glm::uvec3 dimensions,
+        const std::vector<std::unordered_map<glm::ivec3, glm::vec3>>& frames);
 
   private:
     ParserArgs m_Args;

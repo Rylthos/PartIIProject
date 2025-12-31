@@ -11,7 +11,7 @@
 
 namespace ParserImpl {
 
-typedef std::tuple<glm::uvec3, std::unordered_map<glm::ivec3, glm::vec3>> ParserRet;
+typedef std::tuple<glm::uvec3, std::vector<std::unordered_map<glm::ivec3, glm::vec3>>> ParserRet;
 
 struct Triangle {
     glm::vec3 positions[3];

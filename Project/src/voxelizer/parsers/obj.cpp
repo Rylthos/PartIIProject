@@ -301,7 +301,7 @@ ParserRet parseMesh(const std::vector<Triangle>& triangles,
 
     bar.reset();
 
-    return std::make_tuple(dimensions, voxels);
+    return std::make_tuple(dimensions, std::vector { voxels });
 }
 
 ParserRet parseObj(std::filesystem::path filepath, const ParserArgs& args)

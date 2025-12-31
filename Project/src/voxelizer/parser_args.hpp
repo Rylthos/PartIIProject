@@ -13,6 +13,7 @@ struct ParserArgs {
     bool flag_octree = false;
     bool flag_contree = false;
     bool flag_brickmap = false;
+    bool animation = false;
     uint32_t voxels_per_unit = 1;
     float units = 128.f;
 };
