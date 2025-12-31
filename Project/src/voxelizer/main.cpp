@@ -21,6 +21,7 @@ int main(int argc, char** argv)
     app.add_flag("-o", args.flag_octree, "Enable octree generator");
     app.add_flag("-c", args.flag_contree, "Enable contree generator");
     app.add_flag("-b", args.flag_brickmap, "Enable brickmap generator");
+    app.add_flag("--anim", args.animation, "Enable animation");
 
     CLI11_PARSE(app, argc, argv);
 

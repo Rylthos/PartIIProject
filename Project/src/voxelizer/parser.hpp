@@ -5,6 +5,7 @@
 
 #include <unordered_map>
 
+#include "modification/diff.hpp"
 #include "modification/mod_type.hpp"
 
 #include "parser_args.hpp"
@@ -22,6 +23,10 @@ class Parser {
 
     void generateStructures(glm::uvec3 dimensions,
         const std::vector<std::unordered_map<glm::ivec3, glm::vec3>>& frames);
+
+    std::vector<std::unordered_map<glm::ivec3, Modification::DiffType>> generateAnimations(
+        const std::vector<std::unordered_map<glm::ivec3, glm::vec3>>& frames,
+        glm::uvec3 dimensions);
 
   private:
     ParserArgs m_Args;
