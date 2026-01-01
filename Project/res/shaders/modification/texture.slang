@@ -28,6 +28,15 @@ struct TextureModification : IModification
         float3 colour = push_constants.mod.colour;
         i_VoxelData[voxel_index].rgb = colour;
         break;
+      case Type::REPLACE:
+        i_VoxelData[voxel_index].a = 1;
+
+        if (i_VoxelData[voxel_index].a != 0) {
+          float3 colour = push_constants.mod.colour;
+          i_VoxelData[voxel_index].rgb = colour;
+        }
+        break;
+
       case Type::ERASE:
         i_VoxelData[voxel_index].a = 0;
         break;
