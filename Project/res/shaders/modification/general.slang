@@ -10,8 +10,9 @@ enum Shape
 
 enum Type
 {
-  PLACE = 0,
-  ERASE = 1,
+  PLACE   = 0,
+  ERASE   = 1,
+  REPLACE = 2,
 };
 
 struct ModStruct
@@ -89,6 +90,8 @@ func run_shape<T>(in voxel_index: uint3, in forward: float3, in mod: ModStruct) 
   Type type = Type::ERASE;
   if (mod.type == 1) {
     type = Type::PLACE;
+  } else if (mod.type == 2) {
+    type = Type::REPLACE;
   }
 
   switch (mod.shape) {

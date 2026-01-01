@@ -36,4 +36,10 @@ static std::map<Shape, const char*> shapeToString {
     { Shape::CUBOID, "Cuboid"       },
 };
 
+static std::map<Type, const char*> typeToString {
+    { Type::PLACE,   "Place"   },
+    { Type::ERASE,   "Erase"   },
+    { Type::REPLACE, "Replace" },
+};
+
 }

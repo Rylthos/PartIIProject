@@ -36,14 +36,24 @@ struct GridModification : IModification
     uint bit_index = index % 32;
 
     switch (type) {
-      case Type::PLACE:
-        i_Occupancy[array_index] |= 1 << bit_index;
+     case Type::PLACE: {
+          i_Occupancy[array_index] |= 1 << bit_index;
 
-        float3 colour = push_constants.mod.colour;
-        i_Colour[index * 3 + 0] = colour.r;
-        i_Colour[index * 3 + 1] = colour.g;
-        i_Colour[index * 3 + 2] = colour.b;
-        break;
+          float3 colour = push_constants.mod.colour;
+          i_Colour[index * 3 + 0] = colour.r;
+          i_Colour[index * 3 + 1] = colour.g;
+          i_Colour[index * 3 + 2] = colour.b;
+          break;
+        }
+      case Type::REPLACE: {
+          if ((i_Occupancy[array_index] & (1 << bit_index)) != 0) {
+            float3 colour = push_constants.mod.colour;
+            i_Colour[index * 3 + 0] = colour.r;
+            i_Colour[index * 3 + 1] = colour.g;
+            i_Colour[index * 3 + 2] = colour.b;
+          }
+          break;
+        }
       case Type::ERASE:
         i_Occupancy[array_index] &= ~(1 << bit_index);
         break;
