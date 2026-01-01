@@ -3,8 +3,10 @@
 #include <stop_token>
 #include <vector>
 
+#include "imgui.h"
 #include "logger/logger.hpp"
 
+#include "modification/diff.hpp"
 #include "serializers/common.hpp"
 #include "serializers/grid.hpp"
 
@@ -103,7 +105,9 @@ void GridAS::fromFile(std::filesystem::path path)
             return;
         }
 
-        std::tie(info, m_Voxels) = data.value();
+        Modification::AnimationFrames animation;
+
+        std::tie(info, m_Voxels, animation) = data.value();
 
         m_Dimensions = info.dimensions;
 
@@ -111,6 +115,9 @@ void GridAS::fromFile(std::filesystem::path path)
         p_GenerationInfo.nodes = info.nodes;
         p_GenerationInfo.generationTime = 0;
         p_GenerationInfo.completionPercent = 1;
+
+        p_CurrentFrame = 0;
+        p_AnimationFrames = animation;
 
         m_UpdateBuffers = true;
         p_Loading = false;
@@ -188,6 +195,15 @@ void GridAS::update(float dt)
         p_FinishedGeneration = true;
         m_UpdateBuffers = false;
         p_Generating = false;
+    }
+
+    if (p_FinishedGeneration && p_CurrentFrame != p_TargetFrame) {
+        const auto& frame = p_AnimationFrames[p_CurrentFrame];
+        for (const auto& diff : frame) {
+            p_Mods.push_back({ diff.first, diff.second });
+        }
+
+        p_CurrentFrame = (p_CurrentFrame + 1) % p_AnimationFrames.size();
     }
 }
 
