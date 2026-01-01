@@ -105,9 +105,7 @@ void GridAS::fromFile(std::filesystem::path path)
             return;
         }
 
-        Modification::AnimationFrames animation;
-
-        std::tie(info, m_Voxels, animation) = data.value();
+        std::tie(info, m_Voxels, p_AnimationFrames) = data.value();
 
         m_Dimensions = info.dimensions;
 
@@ -117,7 +115,6 @@ void GridAS::fromFile(std::filesystem::path path)
         p_GenerationInfo.completionPercent = 1;
 
         p_CurrentFrame = 0;
-        p_AnimationFrames = animation;
 
         m_UpdateBuffers = true;
         p_Loading = false;
@@ -173,6 +170,38 @@ void GridAS::render(
                 sizeof(ModPushConstants), &pushConstant);
 
             vkCmdDispatch(cmd, 1, 1, 1);
+
+            {
+                VkBufferMemoryBarrier occupancyMB {
+                    .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+                    .pNext = nullptr,
+                    .srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+                    .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+                    .srcQueueFamilyIndex = p_Info.graphicsQueueIndex,
+                    .dstQueueFamilyIndex = p_Info.graphicsQueueIndex,
+                    .buffer = m_OccupancyBuffer.getBuffer(),
+                    .offset = 0,
+                    .size = VK_WHOLE_SIZE,
+                };
+
+                VkBufferMemoryBarrier colourMB {
+                    .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+                    .pNext = nullptr,
+                    .srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+                    .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+                    .srcQueueFamilyIndex = p_Info.graphicsQueueIndex,
+                    .dstQueueFamilyIndex = p_Info.graphicsQueueIndex,
+                    .buffer = m_ColourBuffer.getBuffer(),
+                    .offset = 0,
+                    .size = VK_WHOLE_SIZE,
+                };
+
+                std::vector<VkBufferMemoryBarrier> barriers = { occupancyMB, colourMB };
+
+                vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, barriers.size(),
+                    barriers.data(), 0, nullptr);
+            }
         }
 
         p_Mods.clear();
