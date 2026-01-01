@@ -10,13 +10,29 @@ class AnimationManager {
         return &manager;
     }
 
-    std::function<void(const Event& event)> getUIEvent()
+    std::function<void(const Event& event)> getFrameEvent()
     {
-        return std::bind(&AnimationManager::UI, this, std::placeholders::_1);
+        return std::bind(&AnimationManager::frameEvent, this, std::placeholders::_1);
     }
+
+    void reset();
 
   private:
     AnimationManager() { }
 
-    void UI(const Event& event);
+    void frameEvent(const Event& event);
+    void UI();
+
+    void update(float delta);
+
+    void imguiDisable();
+    void imguiEnable();
+
+  private:
+    uint32_t m_FPS = 4;
+
+    bool m_Playing = false;
+    bool m_Paused = false;
+
+    uint32_t m_CachedFrame = 0;
 };

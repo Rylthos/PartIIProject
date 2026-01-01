@@ -12,6 +12,8 @@
 #include "accelerationStructures/octree.hpp"
 #include "accelerationStructures/texture.hpp"
 
+#include "animation_manager.hpp"
+
 #include "buffer.hpp"
 #include "modification_manager.hpp"
 #include "shader_manager.hpp"
@@ -125,6 +127,9 @@ void ASManager::setAS(ASType type)
     default:
         assert(false && "Invalid Type provided");
     }
+
+    AnimationManager::getManager()->reset();
+
     m_CurrentAS->init(m_InitInfo);
     LOG_INFO("Changed to {}", typeToStringMap[m_CurrentType]);
 }

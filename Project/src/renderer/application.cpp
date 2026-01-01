@@ -104,7 +104,7 @@ void Application::init()
     subscribe(EventFamily::FRAME, SceneManager::getManager()->getUIEvent());
     subscribe(EventFamily::FRAME, PerformanceLogger::getLogger()->getFrameEvent());
     subscribe(EventFamily::FRAME, ModificationManager::getManager()->getUIEvent());
-    subscribe(EventFamily::FRAME, AnimationManager::getManager()->getUIEvent());
+    subscribe(EventFamily::FRAME, AnimationManager::getManager()->getFrameEvent());
 
     m_Window.subscribe(EventFamily::KEYBOARD, m_Camera.getKeyboardEvent());
     m_Window.subscribe(EventFamily::MOUSE, m_Camera.getMouseEvent());
