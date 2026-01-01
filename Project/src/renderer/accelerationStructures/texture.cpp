@@ -92,7 +92,7 @@ void TextureAS::fromFile(std::filesystem::path path)
             return;
         }
 
-        std::tie(info, m_Voxels) = data.value();
+        std::tie(info, m_Voxels, p_AnimationFrames) = data.value();
 
         m_Dimensions = info.dimensions;
 
@@ -155,6 +155,31 @@ void TextureAS::render(
                 sizeof(ModPushConstants), &pushConstant);
 
             vkCmdDispatch(cmd, 1, 1, 1);
+
+            {
+                VkImageMemoryBarrier imageMB {
+                    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                    .pNext = nullptr,
+                    .srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+                    .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+                    .oldLayout = VK_IMAGE_LAYOUT_GENERAL,
+                    .newLayout = VK_IMAGE_LAYOUT_GENERAL,
+                    .srcQueueFamilyIndex = p_Info.graphicsQueueIndex,
+                    .dstQueueFamilyIndex = p_Info.graphicsQueueIndex,
+                    .image = m_DataImage.getImage(),
+                    .subresourceRange = { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                                         .baseMipLevel = 0,
+                                         .levelCount = VK_REMAINING_MIP_LEVELS,
+                                         .baseArrayLayer = 0,
+                                         .layerCount = VK_REMAINING_ARRAY_LAYERS },
+                };
+
+                std::vector<VkImageMemoryBarrier> barriers = { imageMB };
+
+                vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr,
+                    barriers.size(), barriers.data());
+            }
         }
 
         p_Mods.clear();
@@ -177,6 +202,15 @@ void TextureAS::update(float dt)
         p_FinishedGeneration = true;
         m_UpdateBuffers = false;
         p_Generating = false;
+    }
+
+    if (p_FinishedGeneration && p_CurrentFrame != p_TargetFrame) {
+        const auto& frame = p_AnimationFrames[p_CurrentFrame];
+        for (const auto& diff : frame) {
+            p_Mods.push_back({ diff.first, diff.second });
+        }
+
+        p_CurrentFrame = (p_CurrentFrame + 1) % p_AnimationFrames.size();
     }
 }
 

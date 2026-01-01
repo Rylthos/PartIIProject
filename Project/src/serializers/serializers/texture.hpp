@@ -8,9 +8,11 @@
 #include <filesystem>
 
 namespace Serializers {
-std::optional<std::tuple<SerialInfo, std::vector<Generators::TextureVoxel>>> loadTexture(
-    std::filesystem::path directory);
+std::optional<
+    std::tuple<SerialInfo, std::vector<Generators::TextureVoxel>, Modification::AnimationFrames>>
+loadTexture(std::filesystem::path directory);
 
 void storeTexture(std::filesystem::path output, const std::string& name, glm::uvec3 dimensions,
-    std::vector<Generators::TextureVoxel> voxels, Generators::GenerationInfo generationInfo);
+    std::vector<Generators::TextureVoxel> voxels, Generators::GenerationInfo generationInfo,
+    const Modification::AnimationFrames& animation);
 }

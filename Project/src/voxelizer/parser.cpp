@@ -134,7 +134,7 @@ void Parser::generateStructures(
                 stoken, std::move(loader), info[TEXTURE], dimensions, finished[TEXTURE]);
 
             Serializers::storeTexture(
-                outputDirectory, outputName, dimensions, nodes, info[TEXTURE]);
+                outputDirectory, outputName, dimensions, nodes, info[TEXTURE], animationFrames);
         });
     }
 

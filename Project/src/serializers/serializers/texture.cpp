@@ -2,13 +2,15 @@
 
 #include "common.hpp"
 #include "generators/texture.hpp"
+#include "modification/diff.hpp"
 
 #include <iostream>
 
 namespace Serializers {
 
-std::optional<std::tuple<SerialInfo, std::vector<Generators::TextureVoxel>>> loadTexture(
-    std::filesystem::path directory)
+std::optional<
+    std::tuple<SerialInfo, std::vector<Generators::TextureVoxel>, Modification::AnimationFrames>>
+loadTexture(std::filesystem::path directory)
 {
     std::string foldername = directory.filename();
 
@@ -24,20 +26,25 @@ std::optional<std::tuple<SerialInfo, std::vector<Generators::TextureVoxel>>> loa
     serialInfo.dimensions = Serializers::readUvec3(inputStream);
     serialInfo.voxels = Serializers::readUint64(inputStream);
     serialInfo.nodes = Serializers::readUint64(inputStream);
+    size_t voxelCount = Serializers::readUint64(inputStream);
 
     std::vector<Generators::TextureVoxel> nodes;
     nodes.reserve(serialInfo.nodes);
 
-    while (!inputStream.eof()) {
+    for (size_t i = 0; i < voxelCount; i++) {
         glm::u8vec4 data = Serializers::readU8Vec4(inputStream);
 
         nodes.push_back(data);
     }
-    return std::make_pair(serialInfo, nodes);
+
+    Modification::AnimationFrames animation = readAnimationFrames(inputStream);
+
+    return std::make_tuple(serialInfo, nodes, animation);
 }
 
 void storeTexture(std::filesystem::path output, const std::string& name, glm::uvec3 dimensions,
-    std::vector<Generators::TextureVoxel> voxels, Generators::GenerationInfo generationInfo)
+    std::vector<Generators::TextureVoxel> voxels, Generators::GenerationInfo generationInfo,
+    const Modification::AnimationFrames& animation)
 {
     std::filesystem::path target = output / name / (name + ".voxtexture");
 
@@ -50,10 +57,13 @@ void storeTexture(std::filesystem::path output, const std::string& name, glm::uv
     writeUvec3(dimensions, outputStream);
     writeUint64(generationInfo.voxelCount, outputStream);
     writeUint64(generationInfo.nodes, outputStream);
+    writeUint64(voxels.size(), outputStream);
 
     for (const auto& node : voxels) {
         writeU8Vec4(node, outputStream);
     }
+
+    writeAnimationFrames(animation, outputStream);
 
     outputStream.close();
 }
