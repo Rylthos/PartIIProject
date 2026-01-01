@@ -170,7 +170,7 @@ ParserRet parseVox(std::filesystem::path filepath, const ParserArgs& args)
             uint32_t num_models = parseUint32(child.chunkContent, 0);
 
             if (args.animation) {
-                models.resize(num_models);
+                models.reserve(num_models);
             } else {
                 assert(false && "Multiple models not supported outside animation");
             }
@@ -221,10 +221,11 @@ ParserRet parseVox(std::filesystem::path filepath, const ParserArgs& args)
         models.push_back(currentModel.value());
     }
 
+    voxels.resize(models.size());
+
     for (size_t frame = 0; frame < models.size(); frame++) {
         const Model model = models[frame];
         dimensions = model.dimensions;
-        voxels.push_back({});
         for (const auto& vox : model.voxels) {
             glm::u8vec3 pos = vox.first;
             std::uint8_t index = vox.second;
@@ -233,7 +234,6 @@ ParserRet parseVox(std::filesystem::path filepath, const ParserArgs& args)
     }
 
     printf("Dimensions: %s\n", glm::to_string(dimensions).c_str());
-    printf("Voxels: %ld\n", voxels.size());
 
     return std::make_tuple(dimensions, voxels);
 }
