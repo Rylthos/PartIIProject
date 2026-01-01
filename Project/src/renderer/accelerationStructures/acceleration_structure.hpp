@@ -11,6 +11,7 @@
 #include "../camera.hpp"
 #include "../modification_manager.hpp"
 #include "loaders/loader.hpp"
+#include "modification/diff.hpp"
 
 #include <filesystem>
 
@@ -42,6 +43,15 @@ struct ModInfo {
         , voxelIndex(index)
         , colour(colour)
         , additional(additional)
+    {
+    }
+
+    ModInfo(glm::uvec3 index, Modification::DiffType diff)
+        : shape(static_cast<int>(Modification::Shape::VOXEL))
+        , type(static_cast<int>(diff.first))
+        , voxelIndex(index)
+        , colour(diff.second)
+        , additional(0.f)
     {
     }
 };
@@ -76,6 +86,11 @@ class IAccelerationStructure {
 
     virtual bool isLoading() { return p_Loading; }
 
+    virtual bool canAnimate() { return false; }
+    virtual size_t getAnimationFrames() { return p_AnimationFrames.size(); }
+    virtual uint32_t getAnimationFrame() { return p_CurrentFrame; }
+    virtual void setAnimationFrame(uint32_t target) { p_TargetFrame = target; }
+
   protected:
     ASStructInfo p_Info;
 
@@ -86,6 +101,10 @@ class IAccelerationStructure {
     bool p_Loading = false;
     bool p_UpdateBuffers = false;
     bool p_Generating = false;
+
+    uint32_t p_CurrentFrame = 0;
+    uint32_t p_TargetFrame = 0;
+    Modification::AnimationFrames p_AnimationFrames;
 
     std::vector<ModInfo> p_Mods;
 

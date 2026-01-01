@@ -71,6 +71,11 @@ class ASManager {
 
     glm::uvec3 getDimensions() { return m_CurrentAS->getDimensions(); };
 
+    bool animationEnabled() { return m_CurrentAS->canAnimate(); }
+    size_t getAnimationFrames() { return m_CurrentAS->getAnimationFrames(); }
+    uint32_t getAnimationFrame() { return m_CurrentAS->getAnimationFrame(); }
+    void setAnimationFrame(uint32_t target) { m_CurrentAS->setAnimationFrame(target); }
+
   private:
     ASManager() { };
 

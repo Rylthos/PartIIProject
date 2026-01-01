@@ -5,6 +5,7 @@
 #include <memory>
 #include <vector>
 
+#include "animation_manager.hpp"
 #include "events/events.hpp"
 
 #include "VkBootstrap.h"
@@ -103,6 +104,7 @@ void Application::init()
     subscribe(EventFamily::FRAME, SceneManager::getManager()->getUIEvent());
     subscribe(EventFamily::FRAME, PerformanceLogger::getLogger()->getFrameEvent());
     subscribe(EventFamily::FRAME, ModificationManager::getManager()->getUIEvent());
+    subscribe(EventFamily::FRAME, AnimationManager::getManager()->getUIEvent());
 
     m_Window.subscribe(EventFamily::KEYBOARD, m_Camera.getKeyboardEvent());
     m_Window.subscribe(EventFamily::MOUSE, m_Camera.getMouseEvent());
