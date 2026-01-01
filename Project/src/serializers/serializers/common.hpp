@@ -1,5 +1,6 @@
 #pragma once
 
+#include "modification/diff.hpp"
 #include <fstream>
 
 #include <cstdint>
@@ -19,12 +20,24 @@ uint8_t readByte(std::ifstream& stream);
 void writeUint32(uint32_t value, std::ofstream& stream);
 uint32_t readUint32(std::ifstream& stream);
 
+void writeFloat(float value, std::ofstream& stream);
+float readFloat(std::ifstream& stream);
+
 void writeUint64(uint64_t value, std::ofstream& stream);
 uint64_t readUint64(std::ifstream& stream);
 
 void writeUvec3(glm::uvec3 vec, std::ofstream& stream);
 glm::uvec3 readUvec3(std::ifstream& stream);
 
+void writeVec3(glm::vec3 vec, std::ofstream& stream);
+glm::vec3 readVec3(std::ifstream& stream);
+
 void writeU8Vec4(glm::u8vec4 vec, std::ofstream& stream);
 glm::u8vec4 readU8Vec4(std::ifstream& stream);
+
+void writeDiff(Modification::DiffType diff, std::ofstream& stream);
+Modification::DiffType readDiff(std::ifstream& stream);
+
+void writeAnimationFrames(const Modification::AnimationFrames& animation, std::ofstream& stream);
+Modification::AnimationFrames readAnimationFrames(std::ifstream& stream);
 };

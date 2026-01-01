@@ -15,6 +15,7 @@ endif()
 target_link_libraries(serializers PUBLIC
   generators
   logger
+  modification
 
   glm::glm
 )

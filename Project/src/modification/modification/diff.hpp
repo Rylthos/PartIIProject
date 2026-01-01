@@ -5,10 +5,12 @@
 #include <optional>
 
 #include <glm/glm.hpp>
+#include <glm/gtx/hash.hpp>
 
 namespace Modification {
 
-typedef std::optional<std::pair<Type, ShapeInfo>> DiffType;
+typedef std::pair<Type, glm::vec3> DiffType;
+typedef std::vector<std::unordered_map<glm::ivec3, DiffType>> AnimationFrames;
 
-DiffType getDiff(std::optional<glm::vec3> first, std::optional<glm::vec3> second);
+std::optional<DiffType> getDiff(std::optional<glm::vec3> first, std::optional<glm::vec3> second);
 }

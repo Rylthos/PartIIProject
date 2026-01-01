@@ -89,9 +89,9 @@ ParserImpl::ParserRet Parser::parseFile()
 void Parser::generateStructures(
     glm::uvec3 dimensions, const std::vector<std::unordered_map<glm::ivec3, glm::vec3>>& frames)
 {
-    std::vector<std::unordered_map<glm::ivec3, Modification::DiffType>> mods;
+    Modification::AnimationFrames animationFrames;
     if (m_Args.animation) {
-        mods = generateAnimations(frames, dimensions);
+        animationFrames = generateAnimations(frames, dimensions);
     }
 
     std::filesystem::path outputDirectory = m_Args.output;
@@ -120,7 +120,8 @@ void Parser::generateStructures(
             auto voxels = Generators::generateGrid(
                 stoken, std::move(loader), info[GRID], dimensions, finished[GRID]);
 
-            Serializers::storeGrid(outputDirectory, outputName, dimensions, voxels, info[GRID]);
+            Serializers::storeGrid(
+                outputDirectory, outputName, dimensions, voxels, info[GRID], animationFrames);
         });
     }
 
@@ -210,14 +211,14 @@ void Parser::generateStructures(
     }
 }
 
-std::vector<std::unordered_map<glm::ivec3, Modification::DiffType>> Parser::generateAnimations(
+Modification::AnimationFrames Parser::generateAnimations(
     const std::vector<std::unordered_map<glm::ivec3, glm::vec3>>& frames, glm::uvec3 dimensions)
 {
     if (frames.size() == 1) {
         return {};
     }
 
-    std::vector<std::unordered_map<glm::ivec3, Modification::DiffType>> mods;
+    Modification::AnimationFrames animation;
 
     const size_t frameCount = frames.size();
 
@@ -232,7 +233,7 @@ std::vector<std::unordered_map<glm::ivec3, Modification::DiffType>> Parser::gene
     for (uint32_t frame = 0; frame < frameCount; frame++) {
         uint32_t nextFrame = (frame + 1) % frameCount;
 
-        mods.push_back({});
+        animation.push_back({});
 
         for (uint32_t y = 0; y < dimensions.y; y++) {
             for (uint32_t z = 0; z < dimensions.z; z++) {
@@ -245,12 +246,12 @@ std::vector<std::unordered_map<glm::ivec3, Modification::DiffType>> Parser::gene
 
                     auto mod = Modification::getDiff(first, second);
                     if (mod.has_value()) {
-                        mods[frame][index] = mod;
+                        animation.at(frame).insert({ index, mod.value() });
                     }
                 }
             }
         }
     }
 
-    return mods;
+    return animation;
 }

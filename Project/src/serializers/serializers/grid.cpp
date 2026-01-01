@@ -1,13 +1,15 @@
 #include "grid.hpp"
 #include "generators/grid.hpp"
+#include "modification/diff.hpp"
 #include "serializers/common.hpp"
 
 #include <iostream>
 
 namespace Serializers {
 
-std::optional<std::tuple<SerialInfo, std::vector<Generators::GridVoxel>>> loadGrid(
-    std::filesystem::path directory)
+std::optional<
+    std::tuple<SerialInfo, std::vector<Generators::GridVoxel>, Modification::AnimationFrames>>
+loadGrid(std::filesystem::path directory)
 {
     std::string foldername = directory.filename();
 
@@ -24,11 +26,12 @@ std::optional<std::tuple<SerialInfo, std::vector<Generators::GridVoxel>>> loadGr
     serialInfo.dimensions = Serializers::readUvec3(inputStream);
     serialInfo.voxels = Serializers::readUint64(inputStream);
     serialInfo.nodes = Serializers::readUint64(inputStream);
+    size_t voxelCount = Serializers::readUint64(inputStream);
 
     std::vector<Generators::GridVoxel> voxels;
-    voxels.reserve(serialInfo.voxels);
+    voxels.reserve(voxelCount);
 
-    while (!inputStream.eof()) {
+    for (size_t i = 0; i < voxelCount; i++) {
         glm::u8vec4 voxel = Serializers::readU8Vec4(inputStream);
 
         voxels.push_back(Generators::GridVoxel {
@@ -40,11 +43,15 @@ std::optional<std::tuple<SerialInfo, std::vector<Generators::GridVoxel>>> loadGr
                 },
         });
     }
-    return std::make_pair(serialInfo, voxels);
+
+    Modification::AnimationFrames animation = readAnimationFrames(inputStream);
+
+    return std::make_tuple(serialInfo, voxels, animation);
 }
 
 void storeGrid(std::filesystem::path output, const std::string& name, glm::uvec3 dimensions,
-    std::vector<Generators::GridVoxel> grid, Generators::GenerationInfo generationInfo)
+    std::vector<Generators::GridVoxel> grid, Generators::GenerationInfo generationInfo,
+    const Modification::AnimationFrames& animation)
 {
     std::filesystem::path target = output / name / (name + ".voxgrid");
 
@@ -57,6 +64,7 @@ void storeGrid(std::filesystem::path output, const std::string& name, glm::uvec3
     writeUvec3(dimensions, outputStream);
     writeUint64(generationInfo.voxelCount, outputStream);
     writeUint64(generationInfo.nodes, outputStream);
+    writeUint64(grid.size(), outputStream);
 
     for (const auto& voxel : grid) {
         glm::u8vec4 v = {
@@ -67,6 +75,8 @@ void storeGrid(std::filesystem::path output, const std::string& name, glm::uvec3
         };
         Serializers::writeU8Vec4(v, outputStream);
     }
+
+    writeAnimationFrames(animation, outputStream);
 
     outputStream.close();
 }

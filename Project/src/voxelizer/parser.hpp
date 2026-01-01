@@ -24,7 +24,7 @@ class Parser {
     void generateStructures(glm::uvec3 dimensions,
         const std::vector<std::unordered_map<glm::ivec3, glm::vec3>>& frames);
 
-    std::vector<std::unordered_map<glm::ivec3, Modification::DiffType>> generateAnimations(
+    Modification::AnimationFrames generateAnimations(
         const std::vector<std::unordered_map<glm::ivec3, glm::vec3>>& frames,
         glm::uvec3 dimensions);
 

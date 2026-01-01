@@ -4,16 +4,20 @@
 
 #include "generators/grid.hpp"
 
+#include "modification/diff.hpp"
+
 #include <glm/glm.hpp>
 
 #include <filesystem>
 
 namespace Serializers {
 
-std::optional<std::tuple<SerialInfo, std::vector<Generators::GridVoxel>>> loadGrid(
-    std::filesystem::path directory);
+std::optional<
+    std::tuple<SerialInfo, std::vector<Generators::GridVoxel>, Modification::AnimationFrames>>
+loadGrid(std::filesystem::path directory);
 
 void storeGrid(std::filesystem::path output, const std::string& name, glm::uvec3 dimensions,
-    std::vector<Generators::GridVoxel> grid, Generators::GenerationInfo generationInfo);
+    std::vector<Generators::GridVoxel> grid, Generators::GenerationInfo generationInfo,
+    const Modification::AnimationFrames& animation);
 
 }
