@@ -31,6 +31,7 @@
 #include <filesystem>
 #include <map>
 #include <memory>
+#include <optional>
 #include <unordered_map>
 #include <vector>
 
@@ -226,27 +227,26 @@ Modification::AnimationFrames Parser::generateAnimations(
         if (frames.contains(index)) {
             return std::make_optional<glm::vec3>(frames.at(index));
         } else {
-            return std::make_optional<glm::vec3>();
+            return std::optional<glm::vec3>();
         }
     };
 
-    for (uint32_t frame = 0; frame < frameCount; frame++) {
-        uint32_t nextFrame = (frame + 1) % frameCount;
+    animation.resize(frameCount);
 
-        animation.push_back({});
+    for (uint32_t y = 0; y < dimensions.y; y++) {
+        for (uint32_t z = 0; z < dimensions.z; z++) {
+            for (uint32_t x = 0; x < dimensions.x; x++) {
+                glm::ivec3 index(x, y, z);
 
-        for (uint32_t y = 0; y < dimensions.y; y++) {
-            for (uint32_t z = 0; z < dimensions.z; z++) {
-                for (uint32_t x = 0; x < dimensions.x; x++) {
-
-                    glm::ivec3 index(x, y, z);
+                for (uint32_t frame = 0; frame < frameCount; frame++) {
+                    uint32_t nextFrame = (frame + 1) % frameCount;
 
                     std::optional<glm::vec3> first = getVoxel(frames[frame], index);
                     std::optional<glm::vec3> second = getVoxel(frames[nextFrame], index);
 
                     auto mod = Modification::getDiff(first, second);
                     if (mod.has_value()) {
-                        animation.at(frame).insert({ index, mod.value() });
+                        animation[frame].insert({ index, mod.value() });
                     }
                 }
             }
