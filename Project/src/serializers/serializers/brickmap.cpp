@@ -2,14 +2,16 @@
 
 #include "common.hpp"
 #include "generators/brickmap.hpp"
+#include "modification/diff.hpp"
 
 #include <iostream>
 #include <tuple>
 
 namespace Serializers {
 
-std::optional<std::tuple<SerialInfo, std::vector<Generators::BrickgridPtr>,
-    std::vector<Generators::Brickmap>, std::vector<Generators::BrickmapColour>>>
+std::optional<
+    std::tuple<SerialInfo, std::vector<Generators::BrickgridPtr>, std::vector<Generators::Brickmap>,
+        std::vector<Generators::BrickmapColour>, Modification::AnimationFrames>>
 loadBrickmap(std::filesystem::path directory)
 {
     std::string foldername = directory.filename();
@@ -65,12 +67,15 @@ loadBrickmap(std::filesystem::path directory)
         colours.push_back(colour);
     }
 
-    return std::make_tuple(serialInfo, brickgrid, brickmaps, colours);
+    Modification::AnimationFrames animation = readAnimationFrames(inputStream);
+
+    return std::make_tuple(serialInfo, brickgrid, brickmaps, colours, animation);
 }
 
 void storeBrickmap(std::filesystem::path output, const std::string& name, glm::uvec3 dimensions,
     std::vector<Generators::BrickgridPtr> brickgrid, std::vector<Generators::Brickmap> brickmaps,
-    std::vector<Generators::BrickmapColour> colours, Generators::GenerationInfo generationInfo)
+    std::vector<Generators::BrickmapColour> colours, Generators::GenerationInfo generationInfo,
+    const Modification::AnimationFrames& animation)
 {
     std::filesystem::path target = output / name / (name + ".voxbrick");
 
@@ -104,6 +109,8 @@ void storeBrickmap(std::filesystem::path output, const std::string& name, glm::u
         Serializers::writeByte(colour.g, outputStream);
         Serializers::writeByte(colour.b, outputStream);
     }
+
+    writeAnimationFrames(animation, outputStream);
 
     outputStream.close();
 }

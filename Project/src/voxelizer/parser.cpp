@@ -171,7 +171,7 @@ void Parser::generateStructures(
                 stoken, std::move(loader), info[BRICKMAP], dimensions, finished[BRICKMAP]);
 
             Serializers::storeBrickmap(outputDirectory, outputName, dimensions, brickgrid,
-                brickmaps, colours, info[BRICKMAP]);
+                brickmaps, colours, info[BRICKMAP], animationFrames);
         });
     }
 

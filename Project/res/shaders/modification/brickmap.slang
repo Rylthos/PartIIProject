@@ -268,6 +268,19 @@ struct BrickmapModification : IModification
 
                           break;
                         }
+      case Type::REPLACE: {
+                            if ((i_Brickmap[grid.getPtr].data[voxel_index.y] & ((uint64_t)1 << mask_index)) != 0) {
+                              uint64_t colour_ptr = i_Brickmap[grid.getPtr].colourPtr;
+
+                              uint bitcount = getSetBits(i_Brickmap[grid.getPtr], voxel_index);
+
+                              i_Colours[colour_ptr + bitcount].r = (uint8_t)floor(colour.r * 255.);
+                              i_Colours[colour_ptr + bitcount].g = (uint8_t)floor(colour.g * 255.);
+                              i_Colours[colour_ptr + bitcount].b = (uint8_t)floor(colour.b * 255.);
+                            }
+
+                            break;
+                          }
       case Type::ERASE: {
                           uint64_t new_value = i_Brickmap[grid.getPtr].data[voxel_index.y] & ~((uint64_t)1 << mask_index);
                           if (new_value == i_Brickmap[grid.getPtr].data[voxel_index.y]) {

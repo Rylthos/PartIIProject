@@ -31,6 +31,8 @@ class BrickmapAS : public IAccelerationStructure {
 
     glm::uvec3 getDimensions() override { return m_BrickgridSize * 8u; }
 
+    bool canAnimate() override { return true; }
+
   private:
     void mainRender(
         VkCommandBuffer cmd, Camera camera, VkDescriptorSet renderSet, VkExtent2D imageSize);
