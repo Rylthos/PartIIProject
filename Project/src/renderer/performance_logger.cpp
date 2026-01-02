@@ -182,11 +182,12 @@ void PerformanceLogger::parseJson(std::filesystem::path file)
     }
 
     m_Defaults = PerfEntry {};
+    m_CameraSettings.clear();
     json data = json::parse(input);
 
     if (data.contains("defaults")) {
         json defaults = data["defaults"];
-        m_Defaults = parseEntry(defaults);
+        m_Defaults = parseEntry(defaults, true);
     }
 
     if (data.contains("tests")) {
@@ -213,8 +214,8 @@ void PerformanceLogger::startPerf(const PerfEntry& perf)
     m_DataEntries.push_back({});
     m_DataEntries[m_CurrentEntry].gpuFrameTimes.reserve(perf.captures);
 
-    m_Camera->setPosition(perf.camera_pos);
-    m_Camera->setRotation(perf.yaw, perf.pitch);
+    m_Camera->setPosition(perf.camera.pos);
+    m_Camera->setRotation(perf.camera.yaw, perf.camera.pitch);
 
     if (perf.structure != ASType::MAX_TYPE) {
         ASManager::getManager()->setAS(perf.structure);
@@ -232,7 +233,8 @@ void PerformanceLogger::startPerf(const PerfEntry& perf)
     LOG_INFO("Start Perf {}", perf.name);
 }
 
-PerformanceLogger::PerfEntry PerformanceLogger::parseEntry(const nlohmann::json& json)
+PerformanceLogger::PerfEntry PerformanceLogger::parseEntry(
+    const nlohmann::json& json, bool defaults)
 {
     PerfEntry entry = m_Defaults;
 
@@ -273,15 +275,54 @@ PerformanceLogger::PerfEntry PerformanceLogger::parseEntry(const nlohmann::json&
         entry.delay = json["delay"].get<int>();
     }
 
+    if (json.contains("cameras")) {
+        if (!defaults) {
+            LOG_ERROR("Unable to parse multiple cameras for non default entry");
+        } else {
+            size_t size = json["cameras"].size();
+            for (size_t i = 0; i < size; i++) {
+                m_CameraSettings.push_back(parseCamera(json["cameras"][i]));
+            }
+        }
+    }
+
+    if (json.contains("ids")) {
+        if (!defaults) {
+            LOG_ERROR("Unable to parse multiple ids for non default entry");
+        } else {
+            size_t size = json["ids"].size();
+            for (size_t i = 0; i < size; i++) {
+                m_IDs.push_back(json["ids"][i].get<std::string>());
+            }
+        }
+    }
+
     if (json.contains("camera")) {
-        auto cam = json["camera"];
+        entry.camera = parseCamera(json["camera"]);
+    }
+
+    if (json.contains("id")) {
+        if (json["id"].is_number_integer()) {
+            entry.id = m_IDs[json["id"].get<int>()];
+        } else {
+            entry.id = json["id"].get<std::string>();
+        }
+    }
+
+    return entry;
+}
+
+PerformanceLogger::CameraSettings PerformanceLogger::parseCamera(const nlohmann::json& cam)
+{
+    CameraSettings settings;
+    if (cam.is_object()) {
         if (cam.contains("pos")) {
             if (cam["pos"].size() != 3) {
                 LOG_ERROR("Invalid number of entries for camera position");
             } else {
-                entry.camera_pos.x = cam["pos"][0].get<float>();
-                entry.camera_pos.y = cam["pos"][1].get<float>();
-                entry.camera_pos.z = cam["pos"][2].get<float>();
+                settings.pos.x = cam["pos"][0].get<float>();
+                settings.pos.y = cam["pos"][1].get<float>();
+                settings.pos.z = cam["pos"][2].get<float>();
             }
         }
 
@@ -289,13 +330,21 @@ PerformanceLogger::PerfEntry PerformanceLogger::parseEntry(const nlohmann::json&
             if (cam["rot"].size() != 2) {
                 LOG_ERROR("Invalid number of entries for camera rotation");
             } else {
-                entry.yaw = cam["rot"][0].get<float>();
-                entry.pitch = cam["rot"][1].get<float>();
+                settings.yaw = cam["rot"][0].get<float>();
+                settings.pitch = cam["rot"][1].get<float>();
             }
+        }
+    } else {
+        int entry = cam.get<int>();
+
+        if (entry >= m_CameraSettings.size()) {
+            LOG_ERROR("Camera index outside bound of valid camera settings");
+        } else {
+            settings = m_CameraSettings.at(cam.get<int>());
         }
     }
 
-    return entry;
+    return settings;
 }
 
 void PerformanceLogger::savePerf()
@@ -313,6 +362,10 @@ void PerformanceLogger::savePerf()
         json value;
 
         value["name"] = entry.name;
+
+        if (entry.id != "") {
+            value["id"] = entry.id;
+        }
 
         value["frametimes"] = data.gpuFrameTimes;
 

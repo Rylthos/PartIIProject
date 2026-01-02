@@ -12,17 +12,23 @@
 #include <nlohmann/json.hpp>
 
 class PerformanceLogger {
+
+    struct CameraSettings {
+        glm::vec3 pos = glm::vec3(0.f);
+        float pitch = 0.0f;
+        float yaw = 0.0f;
+    };
+
     struct PerfEntry {
         std::string name = "";
+        std::string id = "";
         std::string scene = "";
         ASType structure = ASType::MAX_TYPE;
 
         uint32_t steps = 100;
         uint32_t captures = 10;
         uint32_t delay = 10;
-        glm::vec3 camera_pos = glm::vec3(0.f);
-        float pitch = 0.0f;
-        float yaw = 0.0f;
+        CameraSettings camera;
     };
 
     struct Data {
@@ -64,7 +70,8 @@ class PerformanceLogger {
 
     void parseJson(std::filesystem::path file);
 
-    PerfEntry parseEntry(const nlohmann::json& json);
+    PerfEntry parseEntry(const nlohmann::json& json, bool defaults = false);
+    CameraSettings parseCamera(const nlohmann::json& json);
 
     void startPerf(const PerfEntry& perf);
 
@@ -77,6 +84,8 @@ class PerformanceLogger {
     Camera* m_Camera;
 
     PerfEntry m_Defaults;
+    std::vector<CameraSettings> m_CameraSettings;
+    std::vector<std::string> m_IDs;
 
     bool m_Running = false;
     std::string m_PerfName;
