@@ -17,6 +17,8 @@
 #include "logger/logger.hpp"
 #include "serializers/brickmap.hpp"
 
+#include <algorithm>
+
 struct PushConstants {
     alignas(16) glm::vec3 cameraPosition;
     alignas(16) glm::uvec3 brickgridSize;
@@ -487,7 +489,8 @@ void BrickmapAS::createBrickgridBuffers()
         VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
     m_BrickgridBuffer.setDebugName("Brickgrid Buffer");
 
-    m_BrickmapCount = std::pow(2, std::ceil(std::log2(m_Brickmaps.size())));
+    m_BrickmapCount = std::max(std::pow(2, std::ceil(std::log2(m_Brickmaps.size()))), 64.);
+
     VkDeviceSize brickmapSize = m_BrickmapCount * (sizeof(uint64_t) * 9);
     m_BrickmapsBuffer.init(p_Info.device, p_Info.allocator, brickmapSize,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
