@@ -313,7 +313,7 @@ struct BrickmapModification : IModification
 
           for (int i = 1; i < size; i++) {
             if (i_FreeColours[i] == 0) {
-              i_FreeColours[i] = uint32_t(colour_ptr) + 1;
+              i_FreeColours[i] = uint32_t(colour_ptr / 512) + 1;
               i_FreeColours[0] += 1;
 
               break;
