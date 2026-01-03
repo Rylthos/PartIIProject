@@ -9,10 +9,9 @@
 
 namespace ParserImpl {
 
-void loadDiffuse(aiMaterial* material, aiTextureType type,
+void loadDiffuse(std::filesystem::path basepath, aiMaterial* material, aiTextureType type,
     std::unordered_map<int32_t, Material>& materials, int32_t matIndex)
 {
-    printf("Mat Index: %d | Texture Count: %d\n", matIndex, material->GetTextureCount(type));
     assert(
         material->GetTextureCount(type) <= 1 && "Multiple material to same matIndex not supported");
 
@@ -24,17 +23,23 @@ void loadDiffuse(aiMaterial* material, aiTextureType type,
         mat.diffuse.g = colour.g;
         mat.diffuse.b = colour.b;
         materials.insert({ matIndex, mat });
-
     } else {
         for (uint32_t i = 0; i < material->GetTextureCount(type); i++) {
-
             Material mat;
+
+            aiColor3D colour;
+            material->Get(AI_MATKEY_COLOR_DIFFUSE, colour);
+            mat.diffuse.r = colour.r;
+            mat.diffuse.g = colour.g;
+            mat.diffuse.b = colour.b;
 
             aiString str;
             material->GetTexture(type, i, &str);
 
+            mat.validTexture = true;
+
             if (!materials.contains(matIndex)) {
-                parseImage(str.C_Str(), mat);
+                parseImage(basepath / str.C_Str(), mat);
 
                 materials.insert({ matIndex, mat });
             }
@@ -42,27 +47,39 @@ void loadDiffuse(aiMaterial* material, aiTextureType type,
     }
 }
 
-std::vector<Triangle> processMesh(
-    aiMesh* mesh, const aiScene* scene, std::unordered_map<int32_t, Material>& materials)
+std::vector<Triangle> processMesh(std::filesystem::path basepath, aiMesh* mesh,
+    const aiScene* scene, aiMatrix4x4 transform, std::unordered_map<int32_t, Material>& materials)
 {
     std::vector<glm::vec3> positions;
     std::vector<glm::vec2> uvs;
     std::vector<uint32_t> indices;
 
+    transform = transform.Transpose();
+
+    // clang-format off
+    glm::mat4 glmTransform {
+        transform.a1, transform.a2, transform.a3, transform.a4,
+        transform.b1, transform.b2, transform.b3, transform.b4,
+        transform.c1, transform.c2, transform.c3, transform.c4,
+        transform.d1, transform.d2, transform.d3, transform.d4
+    };
+    // clang-format on
+
     for (uint32_t i = 0; i < mesh->mNumVertices; i++) {
-        glm::vec3 position = {
+        glm::vec4 position = {
             mesh->mVertices[i].x,
             mesh->mVertices[i].y,
             mesh->mVertices[i].z,
+            1.f,
         };
 
-        positions.push_back(position);
+        positions.push_back(glmTransform * position * glm::vec4(1.f, -1.f, 1.f, 1.f));
 
         glm::vec2 uv(0.f);
         if (mesh->mTextureCoords[0]) {
             uv = {
                 mesh->mTextureCoords[0][i].x,
-                mesh->mTextureCoords[0][i].y,
+                1.f - mesh->mTextureCoords[0][i].y,
             };
         }
 
@@ -80,7 +97,7 @@ std::vector<Triangle> processMesh(
     if (mesh->mMaterialIndex >= 0) {
         aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
 
-        loadDiffuse(material, aiTextureType_DIFFUSE, materials, mesh->mMaterialIndex);
+        loadDiffuse(basepath, material, aiTextureType_DIFFUSE, materials, mesh->mMaterialIndex);
         matIndex = mesh->mMaterialIndex;
     }
 
@@ -105,20 +122,22 @@ std::vector<Triangle> processMesh(
     return triangles;
 }
 
-std::vector<Triangle> parseAssimpNode(
-    aiNode* node, const aiScene* scene, std::unordered_map<int32_t, Material>& materials)
+std::vector<Triangle> parseAssimpNode(std::filesystem::path basepath, aiNode* node,
+    const aiScene* scene, aiMatrix4x4 transform, std::unordered_map<int32_t, Material>& materials)
 {
     std::vector<Triangle> triangles;
 
     for (uint32_t i = 0; i < node->mNumMeshes; i++) {
         aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
-        auto newTriangles = processMesh(mesh, scene, materials);
+        auto newTriangles = processMesh(basepath, mesh, scene, transform, materials);
 
         triangles.insert(triangles.end(), newTriangles.begin(), newTriangles.end());
     }
 
     for (uint32_t i = 0; i < node->mNumChildren; i++) {
-        auto newTriangles = parseAssimpNode(node->mChildren[i], scene, materials);
+        aiMatrix4x4 childTransform = transform * node->mChildren[i]->mTransformation;
+        auto newTriangles
+            = parseAssimpNode(basepath, node->mChildren[i], scene, childTransform, materials);
 
         triangles.insert(triangles.end(), newTriangles.begin(), newTriangles.end());
     }
@@ -130,7 +149,8 @@ ParserRet parseGltf(std::filesystem::path path, const ParserArgs& args)
 {
     Assimp::Importer importer;
 
-    const aiScene* scene = importer.ReadFile(path.string().c_str(), aiProcess_Triangulate);
+    const aiScene* scene = importer.ReadFile(
+        path.string().c_str(), aiProcess_Triangulate | aiProcess_ConvertToLeftHanded);
 
     if (!scene || (scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE) != 0 || !scene->mRootNode) {
         fprintf(
@@ -140,14 +160,8 @@ ParserRet parseGltf(std::filesystem::path path, const ParserArgs& args)
 
     std::unordered_map<int32_t, Material> materials;
 
-    auto triangles = parseAssimpNode(scene->mRootNode, scene, materials);
-
-    for (auto& triangle : triangles) {
-        printf("%s | %s | %s\n", glm::to_string(triangle.positions[0]).c_str(),
-            glm::to_string(triangle.positions[1]).c_str(),
-            glm::to_string(triangle.positions[2]).c_str());
-    }
-    printf("Triangles: %ld\n", triangles.size());
+    auto triangles = parseAssimpNode(
+        path.parent_path(), scene->mRootNode, scene, scene->mRootNode->mTransformation, materials);
 
     return parseMesh(triangles, materials, args);
 }
