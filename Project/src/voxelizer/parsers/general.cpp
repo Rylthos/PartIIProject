@@ -183,6 +183,9 @@ ParserRet parseMesh(const std::vector<Triangle>& triangles,
         }
     }
 
+    maxBound += glm::epsilon<float>();
+    minBound -= glm::epsilon<float>();
+
     glm::vec3 size = glm::max(maxBound - minBound, glm::vec3(glm::epsilon<float>()));
     float maxSide = fmax(size.x, fmax(size.y, size.z));
     glm::vec3 aspect = size / maxSide;
