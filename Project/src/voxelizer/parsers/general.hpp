@@ -42,10 +42,6 @@ ParserRet parseMeshes(const std::vector<std::vector<Triangle>>& meshes,
 ParserRet parseMesh(const std::vector<Triangle>& triangles,
     const std::unordered_map<int32_t, Material>& materials, const ParserArgs& args);
 
-ParserRet parseMesh(const std::vector<Triangle>& triangles,
-    const std::unordered_map<int32_t, Material>& materials, const ParserArgs& args,
-    glm::vec3 minBounds, glm::vec3 maxBounds);
-
 void parseImage(std::filesystem::path filepath, Material& material);
 
 }

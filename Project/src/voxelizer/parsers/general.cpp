@@ -180,60 +180,9 @@ std::vector<std::string> split(std::string str, std::string delim)
     return components;
 }
 
-ParserRet parseMeshes(const std::vector<std::vector<Triangle>>& meshes,
-    const std::unordered_map<int32_t, Material>& materials, const ParserArgs& args)
-{
-    glm::vec3 minBound(1000000);
-    glm::vec3 maxBound(-1000000);
-
-    for (const auto& mesh : meshes) {
-        for (size_t i = 0; i < mesh.size(); i++) {
-            for (size_t j = 0; j < 3; j++) {
-                maxBound = glm::max(maxBound, mesh[i].positions[j]);
-                minBound = glm::min(minBound, mesh[i].positions[j]);
-            }
-        }
-    }
-
-    maxBound += glm::epsilon<float>();
-    minBound -= glm::epsilon<float>();
-
-    std::vector<std::unordered_map<glm::ivec3, glm::vec3>> voxels;
-    voxels.reserve(meshes.size());
-
-    glm::uvec3 dimensions;
-
-    for (const auto& mesh : meshes) {
-        std::vector<std::unordered_map<glm::ivec3, glm::vec3>> tempVoxels;
-        std::tie(dimensions, tempVoxels) = parseMesh(mesh, materials, args, minBound, maxBound);
-        voxels.push_back(tempVoxels[0]);
-    }
-
-    return { dimensions, voxels };
-}
-
-ParserRet parseMesh(const std::vector<Triangle>& triangles,
-    const std::unordered_map<int32_t, Material>& materials, const ParserArgs& args)
-{
-    glm::vec3 minBound(1000000);
-    glm::vec3 maxBound(-1000000);
-
-    for (size_t i = 0; i < triangles.size(); i++) {
-        for (size_t j = 0; j < 3; j++) {
-            maxBound = glm::max(maxBound, triangles[i].positions[j]);
-            minBound = glm::min(minBound, triangles[i].positions[j]);
-        }
-    }
-
-    maxBound += glm::epsilon<float>();
-    minBound -= glm::epsilon<float>();
-
-    return parseMesh(triangles, materials, args, minBound, maxBound);
-}
-
 ParserRet parseMesh(const std::vector<Triangle>& triangles,
     const std::unordered_map<int32_t, Material>& materials, const ParserArgs& args,
-    glm::vec3 minBound, glm::vec3 maxBound)
+    glm::vec3 minBound, glm::vec3 maxBound, uint32_t& progress)
 {
     std::unordered_map<glm::ivec3, glm::vec3> voxels;
 
@@ -247,12 +196,6 @@ ParserRet parseMesh(const std::vector<Triangle>& triangles,
     glm::uvec3 dimensions = glm::max(glm::uvec3(glm::ceil(size * scalar)), glm::uvec3(1));
 
     glm::vec3 cellSize = glm::vec3(1.f) / scalar;
-    pgbar::ProgressBar<pgbar::Channel::Stderr, pgbar::Policy::Async, pgbar::Region::Relative> bar;
-
-    bar.config().tasks(triangles.size());
-    bar.config().enable().percent().elapsed().countdown();
-    bar.config().disable().speed();
-    bar.config().prefix("Voxelizing triangles");
 
     for (const auto& t : triangles) {
         glm::uvec3 triangleMin = glm::floor(
@@ -298,12 +241,79 @@ ParserRet parseMesh(const std::vector<Triangle>& triangles,
             }
         }
 
-        bar.tick();
+        progress++;
     }
 
-    bar.reset();
-
     return std::make_tuple(dimensions, std::vector { voxels });
+}
+
+ParserRet parseMesh(const std::vector<Triangle>& triangles,
+    const std::unordered_map<int32_t, Material>& materials, const ParserArgs& args)
+{
+    return parseMeshes({ triangles }, materials, args);
+}
+
+ParserRet parseMeshes(const std::vector<std::vector<Triangle>>& meshes,
+    const std::unordered_map<int32_t, Material>& materials, const ParserArgs& args)
+{
+    glm::vec3 minBound(1000000);
+    glm::vec3 maxBound(-1000000);
+
+    uint32_t triangleCount = 0;
+    for (const auto& mesh : meshes) {
+        triangleCount += mesh.size();
+        for (size_t i = 0; i < mesh.size(); i++) {
+            for (size_t j = 0; j < 3; j++) {
+                maxBound = glm::max(maxBound, mesh[i].positions[j]);
+                minBound = glm::min(minBound, mesh[i].positions[j]);
+            }
+        }
+    }
+
+    maxBound += glm::epsilon<float>();
+    minBound -= glm::epsilon<float>();
+
+    std::vector<std::unordered_map<glm::ivec3, glm::vec3>> voxels;
+    voxels.reserve(meshes.size());
+
+    glm::uvec3 dimensions;
+
+    bool finished = false;
+    uint32_t progress;
+    std::thread thread = std::thread([&]() {
+        for (const auto& mesh : meshes) {
+            std::vector<std::unordered_map<glm::ivec3, glm::vec3>> tempVoxels;
+            std::tie(dimensions, tempVoxels)
+                = parseMesh(mesh, materials, args, minBound, maxBound, progress);
+            voxels.push_back(tempVoxels[0]);
+        }
+        finished = true;
+    });
+
+    std::thread barThread = std::thread([&]() {
+        pgbar::ProgressBar<pgbar::Channel::Stderr, pgbar::Policy::Async, pgbar::Region::Relative>
+            bar;
+
+        bar.config().tasks(triangleCount);
+        bar.config().enable().percent().elapsed().countdown();
+        bar.config().disable().speed();
+        bar.config().prefix("Voxelizing triangles");
+
+        uint32_t curr = 0;
+        do {
+            if (progress != curr) {
+                bar.tick(progress - curr);
+                curr = progress;
+            }
+        } while (!finished);
+        bar.tick_to(100);
+        bar.reset();
+    });
+
+    thread.join();
+    barThread.join();
+
+    return { dimensions, voxels };
 }
 
 void parseImage(std::filesystem::path filepath, Material& material)
