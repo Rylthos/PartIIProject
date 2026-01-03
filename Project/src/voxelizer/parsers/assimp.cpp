@@ -310,6 +310,11 @@ std::vector<Triangle> evaluateNodes(
     return triangles;
 }
 
+std::vector<Triangle> evaluateNodes(const Node& node)
+{
+    return evaluateNodes(node, Animation {}, 0.0f, glm::mat4(1.f));
+}
+
 ParserRet parseAssimp(std::filesystem::path path, const ParserArgs& args)
 {
     Assimp::Importer importer;
@@ -326,7 +331,6 @@ ParserRet parseAssimp(std::filesystem::path path, const ParserArgs& args)
     std::unordered_map<int32_t, Material> materials;
 
     std::vector<Animation> animations = parseAnimations(scene);
-    Animation animation = animations[0];
 
     Node baseNode = parseAssimpNode(
         path.parent_path(), scene->mRootNode, scene, scene->mRootNode->mTransformation, materials);
@@ -336,12 +340,17 @@ ParserRet parseAssimp(std::filesystem::path path, const ParserArgs& args)
 
     std::vector<std::vector<Triangle>> meshes;
 
-    for (uint32_t frame = 0; frame < args.frames; frame++) {
-        float t = (frame / (float)args.frames) * animation.duration;
+    if (args.animation && animations.size() != 0) {
+        Animation animation = animations[0];
+        for (uint32_t frame = 0; frame < args.frames; frame++) {
+            float t = (frame / (float)args.frames) * animation.duration;
 
-        auto frameTriangles = evaluateNodes(baseNode, animation, t, glm::mat4(1.f));
+            auto frameTriangles = evaluateNodes(baseNode, animation, t, glm::mat4(1.f));
 
-        meshes.push_back(frameTriangles);
+            meshes.push_back(frameTriangles);
+        }
+    } else {
+        meshes.push_back(evaluateNodes(baseNode));
     }
 
     std::tie(dimensions, baseVoxels) = parseMeshes(meshes, materials, args);
