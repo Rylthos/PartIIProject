@@ -204,6 +204,7 @@ void Parser::generateStructures(
                     }
                 }
             } while (!finished[i]);
+            bar->tick_to(100);
         });
     }
 
