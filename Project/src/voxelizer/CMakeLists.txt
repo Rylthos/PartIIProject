@@ -30,4 +30,5 @@ target_link_libraries(Voxelizer PRIVATE
   glm::glm
   stb_lib
   pgbar
+  assimp
 )

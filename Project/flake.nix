@@ -26,6 +26,7 @@
           cmake
           gnumake
           ninja
+          zlib
         ];
 
         packages = with pkgs; [
