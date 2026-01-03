@@ -1,13 +1,43 @@
 #include "assimp.hpp"
 
 #include "assimp/Importer.hpp"
+#include "assimp/anim.h"
 #include "assimp/postprocess.h"
+#include "assimp/quaternion.h"
 #include "assimp/scene.h"
+#include "general.hpp"
+#include "glm/gtc/quaternion.hpp"
 
 #include <glm/gtx/string_cast.hpp>
 #include <unordered_map>
+#include <vector>
 
 namespace ParserImpl {
+
+struct Channel {
+    std::string target;
+
+    std::vector<std::pair<double, glm::vec3>> positions;
+    std::vector<std::pair<double, glm::quat>> rotations;
+    std::vector<std::pair<double, glm::vec3>> scales;
+};
+
+struct Animation {
+    std::string name;
+    double duration;
+    std::vector<Channel> channels;
+};
+
+struct Mesh {
+    std::string name;
+    std::vector<Triangle> triangles;
+};
+
+struct Node {
+    std::string name;
+    std::vector<Mesh> meshes;
+    std::vector<Node> nodes;
+};
 
 void loadDiffuse(std::filesystem::path basepath, aiMaterial* material, aiTextureType type,
     std::unordered_map<int32_t, Material>& materials, int32_t matIndex)
@@ -47,8 +77,8 @@ void loadDiffuse(std::filesystem::path basepath, aiMaterial* material, aiTexture
     }
 }
 
-std::vector<Triangle> processMesh(std::filesystem::path basepath, aiMesh* mesh,
-    const aiScene* scene, aiMatrix4x4 transform, std::unordered_map<int32_t, Material>& materials)
+Mesh processMesh(std::filesystem::path basepath, aiMesh* mesh, const aiScene* scene,
+    aiMatrix4x4 transform, std::unordered_map<int32_t, Material>& materials)
 {
     std::vector<glm::vec3> positions;
     std::vector<glm::vec2> uvs;
@@ -101,7 +131,9 @@ std::vector<Triangle> processMesh(std::filesystem::path basepath, aiMesh* mesh,
         matIndex = mesh->mMaterialIndex;
     }
 
-    std::vector<Triangle> triangles;
+    Mesh returnMesh;
+    returnMesh.name = mesh->mName.C_Str();
+
     for (uint32_t i = 0; i < indices.size() / 3; i++) {
         uint32_t index = i * 3;
 
@@ -116,30 +148,163 @@ std::vector<Triangle> processMesh(std::filesystem::path basepath, aiMesh* mesh,
 
         triangle.matIndex = matIndex;
 
-        triangles.push_back(triangle);
+        returnMesh.triangles.push_back(triangle);
     }
 
-    return triangles;
+    return returnMesh;
 }
 
-std::vector<Triangle> parseAssimpNode(std::filesystem::path basepath, aiNode* node,
-    const aiScene* scene, aiMatrix4x4 transform, std::unordered_map<int32_t, Material>& materials)
+Node parseAssimpNode(std::filesystem::path basepath, aiNode* node, const aiScene* scene,
+    aiMatrix4x4 transform, std::unordered_map<int32_t, Material>& materials)
 {
+    Node returnNode;
     std::vector<Triangle> triangles;
+    returnNode.name = node->mName.C_Str();
 
     for (uint32_t i = 0; i < node->mNumMeshes; i++) {
         aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
-        auto newTriangles = processMesh(basepath, mesh, scene, transform, materials);
+        Mesh newMesh = processMesh(basepath, mesh, scene, transform, materials);
 
-        triangles.insert(triangles.end(), newTriangles.begin(), newTriangles.end());
+        returnNode.meshes.push_back(newMesh);
     }
 
     for (uint32_t i = 0; i < node->mNumChildren; i++) {
         aiMatrix4x4 childTransform = transform * node->mChildren[i]->mTransformation;
-        auto newTriangles
+        Node newNode
             = parseAssimpNode(basepath, node->mChildren[i], scene, childTransform, materials);
 
-        triangles.insert(triangles.end(), newTriangles.begin(), newTriangles.end());
+        returnNode.nodes.push_back(newNode);
+    }
+
+    return returnNode;
+}
+
+std::vector<Animation> parseAnimations(const aiScene* scene)
+{
+    if (!scene->HasAnimations())
+        return {};
+
+    std::vector<Animation> animations;
+
+    for (uint32_t i = 0; i < scene->mNumAnimations; i++) {
+        aiAnimation* anim = scene->mAnimations[i];
+
+        Animation animation;
+        animation.name = anim->mName.C_Str();
+        animation.duration = anim->mDuration;
+
+        for (uint32_t j = 0; j < anim->mNumChannels; j++) {
+            aiNodeAnim* nodeAnim = anim->mChannels[j];
+
+            Channel channel;
+
+            channel.target = nodeAnim->mNodeName.C_Str();
+
+            for (uint32_t k = 0; k < nodeAnim->mNumPositionKeys; k++) {
+                aiVectorKey pos = nodeAnim->mPositionKeys[k];
+
+                channel.positions.push_back({
+                    pos.mTime,
+                    { pos.mValue.x, -pos.mValue.y, pos.mValue.z },
+                });
+            }
+
+            for (uint32_t k = 0; k < nodeAnim->mNumRotationKeys; k++) {
+                aiQuatKey quat = nodeAnim->mRotationKeys[k];
+
+                channel.rotations.push_back({
+                    quat.mTime,
+                    { quat.mValue.x, quat.mValue.y, quat.mValue.z, quat.mValue.w },
+                });
+            }
+
+            for (uint32_t k = 0; k < nodeAnim->mNumScalingKeys; k++) {
+                aiVectorKey scale = nodeAnim->mScalingKeys[k];
+
+                channel.scales.push_back({
+                    scale.mTime,
+                    { scale.mValue.x, scale.mValue.y, scale.mValue.z },
+                });
+            }
+
+            animation.channels.push_back(channel);
+        }
+
+        animations.push_back(animation);
+    }
+
+    return animations;
+}
+
+glm::mat4 evaluateTransform(
+    std::string node, const Animation& animation, float time, glm::mat4 transform)
+{
+    for (auto& channel : animation.channels) {
+        if (channel.target != node)
+            continue;
+
+        if (channel.rotations.size() != 0) {
+            for (size_t i = 0; i < channel.rotations.size() - 1; i++) {
+                if (time >= channel.rotations[i].first && time < channel.rotations[i + 1].first) {
+                    float t = (time - channel.rotations[i].first)
+                        / (channel.rotations[i + 1].first - channel.rotations[i].first);
+
+                    glm::quat lerp = glm::lerp(
+                        channel.rotations[i].second, channel.rotations[i + 1].second, t);
+
+                    transform = transform * glm::mat4_cast(lerp);
+                }
+            }
+        }
+
+        if (channel.scales.size() != 0) {
+            for (size_t i = 0; i < channel.scales.size() - 1; i++) {
+                if (time >= channel.scales[i].first && time < channel.scales[i + 1].first) {
+                    float t = (time - channel.scales[i].first)
+                        / (channel.scales[i + 1].first - channel.scales[i].first);
+
+                    glm::vec3 lerp
+                        = (1.f - t) * channel.scales[i].second + t * channel.scales[i + 1].second;
+
+                    transform = glm::scale(transform, lerp);
+                }
+            }
+        }
+
+        if (channel.positions.size() != 0) {
+            for (size_t i = 0; i < channel.positions.size() - 1; i++) {
+                if (time >= channel.positions[i].first && time < channel.positions[i + 1].first) {
+                    float t = (time - channel.positions[i].first)
+                        / (channel.positions[i + 1].first - channel.positions[i].first);
+
+                    glm::vec3 lerp = (1.f - t) * channel.positions[i].second
+                        + t * channel.positions[i + 1].second;
+
+                    transform = glm::translate(transform, lerp);
+                }
+            }
+        }
+    }
+
+    return transform;
+}
+
+std::vector<Triangle> evaluateNodes(
+    const Node& node, const Animation& animation, float time, glm::mat4 transform)
+{
+    std::vector<Triangle> triangles;
+
+    transform = evaluateTransform(node.name, animation, time, transform);
+
+    for (const auto& mesh : node.meshes) {
+        for (size_t i = 0; i < mesh.triangles.size(); i++) {
+            triangles.push_back(transformTriangle(mesh.triangles[i], transform));
+        }
+    }
+
+    for (const auto& node : node.nodes) {
+        auto nodeTriangles = evaluateNodes(node, animation, time, transform);
+        triangles.insert(triangles.end(), nodeTriangles.begin(), nodeTriangles.end());
     }
 
     return triangles;
@@ -160,10 +325,28 @@ ParserRet parseAssimp(std::filesystem::path path, const ParserArgs& args)
 
     std::unordered_map<int32_t, Material> materials;
 
-    auto triangles = parseAssimpNode(
+    std::vector<Animation> animations = parseAnimations(scene);
+    Animation animation = animations[0];
+
+    Node baseNode = parseAssimpNode(
         path.parent_path(), scene->mRootNode, scene, scene->mRootNode->mTransformation, materials);
 
-    return parseMesh(triangles, materials, args);
+    glm::uvec3 dimensions;
+    std::vector<std::unordered_map<glm::ivec3, glm::vec3>> baseVoxels;
+
+    std::vector<std::vector<Triangle>> meshes;
+
+    for (uint32_t frame = 0; frame < args.frames; frame++) {
+        float t = (frame / (float)args.frames) * animation.duration;
+
+        auto frameTriangles = evaluateNodes(baseNode, animation, t, glm::mat4(1.f));
+
+        meshes.push_back(frameTriangles);
+    }
+
+    std::tie(dimensions, baseVoxels) = parseMeshes(meshes, materials, args);
+
+    return { dimensions, baseVoxels };
 }
 
 }

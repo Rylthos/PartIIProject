@@ -16,4 +16,5 @@ struct ParserArgs {
     bool animation = false;
     uint32_t voxels_per_unit = 1;
     float units = 128.f;
+    uint32_t frames = 1;
 };

@@ -1,10 +1,13 @@
 #include "general.hpp"
 #include "glm/ext/scalar_constants.hpp"
+#include "glm/gtc/epsilon.hpp"
+#include "glm/gtx/hash.hpp"
 #include "pgbar/ProgressBar.hpp"
 
 #include <algorithm>
 
 #include <stb/stb_image.h>
+#include <unordered_map>
 
 namespace ParserImpl {
 
@@ -147,6 +150,15 @@ glm::vec3 calculateTexCoords(const Triangle& triangle, glm::vec3 cell, glm::vec3
         glm::vec3(1.0f));
 }
 
+Triangle transformTriangle(Triangle t, glm::mat4 transform)
+{
+    t.positions[0] = transform * glm::vec4(t.positions[0], 1.f);
+    t.positions[1] = transform * glm::vec4(t.positions[1], 1.f);
+    t.positions[2] = transform * glm::vec4(t.positions[2], 1.f);
+
+    return t;
+}
+
 std::vector<std::string> split(std::string str, std::string delim)
 {
     std::vector<std::string> components;
@@ -168,13 +180,43 @@ std::vector<std::string> split(std::string str, std::string delim)
     return components;
 }
 
+ParserRet parseMeshes(const std::vector<std::vector<Triangle>>& meshes,
+    const std::unordered_map<int32_t, Material>& materials, const ParserArgs& args)
+{
+    glm::vec3 minBound(1000000);
+    glm::vec3 maxBound(-1000000);
+
+    for (const auto& mesh : meshes) {
+        for (size_t i = 0; i < mesh.size(); i++) {
+            for (size_t j = 0; j < 3; j++) {
+                maxBound = glm::max(maxBound, mesh[i].positions[j]);
+                minBound = glm::min(minBound, mesh[i].positions[j]);
+            }
+        }
+    }
+
+    maxBound += glm::epsilon<float>();
+    minBound -= glm::epsilon<float>();
+
+    std::vector<std::unordered_map<glm::ivec3, glm::vec3>> voxels;
+    voxels.reserve(meshes.size());
+
+    glm::uvec3 dimensions;
+
+    for (const auto& mesh : meshes) {
+        std::vector<std::unordered_map<glm::ivec3, glm::vec3>> tempVoxels;
+        std::tie(dimensions, tempVoxels) = parseMesh(mesh, materials, args, minBound, maxBound);
+        voxels.push_back(tempVoxels[0]);
+    }
+
+    return { dimensions, voxels };
+}
+
 ParserRet parseMesh(const std::vector<Triangle>& triangles,
     const std::unordered_map<int32_t, Material>& materials, const ParserArgs& args)
 {
-    std::unordered_map<glm::ivec3, glm::vec3> voxels;
-
-    glm::vec3 minBound(10000000);
-    glm::vec3 maxBound(-10000000);
+    glm::vec3 minBound(1000000);
+    glm::vec3 maxBound(-1000000);
 
     for (size_t i = 0; i < triangles.size(); i++) {
         for (size_t j = 0; j < 3; j++) {
@@ -185,6 +227,15 @@ ParserRet parseMesh(const std::vector<Triangle>& triangles,
 
     maxBound += glm::epsilon<float>();
     minBound -= glm::epsilon<float>();
+
+    return parseMesh(triangles, materials, args, minBound, maxBound);
+}
+
+ParserRet parseMesh(const std::vector<Triangle>& triangles,
+    const std::unordered_map<int32_t, Material>& materials, const ParserArgs& args,
+    glm::vec3 minBound, glm::vec3 maxBound)
+{
+    std::unordered_map<glm::ivec3, glm::vec3> voxels;
 
     glm::vec3 size = glm::max(maxBound - minBound, glm::vec3(glm::epsilon<float>()));
     float maxSide = fmax(size.x, fmax(size.y, size.z));
