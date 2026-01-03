@@ -19,8 +19,8 @@
 
 #include "serializers/texture.hpp"
 
+#include "parsers/assimp.hpp"
 #include "parsers/general.hpp"
-#include "parsers/gltf.hpp"
 #include "parsers/obj.hpp"
 #include "parsers/vox.hpp"
 
@@ -83,7 +83,7 @@ ParserImpl::ParserRet Parser::parseFile()
     } else if (!strcmp(extension.c_str(), ".vox")) {
         return ParserImpl::parseVox(path, m_Args);
     } else if (!strcmp(extension.c_str(), ".gltf") || !strcmp(extension.c_str(), ".glb")) {
-        return ParserImpl::parseGltf(path, m_Args);
+        return ParserImpl::parseAssimp(path, m_Args);
     } else {
         fprintf(stderr, "Unsupported file\n");
         exit(-1);

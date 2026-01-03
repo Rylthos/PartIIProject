@@ -1,4 +1,4 @@
-#include "gltf.hpp"
+#include "assimp.hpp"
 
 #include "assimp/Importer.hpp"
 #include "assimp/postprocess.h"
@@ -145,7 +145,7 @@ std::vector<Triangle> parseAssimpNode(std::filesystem::path basepath, aiNode* no
     return triangles;
 }
 
-ParserRet parseGltf(std::filesystem::path path, const ParserArgs& args)
+ParserRet parseAssimp(std::filesystem::path path, const ParserArgs& args)
 {
     Assimp::Importer importer;
 

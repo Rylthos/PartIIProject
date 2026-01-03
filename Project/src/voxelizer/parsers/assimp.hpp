@@ -7,6 +7,6 @@
 
 namespace ParserImpl {
 
-ParserRet parseGltf(std::filesystem::path path, const ParserArgs& args);
+ParserRet parseAssimp(std::filesystem::path path, const ParserArgs& args);
 
 }
