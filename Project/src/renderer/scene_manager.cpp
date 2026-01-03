@@ -93,6 +93,8 @@ void SceneManager::getDirectories()
             m_Directories.push_back(entry.path());
         }
     }
+
+    std::sort(m_Directories.begin(), m_Directories.end());
 }
 
 void SceneManager::getFileEntries()
