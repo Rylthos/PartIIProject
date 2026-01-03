@@ -1,5 +1,8 @@
 #include <CLI/CLI.hpp>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb/stb_image.h"
+
 #include "parser.hpp"
 
 int main(int argc, char** argv)

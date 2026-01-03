@@ -32,3 +32,6 @@
 [submodule "Project/vendor/json"]
 	path = Project/vendor/json
 	url = https://github.com/nlohmann/json.git
+[submodule "Project/vendor/assimp"]
+	path = Project/vendor/assimp
+	url = https://github.com/assimp/assimp.git

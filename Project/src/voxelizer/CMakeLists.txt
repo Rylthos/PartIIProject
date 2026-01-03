@@ -18,7 +18,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
   )
 endif()
 
-target_compile_definitions(Voxelizer PRIVATE STB_IMAGE_IMPLEMENTATION)
+# target_compile_definitions(Voxelizer PRIVATE STB_IMAGE_IMPLEMENTATION)
 
 target_link_libraries(Voxelizer PRIVATE
   loaders
