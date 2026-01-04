@@ -6,6 +6,7 @@
 #include "assimp/quaternion.h"
 #include "assimp/scene.h"
 #include "general.hpp"
+#include "glm/geometric.hpp"
 #include "glm/gtc/quaternion.hpp"
 
 #include <glm/gtx/string_cast.hpp>
@@ -214,7 +215,7 @@ std::vector<Animation> parseAnimations(const aiScene* scene)
 
                 channel.rotations.push_back({
                     quat.mTime,
-                    { quat.mValue.x, quat.mValue.y, quat.mValue.z, quat.mValue.w },
+                    { quat.mValue.w, quat.mValue.x, quat.mValue.y, quat.mValue.z },
                 });
             }
 
@@ -243,20 +244,6 @@ glm::mat4 evaluateTransform(
         if (channel.target != node)
             continue;
 
-        if (channel.rotations.size() != 0) {
-            for (size_t i = 0; i < channel.rotations.size() - 1; i++) {
-                if (time >= channel.rotations[i].first && time < channel.rotations[i + 1].first) {
-                    float t = (time - channel.rotations[i].first)
-                        / (channel.rotations[i + 1].first - channel.rotations[i].first);
-
-                    glm::quat lerp = glm::lerp(
-                        channel.rotations[i].second, channel.rotations[i + 1].second, t);
-
-                    transform = transform * glm::mat4_cast(lerp);
-                }
-            }
-        }
-
         if (channel.scales.size() != 0) {
             for (size_t i = 0; i < channel.scales.size() - 1; i++) {
                 if (time >= channel.scales[i].first && time < channel.scales[i + 1].first) {
@@ -267,6 +254,20 @@ glm::mat4 evaluateTransform(
                         = (1.f - t) * channel.scales[i].second + t * channel.scales[i + 1].second;
 
                     transform = glm::scale(transform, lerp);
+                }
+            }
+        }
+
+        if (channel.rotations.size() != 0) {
+            for (size_t i = 0; i < channel.rotations.size() - 1; i++) {
+                if (time >= channel.rotations[i].first && time < channel.rotations[i + 1].first) {
+                    float t = (time - channel.rotations[i].first)
+                        / (channel.rotations[i + 1].first - channel.rotations[i].first);
+
+                    glm::quat lerp = glm::lerp(
+                        channel.rotations[i].second, channel.rotations[i + 1].second, t);
+
+                    transform = transform * glm::mat4_cast(glm::normalize(lerp));
                 }
             }
         }
@@ -344,7 +345,6 @@ ParserRet parseAssimp(std::filesystem::path path, const ParserArgs& args)
         Animation animation = animations[0];
         for (uint32_t frame = 0; frame < args.frames; frame++) {
             float t = (frame / (float)args.frames) * animation.duration;
-
             auto frameTriangles = evaluateNodes(baseNode, animation, t, glm::mat4(1.f));
 
             meshes.push_back(frameTriangles);
