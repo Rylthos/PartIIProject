@@ -235,6 +235,13 @@ Modification::AnimationFrames Parser::generateAnimations(
         }
     };
 
+    pgbar::ProgressBar<pgbar::Channel::Stderr, pgbar::Policy::Async, pgbar::Region::Relative> bar;
+
+    bar.config().tasks(dimensions.x * dimensions.y * dimensions.z);
+    bar.config().enable().percent().elapsed().countdown();
+    bar.config().disable().speed();
+    bar.config().prefix("Processing animations");
+
     animation.resize(frameCount);
 
     for (uint32_t y = 0; y < dimensions.y; y++) {
@@ -253,9 +260,12 @@ Modification::AnimationFrames Parser::generateAnimations(
                         animation[frame].insert({ index, mod.value() });
                     }
                 }
+
+                bar.tick();
             }
         }
     }
+    bar.reset();
 
     return animation;
 }
