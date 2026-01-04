@@ -46,9 +46,9 @@ bool aabbTriangleIntersection(const Triangle& triangle, glm::vec3 cell, glm::vec
     glm::vec3 a11 = glm::vec3(bc.z, 0, -bc.x);
     glm::vec3 a12 = glm::vec3(ca.z, 0, -ca.x);
 
-    glm::vec3 a20 = glm::vec3(-ab.y, ab.z, 0);
-    glm::vec3 a21 = glm::vec3(-bc.y, bc.z, 0);
-    glm::vec3 a22 = glm::vec3(-ca.y, ca.z, 0);
+    glm::vec3 a20 = glm::vec3(-ab.y, ab.x, 0);
+    glm::vec3 a21 = glm::vec3(-bc.y, bc.x, 0);
+    glm::vec3 a22 = glm::vec3(-ca.y, ca.x, 0);
 
     return aabbTriangleSAT(a, b, c, cellSize, a00) && aabbTriangleSAT(a, b, c, cellSize, a01)
         && aabbTriangleSAT(a, b, c, cellSize, a02) && aabbTriangleSAT(a, b, c, cellSize, a10)
