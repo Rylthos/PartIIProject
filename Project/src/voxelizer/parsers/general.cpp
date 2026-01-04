@@ -70,7 +70,7 @@ glm::vec3 triangleClosestPoint(const Triangle& triangle, glm::vec3 original)
     const glm::vec3 ab = b - a;
     const glm::vec3 ac = c - a;
 
-    glm::vec3 normal = glm::cross(ab, ac);
+    glm::vec3 normal = glm::normalize(glm::cross(ab, ac));
 
     float dist = glm::dot(normal, original - a);
     glm::vec3 point = original - normal * dist;
@@ -97,18 +97,21 @@ glm::vec3 triangleClosestPoint(const Triangle& triangle, glm::vec3 original)
     const float vc = d1 * d4 - d3 * d2;
     if (vc <= 0.f && d1 >= 0.f && d3 <= 0.f) {
         const float v = d1 / (d1 - d3);
+        assert(v >= 0.f && v <= 1.f);
         return a + v * ab;
     }
 
     const float vb = d5 * d2 - d1 * d6;
     if (vb <= 0.f && d2 >= 0.f && d6 <= 0.f) {
         const float v = d2 / (d2 - d6);
+        assert(v >= 0.f && v <= 1.f);
         return a + v * ac;
     }
 
     const float va = d3 * d6 - d5 * d4;
     if (va <= 0.f && (d4 - d3) >= 0.f && (d5 - d6) >= 0.f) {
-        const float v = (d4 - d3) / ((d3 - d3) + (d5 - d6));
+        const float v = (d4 - d3) / ((d4 - d3) + (d5 - d6));
+        assert(v >= 0.f && v <= 1.f);
         return b + v * (c - b);
     }
 
