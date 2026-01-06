@@ -30,13 +30,13 @@ bool aabbTriangleSAT(glm::vec3 v0, glm::vec3 v1, glm::vec3 v2, glm::vec3 aabbSiz
 bool aabbTriangleIntersection(const Triangle& triangle, glm::vec3 cell, glm::vec3 cellSize)
 {
     glm::vec3 cellCenter = cell + cellSize / 2.f;
-    glm::vec3 a = triangle.positions[0] - cellCenter;
-    glm::vec3 b = triangle.positions[1] - cellCenter;
-    glm::vec3 c = triangle.positions[2] - cellCenter;
+    glm::vec3 a = triangle.vertices[0].position - cellCenter;
+    glm::vec3 b = triangle.vertices[1].position - cellCenter;
+    glm::vec3 c = triangle.vertices[2].position - cellCenter;
 
-    glm::vec3 ab = glm::normalize(triangle.positions[1] - triangle.positions[0]);
-    glm::vec3 bc = glm::normalize(triangle.positions[2] - triangle.positions[1]);
-    glm::vec3 ca = glm::normalize(triangle.positions[0] - triangle.positions[2]);
+    glm::vec3 ab = glm::normalize(triangle.vertices[1].position - triangle.vertices[0].position);
+    glm::vec3 bc = glm::normalize(triangle.vertices[2].position - triangle.vertices[1].position);
+    glm::vec3 ca = glm::normalize(triangle.vertices[0].position - triangle.vertices[2].position);
 
     glm::vec3 a00 = glm::vec3(0, -ab.z, ab.y);
     glm::vec3 a01 = glm::vec3(0, -bc.z, bc.y);
@@ -63,9 +63,9 @@ bool aabbTriangleIntersection(const Triangle& triangle, glm::vec3 cell, glm::vec
 
 glm::vec3 triangleClosestPoint(const Triangle& triangle, glm::vec3 original)
 {
-    const glm::vec3 a = triangle.positions[0];
-    const glm::vec3 b = triangle.positions[1];
-    const glm::vec3 c = triangle.positions[2];
+    const glm::vec3 a = triangle.vertices[0].position;
+    const glm::vec3 b = triangle.vertices[1].position;
+    const glm::vec3 c = triangle.vertices[2].position;
 
     const glm::vec3 ab = b - a;
     const glm::vec3 ac = c - a;
@@ -125,9 +125,9 @@ glm::vec3 calculateTexCoords(const Triangle& triangle, glm::vec3 cell, glm::vec3
 {
     glm::vec3 point = triangleClosestPoint(triangle, cell + cellSize / 2.f);
 
-    const glm::vec3 a = triangle.positions[0];
-    const glm::vec3 b = triangle.positions[1];
-    const glm::vec3 c = triangle.positions[2];
+    const glm::vec3 a = triangle.vertices[0].position;
+    const glm::vec3 b = triangle.vertices[1].position;
+    const glm::vec3 c = triangle.vertices[2].position;
 
     const glm::vec3 ab = b - a;
     const glm::vec3 ac = c - a;
@@ -148,16 +148,16 @@ glm::vec3 calculateTexCoords(const Triangle& triangle, glm::vec3 cell, glm::vec3
     u /= denom;
     v /= denom;
 
-    return glm::mod(
-        u * triangle.texture[0] + v * triangle.texture[1] + (1.f - u - v) * triangle.texture[2],
+    return glm::mod(u * triangle.vertices[0].texture + v * triangle.vertices[1].texture
+            + (1.f - u - v) * triangle.vertices[2].texture,
         glm::vec3(1.0f));
 }
 
 Triangle transformTriangle(Triangle t, glm::mat4 transform)
 {
-    t.positions[0] = transform * glm::vec4(t.positions[0], 1.f);
-    t.positions[1] = transform * glm::vec4(t.positions[1], 1.f);
-    t.positions[2] = transform * glm::vec4(t.positions[2], 1.f);
+    for (uint32_t v = 0; v < 3; v++) {
+        t.vertices[v].position = transform * glm::vec4(t.vertices[v].position, 1.f);
+    }
 
     return t;
 }
@@ -202,12 +202,15 @@ ParserRet parseMesh(const std::vector<Triangle>& triangles,
     glm::vec3 cellSize = glm::vec3(1.f) / scalar;
 
     for (const auto& t : triangles) {
-        glm::uvec3 triangleMin = glm::floor(
-            (glm::min(t.positions[0], glm::min(t.positions[1], t.positions[2])) - minBound)
-            * scalar);
+        glm::uvec3 triangleMin
+            = glm::floor((glm::min(t.vertices[0].position,
+                              glm::min(t.vertices[1].position, t.vertices[2].position))
+                             - minBound)
+                * scalar);
         glm::uvec3 triangleMax = glm::max(
-            glm::uvec3(glm::ceil(
-                (glm::max(t.positions[0], glm::max(t.positions[1], t.positions[2])) - minBound)
+            glm::uvec3(glm::ceil((glm::max(t.vertices[0].position,
+                                      glm::max(t.vertices[1].position, t.vertices[2].position))
+                                     - minBound)
                 * scalar)),
             glm::uvec3(1));
 
@@ -268,8 +271,8 @@ ParserRet parseMeshes(const std::vector<std::vector<Triangle>>& meshes,
         triangleCount += mesh.size();
         for (size_t i = 0; i < mesh.size(); i++) {
             for (size_t j = 0; j < 3; j++) {
-                maxBound = glm::max(maxBound, mesh[i].positions[j]);
-                minBound = glm::min(minBound, mesh[i].positions[j]);
+                maxBound = glm::max(maxBound, mesh[i].vertices[j].position);
+                minBound = glm::min(minBound, mesh[i].vertices[j].position);
             }
         }
     }

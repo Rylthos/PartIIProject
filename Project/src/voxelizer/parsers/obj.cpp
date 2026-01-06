@@ -156,14 +156,14 @@ ParserRet parseObj(std::filesystem::path filepath, const ParserArgs& args)
                 auto v2 = faces[1];
                 auto v3 = faces[2];
 
-                t.positions[0] = vertices[std::get<0>(v1)];
-                t.positions[1] = vertices[std::get<0>(v2)];
-                t.positions[2] = vertices[std::get<0>(v3)];
+                t.vertices[0].position = vertices[std::get<0>(v1)];
+                t.vertices[1].position = vertices[std::get<0>(v2)];
+                t.vertices[2].position = vertices[std::get<0>(v3)];
 
                 if (textures) {
-                    t.texture[0] = texture[std::get<1>(v1)];
-                    t.texture[1] = texture[std::get<1>(v2)];
-                    t.texture[2] = texture[std::get<1>(v3)];
+                    t.vertices[0].texture = texture[std::get<1>(v1)];
+                    t.vertices[1].texture = texture[std::get<1>(v2)];
+                    t.vertices[2].texture = texture[std::get<1>(v3)];
                 }
 
                 t.matIndex = currentMaterial;
@@ -177,22 +177,22 @@ ParserRet parseObj(std::filesystem::path filepath, const ParserArgs& args)
                 auto v3 = faces[2];
                 auto v4 = faces[3];
 
-                t1.positions[0] = vertices[std::get<0>(v1)];
-                t1.positions[1] = vertices[std::get<0>(v2)];
-                t1.positions[2] = vertices[std::get<0>(v3)];
+                t1.vertices[0].position = vertices[std::get<0>(v1)];
+                t1.vertices[1].position = vertices[std::get<0>(v2)];
+                t1.vertices[2].position = vertices[std::get<0>(v3)];
 
-                t2.positions[0] = vertices[std::get<0>(v3)];
-                t2.positions[1] = vertices[std::get<0>(v4)];
-                t2.positions[2] = vertices[std::get<0>(v1)];
+                t2.vertices[0].position = vertices[std::get<0>(v3)];
+                t2.vertices[1].position = vertices[std::get<0>(v4)];
+                t2.vertices[2].position = vertices[std::get<0>(v1)];
 
                 if (textures) {
-                    t1.texture[0] = texture[std::get<1>(v1)];
-                    t1.texture[1] = texture[std::get<1>(v2)];
-                    t1.texture[2] = texture[std::get<1>(v3)];
+                    t1.vertices[0].texture = texture[std::get<1>(v1)];
+                    t1.vertices[1].texture = texture[std::get<1>(v2)];
+                    t1.vertices[2].texture = texture[std::get<1>(v3)];
 
-                    t2.texture[0] = texture[std::get<1>(v3)];
-                    t2.texture[1] = texture[std::get<1>(v4)];
-                    t2.texture[2] = texture[std::get<1>(v1)];
+                    t2.vertices[0].texture = texture[std::get<1>(v3)];
+                    t2.vertices[1].texture = texture[std::get<1>(v4)];
+                    t2.vertices[2].texture = texture[std::get<1>(v1)];
                 }
 
                 t1.matIndex = currentMaterial;

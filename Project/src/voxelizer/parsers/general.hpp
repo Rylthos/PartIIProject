@@ -16,9 +16,13 @@ namespace ParserImpl {
 // Dimensions, Frames(index->colour)
 typedef std::tuple<glm::uvec3, std::vector<std::unordered_map<glm::ivec3, glm::vec3>>> ParserRet;
 
+struct Vertex {
+    glm::vec3 position;
+    glm::vec3 texture;
+};
+
 struct Triangle {
-    glm::vec3 positions[3];
-    glm::vec3 texture[3];
+    Vertex vertices[3];
     int32_t matIndex;
 };
 

@@ -136,10 +136,13 @@ Mesh processMesh(
 
         Triangle triangle;
         for (uint32_t v = 0; v < 3; v++) {
-            uint32_t vertexIndex = indices[index + v];
-            triangle.positions[v] = positions[vertexIndex];
+            Vertex vertex;
 
-            triangle.texture[v] = glm::vec3(uvs[vertexIndex], 0.f);
+            uint32_t vertexIndex = indices[index + v];
+            vertex.position = positions[vertexIndex];
+            vertex.texture = glm::vec3(uvs[vertexIndex], 0.f);
+
+            triangle.vertices[v] = vertex;
         }
 
         triangle.matIndex = matIndex;
