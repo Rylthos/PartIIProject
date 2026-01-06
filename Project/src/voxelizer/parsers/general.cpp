@@ -183,9 +183,10 @@ std::vector<std::string> split(std::string str, std::string delim)
     return components;
 }
 
+template <typename T>
 ParserRet parseMesh(const std::vector<Triangle>& triangles,
     const std::unordered_map<int32_t, Material>& materials, const ParserArgs& args,
-    glm::vec3 minBound, glm::vec3 maxBound, uint32_t& progress)
+    glm::vec3 minBound, glm::vec3 maxBound, T& bar)
 {
     std::unordered_map<glm::ivec3, glm::vec3> voxels;
 
@@ -244,7 +245,7 @@ ParserRet parseMesh(const std::vector<Triangle>& triangles,
             }
         }
 
-        progress++;
+        bar.tick();
     }
 
     return std::make_tuple(dimensions, std::vector { voxels });
@@ -279,42 +280,21 @@ ParserRet parseMeshes(const std::vector<std::vector<Triangle>>& meshes,
     std::vector<std::unordered_map<glm::ivec3, glm::vec3>> voxels;
     voxels.reserve(meshes.size());
 
+    pgbar::ProgressBar<pgbar::Channel::Stderr, pgbar::Policy::Async, pgbar::Region::Relative> bar;
+
+    bar.config().enable().percent().elapsed().countdown();
+    bar.config().disable().speed();
+    bar.config().prefix("Voxelizing triangles");
+    bar.config().tasks(triangleCount);
+
     glm::uvec3 dimensions;
 
-    bool finished = false;
-    uint32_t progress;
-    std::thread thread = std::thread([&]() {
-        for (const auto& mesh : meshes) {
-            std::vector<std::unordered_map<glm::ivec3, glm::vec3>> tempVoxels;
-            std::tie(dimensions, tempVoxels)
-                = parseMesh(mesh, materials, args, minBound, maxBound, progress);
-            voxels.push_back(tempVoxels[0]);
-        }
-        finished = true;
-    });
-
-    std::thread barThread = std::thread([&]() {
-        pgbar::ProgressBar<pgbar::Channel::Stderr, pgbar::Policy::Async, pgbar::Region::Relative>
-            bar;
-
-        bar.config().tasks(triangleCount);
-        bar.config().enable().percent().elapsed().countdown();
-        bar.config().disable().speed();
-        bar.config().prefix("Voxelizing triangles");
-
-        uint32_t curr = 0;
-        do {
-            if (progress != curr) {
-                bar.tick(progress - curr);
-                curr = progress;
-            }
-        } while (!finished);
-        bar.tick_to(100);
-        bar.reset();
-    });
-
-    thread.join();
-    barThread.join();
+    for (const auto& mesh : meshes) {
+        std::vector<std::unordered_map<glm::ivec3, glm::vec3>> tempVoxels;
+        std::tie(dimensions, tempVoxels)
+            = parseMesh(mesh, materials, args, minBound, maxBound, bar);
+        voxels.push_back(tempVoxels[0]);
+    }
 
     return { dimensions, voxels };
 }

@@ -195,13 +195,9 @@ void Parser::generateStructures(
 
             float prev = 0.0f;
             do {
-                if (info[i].completionPercent >= 1.f) {
-                    bar->tick_to(100);
-                } else {
-                    if (fabs(info[i].completionPercent - prev) > 0.0001) {
-                        bar->tick((info[i].completionPercent - prev) * 10000);
-                        prev = info[i].completionPercent;
-                    }
+                if (fabs(info[i].completionPercent - prev) > 0.0001) {
+                    bar->tick((info[i].completionPercent - prev) * 10000);
+                    prev = info[i].completionPercent;
                 }
             } while (!finished[i]);
             bar->tick_to(100);
