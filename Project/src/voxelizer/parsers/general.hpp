@@ -19,6 +19,9 @@ typedef std::tuple<glm::uvec3, std::vector<std::unordered_map<glm::ivec3, glm::v
 struct Vertex {
     glm::vec3 position;
     glm::vec3 texture;
+
+    std::vector<size_t> boneIDs;
+    std::vector<float> boneWeights;
 };
 
 struct Triangle {
@@ -37,6 +40,7 @@ struct Material {
 };
 
 Triangle transformTriangle(Triangle t, glm::mat4 transform);
+Triangle transformTriangle(Triangle t, std::vector<glm::mat4> boneTransforms);
 
 std::vector<std::string> split(std::string str, std::string delim);
 

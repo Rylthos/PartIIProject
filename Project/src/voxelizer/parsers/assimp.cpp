@@ -2,6 +2,8 @@
 
 #include "assimp/Importer.hpp"
 #include "assimp/anim.h"
+#include "assimp/matrix4x4.h"
+#include "assimp/mesh.h"
 #include "assimp/postprocess.h"
 #include "assimp/quaternion.h"
 #include "assimp/scene.h"
@@ -34,6 +36,14 @@ struct Mesh {
     std::vector<Triangle> triangles;
 };
 
+struct Bone {
+    std::string name;
+
+    glm::mat4 offset;
+
+    std::unordered_map<size_t, float> vertexWeights;
+};
+
 struct Node {
     std::string name;
     std::vector<Mesh> meshes;
@@ -44,6 +54,24 @@ struct Node {
 
 struct ParseInformation {
     std::unordered_map<int32_t, Material> materials;
+
+    std::vector<Bone> bones;
+    std::unordered_map<std::string, size_t> boneMap;
+};
+
+struct EvaluateInfo {
+    Animation animation;
+    float time;
+
+    std::vector<glm::mat4> boneTransforms;
+
+    std::vector<Bone> bones;
+    std::unordered_map<std::string, size_t> boneMap;
+
+    EvaluateInfo() : animation({}), time(0.f), boneTransforms({}), bones({}), boneMap({}) { }
+    EvaluateInfo(float time) : animation({}), time(time), boneTransforms({}), bones({}), boneMap({})
+    {
+    }
 };
 
 void loadDiffuse(std::filesystem::path basepath, aiMaterial* material, aiTextureType type,
@@ -90,6 +118,38 @@ Mesh processMesh(
     std::vector<glm::vec3> positions;
     std::vector<glm::vec2> uvs;
     std::vector<uint32_t> indices;
+
+    std::vector<size_t> boneIDs;
+
+    for (uint32_t i = 0; i < mesh->mNumBones; i++) {
+        Bone bone;
+
+        aiBone* meshBone = mesh->mBones[i];
+
+        bone.name = meshBone->mName.C_Str();
+
+        for (uint32_t j = 0; j < meshBone->mNumWeights; j++) {
+            aiVertexWeight weight = meshBone->mWeights[j];
+
+            bone.vertexWeights.insert({ weight.mVertexId, weight.mWeight });
+        }
+
+        // clang-format off
+        aiMatrix4x4 offset = meshBone->mOffsetMatrix;
+        bone.offset = {
+            offset.a1, offset.b1, offset.c1, offset.d1,
+            offset.a2, offset.b2, offset.c2, offset.d2,
+            offset.a3, offset.b3, offset.c3, offset.d3,
+            offset.a4, offset.b4, offset.c4, offset.d4
+        };
+        // clang-format on
+
+        size_t boneIndex = parseInfo.bones.size();
+        parseInfo.boneMap.insert({ bone.name, boneIndex });
+        parseInfo.bones.push_back(bone);
+
+        boneIDs.push_back(boneIndex);
+    }
 
     for (uint32_t i = 0; i < mesh->mNumVertices; i++) {
         glm::vec4 position = {
@@ -141,6 +201,15 @@ Mesh processMesh(
             uint32_t vertexIndex = indices[index + v];
             vertex.position = positions[vertexIndex];
             vertex.texture = glm::vec3(uvs[vertexIndex], 0.f);
+
+            for (const size_t& boneID : boneIDs) {
+                const Bone& bone = parseInfo.bones[boneID];
+
+                if (bone.vertexWeights.contains(vertexIndex)) {
+                    vertex.boneIDs.push_back(boneID);
+                    vertex.boneWeights.push_back(bone.vertexWeights.at(vertexIndex));
+                }
+            }
 
             triangle.vertices[v] = vertex;
         }
@@ -247,7 +316,10 @@ template <typename Type>
 glm::mat4 calculateLerp(const std::vector<std::pair<double, Type>>& channel, float target,
     std::function<glm::mat4(Type a, Type b, float t)> lerpFunction)
 {
+    glm::mat4 returnMat(1.f);
     if (channel.size() != 0) {
+        returnMat = lerpFunction(channel[0].second, channel[0].second, 0.0f);
+
         for (size_t i = 0; i < channel.size() - 1; i++) {
             if (target >= channel[i].first && target < channel[i + 1].first) {
                 float t = (target - channel[i].first) / (channel[i + 1].first - channel[i].first);
@@ -257,7 +329,7 @@ glm::mat4 calculateLerp(const std::vector<std::pair<double, Type>>& channel, flo
         }
     }
 
-    return glm::mat4(1.f);
+    return returnMat;
 }
 
 glm::mat4 evaluateTransform(
@@ -291,12 +363,30 @@ glm::mat4 evaluateTransform(
     return transform;
 }
 
+void evaluateBones(const Node& node, EvaluateInfo& info, glm::mat4 transform = glm::mat4(1.f))
+{
+    if (info.boneMap.contains(node.name)) {
+        size_t boneIndex = info.boneMap.at(node.name);
+        transform
+            = transform * evaluateTransform(node.name, info.animation, info.time, glm::mat4(1.f));
+
+        info.boneTransforms[boneIndex] = transform * info.bones[boneIndex].offset;
+    }
+
+    for (const auto& childNode : node.nodes) {
+        evaluateBones(childNode, info, transform);
+    }
+}
+
 std::vector<Triangle> evaluateNodes(
-    const Node& node, const Animation& animation, float time, glm::mat4 transform)
+    const Node& node, const EvaluateInfo& info, glm::mat4 transform = glm::mat4(1.f))
 {
     std::vector<Triangle> triangles;
 
-    transform = evaluateTransform(node.name, animation, time, transform);
+    if (!info.boneMap.contains(node.name)) {
+        transform = transform * node.transform
+            * evaluateTransform(node.name, info.animation, info.time, glm::mat4(1.f));
+    }
 
     // clang-format off
     const glm::mat4 triangleTransform = {
@@ -309,22 +399,23 @@ std::vector<Triangle> evaluateNodes(
 
     for (const auto& mesh : node.meshes) {
         for (size_t i = 0; i < mesh.triangles.size(); i++) {
-            triangles.push_back(transformTriangle(
-                transformTriangle(mesh.triangles[i], transform), triangleTransform));
+            Triangle node = mesh.triangles[i];
+            if (info.boneMap.size() != 0) {
+                node = transformTriangle(node, info.boneTransforms);
+            } else {
+                node = transformTriangle(node, transform);
+            }
+            node = transformTriangle(node, triangleTransform);
+            triangles.push_back(node);
         }
     }
 
     for (const auto& node : node.nodes) {
-        auto nodeTriangles = evaluateNodes(node, animation, time, transform * node.transform);
+        auto nodeTriangles = evaluateNodes(node, info, transform);
         triangles.insert(triangles.end(), nodeTriangles.begin(), nodeTriangles.end());
     }
 
     return triangles;
-}
-
-std::vector<Triangle> evaluateNodes(const Node& node)
-{
-    return evaluateNodes(node, Animation {}, 0.0f, node.transform);
 }
 
 ParserRet parseAssimp(std::filesystem::path path, const ParserArgs& args)
@@ -351,21 +442,40 @@ ParserRet parseAssimp(std::filesystem::path path, const ParserArgs& args)
 
     std::vector<std::vector<Triangle>> meshes;
 
+    EvaluateInfo info;
+    info.bones = parseInfo.bones;
+    info.boneMap = parseInfo.boneMap;
+    info.boneTransforms = std::vector<glm::mat4>(info.boneMap.size(), glm::mat4(1.f));
+
     if (args.animation && animations.size() != 0) {
         Animation animation = animations[0];
+
+        info.animation = animation;
+
         for (uint32_t frame = 0; frame < args.frames; frame++) {
             float t = (frame / (float)args.frames) * animation.duration;
-            auto frameTriangles = evaluateNodes(baseNode, animation, t, glm::mat4(1.f));
+
+            info.time = t;
+            evaluateBones(baseNode, info, baseNode.transform);
+
+            auto frameTriangles = evaluateNodes(baseNode, info);
 
             meshes.push_back(frameTriangles);
         }
     } else {
-        meshes.push_back(evaluateNodes(baseNode));
+        info.time = 0.f;
+        info.animation = {};
+        if (animations.size() != 0) {
+            info.animation = animations[0];
+        }
+
+        evaluateBones(baseNode, info, baseNode.transform);
+
+        meshes.push_back(evaluateNodes(baseNode, info));
     }
 
     std::tie(dimensions, baseVoxels) = parseMeshes(meshes, parseInfo.materials, args);
 
     return { dimensions, baseVoxels };
 }
-
 }

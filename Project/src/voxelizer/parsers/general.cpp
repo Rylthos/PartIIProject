@@ -162,6 +162,22 @@ Triangle transformTriangle(Triangle t, glm::mat4 transform)
     return t;
 }
 
+Triangle transformTriangle(Triangle t, std::vector<glm::mat4> boneTransforms)
+{
+    for (uint32_t v = 0; v < 3; v++) {
+        const Vertex& vertex = t.vertices[v];
+
+        glm::mat4 skinMat(0.f);
+        for (uint32_t i = 0; i < vertex.boneIDs.size(); i++) {
+            skinMat += vertex.boneWeights[i] * boneTransforms[vertex.boneIDs[i]];
+        }
+
+        t.vertices[v].position = skinMat * glm::vec4(t.vertices[v].position, 1.f);
+    }
+
+    return t;
+}
+
 std::vector<std::string> split(std::string str, std::string delim)
 {
     std::vector<std::string> components;
