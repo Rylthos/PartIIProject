@@ -142,6 +142,7 @@ void ASManager::loadAS(
         LOG_ERROR("Model is not supported for this structure");
         return;
     }
+    LOG_INFO("Load scene {}", path.string());
     m_CurrentAS->fromFile(path);
 }
 
