@@ -59,10 +59,9 @@ void ContreeAS::init(ASStructInfo info)
 
 void ContreeAS::fromLoader(std::unique_ptr<Loader>&& loader)
 {
-    p_FinishedGeneration = false;
+    vkQueueWaitIdle(p_Info.graphicsQueue);
 
-    ShaderManager::getInstance()->removeMacro("GENERATION_FINISHED");
-    updateShaders();
+    reset();
 
     p_GenerationThread.request_stop();
 
@@ -76,7 +75,12 @@ void ContreeAS::fromLoader(std::unique_ptr<Loader>&& loader)
 
 void ContreeAS::fromFile(std::filesystem::path path)
 {
+    vkQueueWaitIdle(p_Info.graphicsQueue);
+
     p_FileThread.request_stop();
+
+    reset();
+
     p_FileThread = std::jthread([this, path](std::stop_token stoken) {
         p_Loading = true;
         Serializers::SerialInfo info;
@@ -142,6 +146,8 @@ void ContreeAS::render(
 void ContreeAS::update(float dt)
 {
     if (m_UpdateBuffers) {
+        vkQueueWaitIdle(p_Info.graphicsQueue);
+
         freeDescriptorSet();
         destroyBuffers();
 

@@ -10,6 +10,7 @@
 
 #include "../camera.hpp"
 #include "../modification_manager.hpp"
+#include "../shader_manager.hpp"
 #include "loaders/loader.hpp"
 #include "modification/diff.hpp"
 
@@ -90,6 +91,14 @@ class IAccelerationStructure {
     virtual size_t getAnimationFrames() { return p_AnimationFrames.size(); }
     virtual uint32_t getAnimationFrame() { return p_CurrentFrame; }
     virtual void setAnimationFrame(uint32_t target) { p_TargetFrame = target; }
+
+  protected:
+    void reset()
+    {
+        p_FinishedGeneration = false;
+        ShaderManager::getInstance()->removeMacro("GENERATION_FINISHED");
+        updateShaders();
+    }
 
   protected:
     ASStructInfo p_Info;

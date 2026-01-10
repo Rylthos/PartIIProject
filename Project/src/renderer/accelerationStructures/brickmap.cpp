@@ -82,10 +82,7 @@ void BrickmapAS::init(ASStructInfo info)
 
 void BrickmapAS::fromLoader(std::unique_ptr<Loader>&& loader)
 {
-    p_FinishedGeneration = false;
-
-    ShaderManager::getInstance()->removeMacro("GENERATION_FINISHED");
-    updateShaders();
+    reset();
 
     p_GenerationThread.request_stop();
 
@@ -99,7 +96,12 @@ void BrickmapAS::fromLoader(std::unique_ptr<Loader>&& loader)
 
 void BrickmapAS::fromFile(std::filesystem::path path)
 {
+    vkQueueWaitIdle(p_Info.graphicsQueue);
+
     p_FileThread.request_stop();
+
+    reset();
+
     p_FileThread = std::jthread([this, path](std::stop_token stoken) {
         p_Loading = true;
         Serializers::SerialInfo info;
@@ -257,6 +259,8 @@ void BrickmapAS::update(float dt)
     }
 
     if (m_UpdateBuffers) {
+        vkQueueWaitIdle(p_Info.graphicsQueue);
+
         freeBuffers();
         freeDescriptorSet();
 
