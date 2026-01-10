@@ -179,7 +179,9 @@ void Application::initVulkan()
     vkb::InstanceBuilder builder;
     auto builderRet = builder.set_app_name("Voxel Raymarcher")
                           .request_validation_layers(true)
+#ifdef DEBUG
                           .enable_validation_layers(true)
+#endif
                           .use_default_debug_messenger()
                           .require_api_version(1, 4, 0)
                           .build();
