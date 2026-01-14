@@ -1,0 +1,12 @@
+Character:
+  Custom .vox
+
+Sponza:
+  glTF-Sample-Models Sponza
+  units: 32
+  res: 32
+
+Cat Statue:
+  sketchfab: https://sketchfab.com/3d-models/cat-statue-fb4f3bfccf6c404fbac221aa144e8540
+  units: 16
+  res: 16

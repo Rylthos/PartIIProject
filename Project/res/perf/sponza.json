@@ -1,0 +1,30 @@
+{
+  "defaults": {
+    "steps": 1000,
+    "captures": 50,
+    "delay": 50,
+    "scene": "res/structures/sponza",
+    "cameras": [
+      {
+        "pos": [ 220, 350, 315 ],
+        "rot": [ -90.01, 0 ]
+      },
+      {
+        "pos": [ 175, 350, 314 ],
+        "rot": [ 90.01, 0 ]
+      },
+      {
+        "pos": [ 512, -250, 318 ],
+        "rot": [ 180.01, -89.9 ]
+      }
+    ],
+    "ids": [
+      "lion",
+      "corridor",
+      "top"
+    ],
+    "test_all": true
+  },
+  "tests": [
+  ]
+}

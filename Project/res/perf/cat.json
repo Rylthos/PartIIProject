@@ -1,0 +1,30 @@
+{
+  "defaults": {
+    "steps": 700,
+    "captures": 100,
+    "delay": 20,
+    "scene": "res/structures/cat_statue",
+    "cameras": [
+      {
+        "pos": [ -202, 280, -400 ],
+        "rot": [ 35, 0 ]
+      },
+      {
+        "pos": [ 360, 300, 960 ],
+        "rot": [ 190, 0 ]
+      },
+      {
+        "pos": [ 160, -315, 200 ],
+        "rot": [ -270.01, -89.9 ]
+      }
+    ],
+    "ids": [
+      "front",
+      "back",
+      "top"
+    ],
+    "test_all": true
+  },
+  "tests": [
+  ]
+}

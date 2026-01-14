@@ -1,0 +1,30 @@
+{
+  "defaults": {
+    "steps": 200,
+    "captures": 100,
+    "delay": 20,
+    "scene": "res/structures/character",
+    "cameras": [
+      {
+        "pos": [ 25, 70, -113 ],
+        "rot": [ 0.01, 0 ]
+      },
+      {
+        "pos": [ 160, 70, 13 ],
+        "rot": [ -90.01, 0 ]
+      },
+      {
+        "pos": [ 25, -50, 13 ],
+        "rot": [ -180.01, -89.9 ]
+      }
+    ],
+    "ids": [
+      "front",
+      "side",
+      "top"
+    ],
+    "test_all": true
+  },
+  "tests": [
+  ]
+}
