@@ -1,6 +1,7 @@
 import json
 import sys
 
+import hashlib
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -14,6 +15,14 @@ with open(sys.argv[1], 'r') as f:
     lines = f.read()
 
 data = json.loads(lines)["values"]
+
+def name_to_colour(name, cmap):
+    h = hashlib.md5(name.encode("utf-8")).hexdigest()
+
+    idx = int(h, 16)
+
+    plt_cmap = plt.get_cmap(cmap)
+    return plt_cmap(idx % plt_cmap.N)
 
 def parse_frames(data):
     frames = data["frametimes"]
@@ -107,8 +116,12 @@ def barpoints():
     ids = set([f["id"] for f in data])
     structures = set([f["structure"] for f in data])
 
+    ids = sorted(ids)
+    structures = sorted(structures)
+
     ids = dict([(x, i) for i, x in enumerate(ids)])
     structures = dict([(x, i) for i, x in enumerate(structures)])
+
 
     w = 1. / (len(ids) + 1)
     x = np.arange(len(structures))
@@ -124,7 +137,7 @@ def barpoints():
         frametimes = [get_frametimes(f) for f in data_id]
         frametimes, medians, q1, q3 = zip(*frametimes)
 
-        ax.bar(x + offset, medians, w, label=f"{id}")
+        ax.bar(x + offset, medians, w, label=f"{id}", color=name_to_colour(id, "tab20b"))
 
         for i, frames in enumerate(frametimes):
             cut_frames = frames[q1[i]:q3[i]]
