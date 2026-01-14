@@ -84,6 +84,8 @@ class ASManager {
     uint32_t getAnimationFrame() { return m_CurrentAS->getAnimationFrame(); }
     void setAnimationFrame(uint32_t target) { m_CurrentAS->setAnimationFrame(target); }
 
+    bool finishedGeneration() { return m_CurrentAS->finishedGeneration(); }
+
   private:
     ASManager() { };
 

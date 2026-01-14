@@ -92,6 +92,8 @@ class IAccelerationStructure {
     virtual uint32_t getAnimationFrame() { return p_CurrentFrame; }
     virtual void setAnimationFrame(uint32_t target) { p_TargetFrame = target; }
 
+    virtual bool finishedGeneration() { return p_FinishedGeneration; }
+
   protected:
     void reset()
     {

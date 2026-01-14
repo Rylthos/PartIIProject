@@ -126,6 +126,9 @@ void PerformanceLogger::update(float delta)
     if (!m_Running)
         return;
 
+    if (!ASManager::getManager()->finishedGeneration())
+        return;
+
     const PerfEntry& entry = m_PerfEntries[m_CurrentEntry];
 
     if (m_CurrentDelay < entry.delay) {
