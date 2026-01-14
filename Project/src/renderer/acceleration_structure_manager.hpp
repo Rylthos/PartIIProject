@@ -34,6 +34,14 @@ struct HitData {
     alignas(16) int hit;
 };
 
+inline static std::map<ASType, const char*> structTypeToStringMap {
+    { ASType::GRID,     "Grid"     },
+    { ASType::OCTREE,   "Octree"   },
+    { ASType::CONTREE,  "Contree"  },
+    { ASType::BRICKMAP, "Brickmap" },
+    { ASType::TEXTURE,  "Texture"  },
+};
+
 class ASManager {
   public:
     static ASManager* getManager()

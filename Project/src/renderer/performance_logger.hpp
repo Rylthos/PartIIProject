@@ -70,12 +70,15 @@ class PerformanceLogger {
 
     void parseJson(std::filesystem::path file);
 
-    PerfEntry parseEntry(const nlohmann::json& json, bool defaults = false);
+    PerfEntry parseEntry(
+        const nlohmann::json& json, const PerfEntry& defaultEntry, bool defaults = false);
     CameraSettings parseCamera(const nlohmann::json& json);
 
     void startPerf(const PerfEntry& perf);
 
     void savePerf();
+
+    void testAll();
 
   private:
     std::filesystem::path m_CurrentPath;
@@ -90,11 +93,14 @@ class PerformanceLogger {
     bool m_Running = false;
     std::string m_PerfName;
     std::vector<PerfEntry> m_PerfEntries;
+    std::unordered_map<std::string, size_t> m_PerfEntryMap;
     std::vector<Data> m_DataEntries;
     size_t m_CurrentEntry = 0;
 
     uint32_t m_CurrentCaptures = 0;
     uint32_t m_CurrentDelay = 0;
+
+    bool m_TestAll = false;
 
     std::vector<std::filesystem::path> m_FileEntries;
     std::vector<std::filesystem::path> m_Directories;

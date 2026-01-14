@@ -30,14 +30,6 @@
 
 #include <vulkan/vulkan_core.h>
 
-static std::map<ASType, const char*> typeToStringMap {
-    { ASType::GRID,     "Grid"     },
-    { ASType::OCTREE,   "Octree"   },
-    { ASType::CONTREE,  "Contree"  },
-    { ASType::BRICKMAP, "Brickmap" },
-    { ASType::TEXTURE,  "Texture"  },
-};
-
 static std::map<RenderStyle, const char*> styleToStringMap {
     { RenderStyle::NORMAL, "Normal"  },
     { RenderStyle::HEAT,   "Heatmap" },
@@ -131,7 +123,7 @@ void ASManager::setAS(ASType type)
     AnimationManager::getManager()->reset();
 
     m_CurrentAS->init(m_InitInfo);
-    LOG_INFO("Changed to {}", typeToStringMap[m_CurrentType]);
+    LOG_INFO("Changed to {}", structTypeToStringMap[m_CurrentType]);
 }
 
 void ASManager::loadAS(
@@ -159,7 +151,7 @@ void ASManager::UI(const Event& event)
     if (frameEvent.type() == FrameEventType::UI) {
         if (ImGui::Begin("AS Manager")) {
             int currentlySelectedID = static_cast<uint8_t>(m_CurrentType);
-            const char* previewValue = typeToStringMap[m_CurrentType];
+            const char* previewValue = structTypeToStringMap[m_CurrentType];
 
             ImGui::Text("Current AS");
             ImGui::PushItemWidth(-1.f);
@@ -167,7 +159,7 @@ void ASManager::UI(const Event& event)
                 for (uint8_t i = 0; i < static_cast<uint8_t>(ASType::MAX_TYPE); i++) {
                     const bool isSelected = (currentlySelectedID == i);
                     ASType currentType = static_cast<ASType>(i);
-                    if (ImGui::Selectable(typeToStringMap[currentType], isSelected)) {
+                    if (ImGui::Selectable(structTypeToStringMap[currentType], isSelected)) {
                         m_CurrentType = currentType;
                         setAS(m_CurrentType);
                     }

@@ -152,6 +152,20 @@ void PerformanceLogger::update(float delta)
     }
 }
 
+void PerformanceLogger::getEntries()
+{
+    m_Directories.clear();
+    m_FileEntries.clear();
+
+    for (auto const& entry : std::filesystem::directory_iterator { m_CurrentPath }) {
+        if (entry.is_directory()) {
+            m_Directories.push_back(entry.path());
+        } else if (entry.is_regular_file()) {
+            m_FileEntries.push_back(entry.path());
+        }
+    }
+}
+
 void PerformanceLogger::startLog(std::filesystem::path file)
 {
     if (!std::filesystem::exists(file)) {
@@ -183,18 +197,39 @@ void PerformanceLogger::parseJson(std::filesystem::path file)
 
     m_Defaults = PerfEntry {};
     m_CameraSettings.clear();
+    m_TestAll = false;
+
     json data = json::parse(input);
 
     if (data.contains("defaults")) {
         json defaults = data["defaults"];
-        m_Defaults = parseEntry(defaults, true);
+        m_Defaults = parseEntry(defaults, m_Defaults, true);
+    }
+
+    if (m_TestAll) {
+        testAll();
     }
 
     if (data.contains("tests")) {
         json tests = data["tests"];
         for (int i = 0; i < tests.size(); i++) {
-            PerfEntry entry = parseEntry(tests[i]);
-            m_PerfEntries.push_back(entry);
+            PerfEntry defaultEntry = m_Defaults;
+            bool alreadyExists = false;
+            if (tests[i].contains("name")) {
+                std::string name = tests[i]["name"].get<std::string>();
+                if (m_PerfEntryMap.contains(name)) {
+                    defaultEntry = m_PerfEntries[m_PerfEntryMap[name]];
+                    alreadyExists = true;
+                }
+            }
+            PerfEntry entry = parseEntry(tests[i], defaultEntry);
+
+            if (alreadyExists) {
+                m_PerfEntries[m_PerfEntryMap[entry.name]] = entry;
+            } else {
+                m_PerfEntries.push_back(entry);
+                m_PerfEntryMap.insert({ entry.name, m_PerfEntries.size() - 1 });
+            }
         }
     }
 
@@ -234,9 +269,9 @@ void PerformanceLogger::startPerf(const PerfEntry& perf)
 }
 
 PerformanceLogger::PerfEntry PerformanceLogger::parseEntry(
-    const nlohmann::json& json, bool defaults)
+    const nlohmann::json& json, const PerfEntry& defaultEntry, bool defaults)
 {
-    PerfEntry entry = m_Defaults;
+    PerfEntry entry = defaultEntry;
 
     if (json.contains("name")) {
         entry.name = json["name"].get<std::string>();
@@ -307,6 +342,10 @@ PerformanceLogger::PerfEntry PerformanceLogger::parseEntry(
         } else {
             entry.id = json["id"].get<std::string>();
         }
+    }
+
+    if (defaults && json.contains("test_all")) {
+        m_TestAll = json["test_all"].get<bool>();
     }
 
     return entry;
@@ -419,16 +458,34 @@ void PerformanceLogger::savePerf()
     LOG_INFO("Wrote perf file {}", filename);
 }
 
-void PerformanceLogger::getEntries()
+void PerformanceLogger::testAll()
 {
-    m_Directories.clear();
-    m_FileEntries.clear();
+    for (uint8_t type = 0; type < static_cast<uint8_t>(ASType::MAX_TYPE); type++) {
+        ASType structure = static_cast<ASType>(type);
 
-    for (auto const& entry : std::filesystem::directory_iterator { m_CurrentPath }) {
-        if (entry.is_directory()) {
-            m_Directories.push_back(entry.path());
-        } else if (entry.is_regular_file()) {
-            m_FileEntries.push_back(entry.path());
+        if (m_IDs.size() != m_CameraSettings.size()) {
+            LOG_ERROR("To use test_all IDs and camera settings should be the same size");
+            return;
+        }
+
+        for (size_t i = 0; i < m_IDs.size(); i++) {
+            const std::string& id = m_IDs[i];
+            const CameraSettings& cameraSetting = m_CameraSettings[i];
+
+            PerfEntry entry = m_Defaults;
+
+            entry.id = id;
+            entry.camera = cameraSetting;
+            entry.structure = structure;
+
+            std::string structName = structTypeToStringMap[structure];
+
+            std::string name = std::filesystem::path(m_Defaults.scene).filename().string();
+
+            entry.name = std::format("{}_{}_{}", name, structName, id);
+
+            m_PerfEntries.push_back(entry);
+            m_PerfEntryMap.insert({ entry.name, m_PerfEntries.size() - 1 });
         }
     }
 }
