@@ -39,6 +39,8 @@ void PerformanceLogger::addGPUTime(float gpuTime)
     }
 }
 
+void PerformanceLogger::takeScreenshot(std::string name) { m_ScreenshotFunction(name); }
+
 void PerformanceLogger::frameEvent(const Event& event)
 {
     const FrameEvent& frameEvent = static_cast<const FrameEvent&>(event);
@@ -123,22 +125,34 @@ void PerformanceLogger::UI()
 
 void PerformanceLogger::update(float delta)
 {
-    if (!m_Running)
-        return;
+    static bool screenshotTaken = false;
 
-    if (!ASManager::getManager()->finishedGeneration())
+    if (!m_Running) {
+        screenshotTaken = false;
         return;
+    }
+
+    if (!ASManager::getManager()->finishedGeneration()) {
+        return;
+    }
 
     const PerfEntry& entry = m_PerfEntries[m_CurrentEntry];
 
     if (m_CurrentDelay < entry.delay) {
         m_CurrentDelay++;
+        screenshotTaken = false;
         return;
+    }
+    if (!screenshotTaken) {
+        takeScreenshot(std::format(
+            "res/perf_output/{}/{}.ppm", m_PerfName, m_PerfEntries[m_CurrentEntry].name));
+        screenshotTaken = true;
     }
 
     m_CurrentCaptures++;
 
     if (m_CurrentCaptures > entry.captures) {
+
         Data& data = m_DataEntries[m_CurrentEntry];
         data.memoryUsage = ASManager::getManager()->getMemoryUsage();
         data.voxels = ASManager::getManager()->getVoxels();
@@ -149,6 +163,7 @@ void PerformanceLogger::update(float delta)
 
         if (m_CurrentEntry < m_PerfEntries.size()) {
             startPerf(m_PerfEntries[m_CurrentEntry]);
+            screenshotTaken = false;
         } else {
             savePerf();
         }
@@ -164,7 +179,9 @@ void PerformanceLogger::getEntries()
         if (entry.is_directory()) {
             m_Directories.push_back(entry.path());
         } else if (entry.is_regular_file()) {
-            m_FileEntries.push_back(entry.path());
+            if (entry.path().extension() == ".json") {
+                m_FileEntries.push_back(entry.path());
+            }
         }
     }
 }

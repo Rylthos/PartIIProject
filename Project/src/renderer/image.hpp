@@ -11,7 +11,11 @@ class Image {
     ~Image();
 
     void init(VkDevice device, VmaAllocator allocator, uint32_t graphicsQueueIndex,
-        VkExtent3D extent, VkFormat format, VkImageType type, VkImageUsageFlags usage);
+        VkExtent3D extent, VkFormat format, VkImageType type, VkImageUsageFlags usage,
+        VmaAllocationCreateFlags flags = 0,
+        VmaMemoryUsage memoryUsage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+        VkMemoryPropertyFlags memoryFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL);
     void createView(VkImageViewType type);
     void cleanup();
 
@@ -28,6 +32,7 @@ class Image {
     VkImageView getImageView() const { return m_View; }
     VkExtent3D getExtent() const { return m_Extent; }
     VkFormat getFormat() const { return m_Format; }
+    VmaAllocation getAllocation() const { return m_Allocation; }
 
   private:
     VkDevice m_Device;

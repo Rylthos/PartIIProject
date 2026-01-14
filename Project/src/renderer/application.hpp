@@ -62,6 +62,8 @@ class Application : public EventDispatcher {
     std::vector<VkSemaphore> m_AcquireSemaphore;
     std::vector<VkSemaphore> m_SubmitSemaphore;
 
+    Image m_ScreenshotImage;
+
     VkCommandPool m_GeneralPool;
     std::array<PerFrameData, FRAMES_IN_FLIGHT> m_PerFrameData;
 
@@ -88,6 +90,8 @@ class Application : public EventDispatcher {
     Camera m_Camera;
 
     bool m_RenderImGui = true;
+
+    std::optional<std::string> m_TakeScreenshot;
 
   private:
     void initVulkan();
@@ -149,4 +153,6 @@ class Application : public EventDispatcher {
     void handleKeyInput(const Event& event);
     void handleMouse(const Event& event);
     void handleWindow(const Event& event);
+
+    void takeScreenshot(std::string filename);
 };

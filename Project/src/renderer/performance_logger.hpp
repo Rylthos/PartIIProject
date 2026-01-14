@@ -57,6 +57,13 @@ class PerformanceLogger {
 
     void addGPUTime(float GPUTime);
 
+    void setScreenshotFunction(const std::function<void(std::string)>& screenshotFunc)
+    {
+        m_ScreenshotFunction = screenshotFunc;
+    }
+
+    void takeScreenshot(std::string name);
+
   private:
     PerformanceLogger();
 
@@ -101,6 +108,8 @@ class PerformanceLogger {
     uint32_t m_CurrentDelay = 0;
 
     bool m_TestAll = false;
+
+    std::function<void(std::string)> m_ScreenshotFunction;
 
     std::vector<std::filesystem::path> m_FileEntries;
     std::vector<std::filesystem::path> m_Directories;

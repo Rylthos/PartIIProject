@@ -10,7 +10,9 @@ Image::~Image() { }
 Image::Image() { }
 
 void Image::init(VkDevice device, VmaAllocator allocator, uint32_t graphicsQueueIndex,
-    VkExtent3D extent, VkFormat format, VkImageType type, VkImageUsageFlags usage)
+    VkExtent3D extent, VkFormat format, VkImageType type, VkImageUsageFlags usage,
+    VmaAllocationCreateFlags flags, VmaMemoryUsage memoryUsage, VkMemoryPropertyFlags memoryFlags,
+    VkImageTiling tiling)
 {
     m_Device = device;
     m_Allocator = allocator;
@@ -28,7 +30,7 @@ void Image::init(VkDevice device, VmaAllocator allocator, uint32_t graphicsQueue
         .mipLevels = 1,
         .arrayLayers = 1,
         .samples = VK_SAMPLE_COUNT_1_BIT,
-        .tiling = VK_IMAGE_TILING_OPTIMAL,
+        .tiling = tiling,
         .usage = usage,
         .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
         .queueFamilyIndexCount = 1,
@@ -37,13 +39,13 @@ void Image::init(VkDevice device, VmaAllocator allocator, uint32_t graphicsQueue
     };
 
     VmaAllocationCreateInfo allocationCI {
-        .flags = 0,
-        .usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-        .requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        .flags = flags,
+        .usage = memoryUsage,
+        .requiredFlags = memoryFlags,
     };
 
     VK_CHECK(vmaCreateImage(m_Allocator, &imageCI, &allocationCI, &m_Image, &m_Allocation, nullptr),
-        "Failed to allocate voxel draw image");
+        "Failed to allocate image");
 }
 
 void Image::createView(VkImageViewType type)

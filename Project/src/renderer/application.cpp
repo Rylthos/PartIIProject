@@ -1,6 +1,7 @@
 #include "application.hpp"
 
 #include <cstdint>
+#include <filesystem>
 #include <functional>
 #include <memory>
 #include <vector>
@@ -25,6 +26,8 @@
 #include "glm/vector_relational.hpp"
 
 #include <vulkan/vulkan_core.h>
+
+#include <fstream>
 
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
@@ -105,6 +108,9 @@ void Application::init()
     subscribe(EventFamily::FRAME, PerformanceLogger::getLogger()->getFrameEvent());
     subscribe(EventFamily::FRAME, ModificationManager::getManager()->getUIEvent());
     subscribe(EventFamily::FRAME, AnimationManager::getManager()->getFrameEvent());
+
+    PerformanceLogger::getLogger()->setScreenshotFunction(
+        std::bind(&Application::takeScreenshot, this, _1));
 
     m_Window.subscribe(EventFamily::KEYBOARD, m_Camera.getKeyboardEvent());
     m_Window.subscribe(EventFamily::MOUSE, m_Camera.getMouseEvent());
@@ -317,6 +323,14 @@ void Application::createDrawImages()
         m_PerFrameData[i].drawImage.setDebugNameView("Draw image view");
     }
 
+    m_ScreenshotImage.init(m_VkDevice, m_VmaAllocator, m_GraphicsQueue.queueFamily, extent,
+        VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TYPE_2D, VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+        VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_HOST,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        VK_IMAGE_TILING_LINEAR);
+
+    m_ScreenshotImage.setDebugName("Screenshot Image");
+
     LOG_DEBUG("Created draw images");
 }
 
@@ -345,6 +359,8 @@ void Application::destroyImages()
         m_PerFrameData[i].drawImage.cleanup();
         m_PerFrameData[i].rayDirectionImage.cleanup();
     }
+
+    m_ScreenshotImage.cleanup();
 
     LOG_DEBUG("Destroyed images");
 }
@@ -1029,6 +1045,20 @@ void Application::render()
             vkCmdPipelineBarrier2(commandBuffer, &dependency);
         }
 
+        if (m_TakeScreenshot.has_value()) {
+            currentFrame.drawImage.transition(
+                commandBuffer, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+
+            m_ScreenshotImage.transition(
+                commandBuffer, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+            currentFrame.drawImage.copyToImage(commandBuffer, m_ScreenshotImage.getImage(),
+                currentFrame.drawImage.getExtent(), m_ScreenshotImage.getExtent());
+
+            currentFrame.drawImage.transition(
+                commandBuffer, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
+        }
+
         {
             Debug::beginCmdDebugLabel(commandBuffer, "UI Rendering", { 0.f, 0.f, 1.f, 1.f });
 
@@ -1133,6 +1163,49 @@ void Application::render()
         }
     }
 
+    if (m_TakeScreenshot.has_value()) {
+        std::string filename = m_TakeScreenshot.value();
+        m_TakeScreenshot.reset();
+
+        vkQueueWaitIdle(m_GraphicsQueue.queue);
+
+        LOG_INFO("Take Screenshot");
+
+        VkImageSubresource subResource { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0 };
+        VkSubresourceLayout subResourceLayout;
+        vkGetImageSubresourceLayout(
+            m_VkDevice, m_ScreenshotImage.getImage(), &subResource, &subResourceLayout);
+
+        uint8_t* data;
+        vmaMapMemory(m_VmaAllocator, m_ScreenshotImage.getAllocation(), (void**)&data);
+
+        data += subResourceLayout.offset;
+
+        if (!std::filesystem::exists(std::filesystem::path(filename).parent_path())) {
+            std::filesystem::create_directories(std::filesystem::path(filename).parent_path());
+        }
+
+        std::ofstream file(filename, std::ios::out | std::ios::binary);
+
+        glm::uvec2 size = m_Window.getWindowSize();
+
+        file << "P6\n" << size.x << "\n" << size.y << "\n" << 255 << "\n";
+
+        for (uint32_t y = 0; y < size.y; y++) {
+            uint32_t* row = (uint32_t*)data;
+            for (uint32_t x = 0; x < size.x; x++) {
+                file.write((char*)row, 3);
+                row++;
+            }
+            data += subResourceLayout.rowPitch;
+        }
+
+        LOG_INFO("Wrote screenshot: {}", filename);
+        file.close();
+
+        vmaUnmapMemory(m_VmaAllocator, m_ScreenshotImage.getAllocation());
+    }
+
     m_Window.swapBuffers();
 }
 
@@ -1204,6 +1277,10 @@ void Application::handleKeyInput(const Event& event)
         if (keyEvent.keycode == GLFW_KEY_I) {
             m_RenderImGui = !m_RenderImGui;
         }
+
+        if (keyEvent.keycode == GLFW_KEY_K) {
+            takeScreenshot("screenshot.ppm");
+        }
     }
 }
 
@@ -1237,3 +1314,5 @@ void Application::handleWindow(const Event& event)
         createDescriptors();
     }
 }
+
+void Application::takeScreenshot(std::string filename) { m_TakeScreenshot = filename; }
