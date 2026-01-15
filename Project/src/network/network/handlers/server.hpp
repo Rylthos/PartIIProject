@@ -4,6 +4,6 @@
 
 namespace Network::Server {
 
-void run(Node& node);
+void run(Node& node, ServerSettings settings);
 
 }

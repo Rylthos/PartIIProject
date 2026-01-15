@@ -9,10 +9,11 @@
 
 namespace Network::Client {
 
-typedef std::function<void(std::optional<std::vector<uint8_t>>)> StandardCallback;
+typedef std::function<void(std::vector<uint8_t>)> StandardCallback;
 
 void run(const Node& node);
 
-void addFileRequest(std::string path, const StandardCallback& callback);
+void addDirEntryRequest(std::string path, StandardCallback callback);
+void addFileEntryRequest(std::string path, StandardCallback callback);
 
 }

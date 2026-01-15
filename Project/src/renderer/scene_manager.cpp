@@ -5,6 +5,7 @@
 #include "logger/logger.hpp"
 
 #include "acceleration_structure_manager.hpp"
+#include "network/serializers.hpp"
 
 #include <imgui.h>
 
@@ -16,6 +17,8 @@
 SceneManager::SceneManager()
 {
 #ifdef SERVER_CLIENT
+    m_CurrentPath = "/";
+    getDirectories();
 #else
     m_CurrentPath = std::filesystem::current_path();
     if (std::filesystem::exists(m_CurrentPath / "res" / "structures")) {
@@ -31,12 +34,6 @@ void SceneManager::UI(const Event& event)
     const FrameEvent& frameEvent = static_cast<const FrameEvent&>(event);
 
     if (frameEvent.type() == FrameEventType::UI) {
-#ifdef SERVER_CLIENT
-        if (!m_Requested) {
-            requestEntries("");
-            m_Requested = true;
-        }
-#endif
         if (ImGui::Begin("Scene manager")) {
             {
                 static int itemIndex = -1;
@@ -49,17 +46,11 @@ void SceneManager::UI(const Event& event)
                             if (itemIndex == i) {
                                 itemIndex = -1;
                                 m_CurrentPath = m_Directories[i];
-#ifdef SERVER_CLIENT
-#else
                                 getDirectories();
-#endif
                             } else {
                                 itemIndex = i;
                                 m_SelectedPath = m_Directories[i];
-#ifdef SERVER_CLIENT
-#else
                                 getFileEntries();
-#endif
                             }
                         }
 
@@ -109,6 +100,15 @@ void SceneManager::UI(const Event& event)
 void SceneManager::getDirectories()
 {
 #ifdef SERVER_CLIENT
+    if (m_RequestedDirectories)
+        return;
+
+    m_RequestedDirectories = true;
+
+    m_Directories.clear();
+
+    Network::Client::addDirEntryRequest(m_CurrentPath,
+        std::bind(&SceneManager::handleDirectoryEntries, this, std::placeholders::_1));
 #else
     m_Directories.clear();
 
@@ -125,6 +125,15 @@ void SceneManager::getDirectories()
 void SceneManager::getFileEntries()
 {
 #ifdef SERVER_CLIENT
+    if (m_RequestedEntries)
+        return;
+
+    m_RequestedEntries = true;
+
+    m_FileEntries.clear();
+
+    Network::Client::addFileEntryRequest(
+        m_SelectedPath, std::bind(&SceneManager::handleFileEntries, this, std::placeholders::_1));
 #else
     std::filesystem::path folderName = m_SelectedPath.filename();
 
@@ -141,18 +150,43 @@ void SceneManager::getFileEntries()
 }
 
 #ifdef SERVER_CLIENT
-void SceneManager::requestEntries(std::string path)
+void SceneManager::handleDirectoryEntries(std::vector<uint8_t> data)
 {
-    Network::Client::addFileRequest(
-        path, std::bind(&SceneManager::handleEntries, this, std::placeholders::_1));
-    LOG_INFO("Requested Entries");
+    using namespace Network;
+
+    LOG_INFO("Received directory entries");
+
+    m_Directories.clear();
+
+    size_t index = 0;
+    uint32_t elements = Serializer::readUint32_t(data, data.size(), index);
+
+    for (uint32_t i = 0; i < elements; i++) {
+        std::string str = Serializer::readString(data, data.size(), index);
+        m_Directories.push_back(str);
+    }
+
+    std::sort(m_Directories.begin(), m_Directories.end());
+
+    m_RequestedDirectories = false;
 }
 
-void SceneManager::handleEntries(std::optional<std::vector<uint8_t>> data)
+void SceneManager::handleFileEntries(std::vector<uint8_t> data)
 {
-    if (!data.has_value()) {
-        LOG_ERROR("Failed to get data");
+    using namespace Network;
+
+    LOG_INFO("Received file entries");
+
+    m_FileEntries.clear();
+
+    size_t index = 0;
+    uint32_t elements = Serializer::readUint32_t(data, data.size(), index);
+
+    for (uint32_t i = 0; i < elements; i++) {
+        std::string str = Serializer::readString(data, data.size(), index);
+        m_FileEntries.insert(str);
     }
-    LOG_INFO("Got data: {}", data->size());
+
+    m_RequestedEntries = false;
 }
 #endif

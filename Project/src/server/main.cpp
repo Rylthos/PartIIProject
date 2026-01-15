@@ -20,7 +20,7 @@ int main(int argc, char** argv)
 
     printf("Connected to port %d\n", settings.port);
 
-    Network::Server::run(server);
+    Network::Server::run(server, settings);
 
     return 0;
 }

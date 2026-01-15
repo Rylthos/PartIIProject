@@ -29,8 +29,8 @@ class SceneManager {
     void getFileEntries();
 
 #ifdef SERVER_CLIENT
-    void requestEntries(std::string path);
-    void handleEntries(std::optional<std::vector<uint8_t>> data);
+    void handleDirectoryEntries(std::vector<uint8_t> data);
+    void handleFileEntries(std::vector<uint8_t> data);
 #endif
 
   private:
@@ -39,10 +39,11 @@ class SceneManager {
 
     bool m_ValidStructures[static_cast<uint8_t>(ASType::MAX_TYPE)];
 
-    std::set<std::filesystem::path> m_FileEntries;
+    std::set<std::string> m_FileEntries;
     std::vector<std::filesystem::path> m_Directories;
 
 #ifdef SERVER_CLIENT
-    bool m_Requested = false;
+    bool m_RequestedDirectories = false;
+    bool m_RequestedEntries = false;
 #endif
 };
