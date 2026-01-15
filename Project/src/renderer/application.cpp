@@ -35,6 +35,10 @@
 #include "spdlog/fmt/bundled/base.h"
 #include "spdlog/spdlog.h"
 
+#ifdef SERVER_CLIENT
+#include "network/handlers/client.hpp"
+#endif
+
 #define STORAGE_IMAGE_SIZE 1000
 #define STORAGE_BUFFER_SIZE 1000
 
@@ -44,6 +48,17 @@ struct SetupPushConstants {
     alignas(16) glm::vec3 cameraRight;
     alignas(16) glm::vec3 cameraUp;
 };
+
+#ifdef SERVER_CLIENT
+void Application::init(Network::ClientSettings settings)
+{
+    m_NetworkNode = Network::initClient(settings);
+
+    m_NetworkThread = std::thread([&]() { Network::Client::run(m_NetworkNode); });
+
+    init();
+}
+#endif
 
 void Application::init()
 {

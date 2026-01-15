@@ -28,6 +28,11 @@ class SceneManager {
     void getDirectories();
     void getFileEntries();
 
+#ifdef SERVER_CLIENT
+    void requestEntries(std::string path);
+    void handleEntries(std::optional<std::vector<uint8_t>> data);
+#endif
+
   private:
     std::filesystem::path m_CurrentPath;
     std::filesystem::path m_SelectedPath;
@@ -36,4 +41,8 @@ class SceneManager {
 
     std::set<std::filesystem::path> m_FileEntries;
     std::vector<std::filesystem::path> m_Directories;
+
+#ifdef SERVER_CLIENT
+    bool m_Requested = false;
+#endif
 };

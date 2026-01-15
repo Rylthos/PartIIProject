@@ -8,15 +8,22 @@
 
 #include <imgui.h>
 
+#ifdef SERVER_CLIENT
+#include "network/handlers/client.hpp"
+#include <functional>
+#endif
+
 SceneManager::SceneManager()
 {
-
+#ifdef SERVER_CLIENT
+#else
     m_CurrentPath = std::filesystem::current_path();
     if (std::filesystem::exists(m_CurrentPath / "res" / "structures")) {
         m_CurrentPath /= "res";
         m_CurrentPath /= "structures";
     }
     getDirectories();
+#endif
 }
 
 void SceneManager::UI(const Event& event)
@@ -24,6 +31,12 @@ void SceneManager::UI(const Event& event)
     const FrameEvent& frameEvent = static_cast<const FrameEvent&>(event);
 
     if (frameEvent.type() == FrameEventType::UI) {
+#ifdef SERVER_CLIENT
+        if (!m_Requested) {
+            requestEntries("");
+            m_Requested = true;
+        }
+#endif
         if (ImGui::Begin("Scene manager")) {
             {
                 static int itemIndex = -1;
@@ -36,11 +49,17 @@ void SceneManager::UI(const Event& event)
                             if (itemIndex == i) {
                                 itemIndex = -1;
                                 m_CurrentPath = m_Directories[i];
+#ifdef SERVER_CLIENT
+#else
                                 getDirectories();
+#endif
                             } else {
                                 itemIndex = i;
                                 m_SelectedPath = m_Directories[i];
+#ifdef SERVER_CLIENT
+#else
                                 getFileEntries();
+#endif
                             }
                         }
 
@@ -60,7 +79,10 @@ void SceneManager::UI(const Event& event)
             ImGui::SameLine();
 
             if (ImGui::Button("Load structure")) {
+#ifdef SERVER_CLIENT
+#else
                 ASManager::getManager()->loadAS(m_SelectedPath, m_ValidStructures);
+#endif
             }
 
             {
@@ -86,6 +108,8 @@ void SceneManager::UI(const Event& event)
 
 void SceneManager::getDirectories()
 {
+#ifdef SERVER_CLIENT
+#else
     m_Directories.clear();
 
     for (auto const& entry : std::filesystem::directory_iterator { m_CurrentPath }) {
@@ -95,10 +119,13 @@ void SceneManager::getDirectories()
     }
 
     std::sort(m_Directories.begin(), m_Directories.end());
+#endif
 }
 
 void SceneManager::getFileEntries()
 {
+#ifdef SERVER_CLIENT
+#else
     std::filesystem::path folderName = m_SelectedPath.filename();
 
     m_FileEntries.clear();
@@ -110,4 +137,22 @@ void SceneManager::getFileEntries()
             }
         }
     }
+#endif
 }
+
+#ifdef SERVER_CLIENT
+void SceneManager::requestEntries(std::string path)
+{
+    Network::Client::addFileRequest(
+        path, std::bind(&SceneManager::handleEntries, this, std::placeholders::_1));
+    LOG_INFO("Requested Entries");
+}
+
+void SceneManager::handleEntries(std::optional<std::vector<uint8_t>> data)
+{
+    if (!data.has_value()) {
+        LOG_ERROR("Failed to get data");
+    }
+    LOG_INFO("Got data: {}", data->size());
+}
+#endif

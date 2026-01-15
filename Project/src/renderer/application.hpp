@@ -9,6 +9,10 @@
 #include "vk_mem_alloc.h"
 #include "vulkan/vulkan.h"
 
+#ifdef SERVER_CLIENT
+#include "network/setup.hpp"
+#endif
+
 #define FRAMES_IN_FLIGHT 2
 
 struct Sphere {
@@ -35,12 +39,20 @@ struct PerFrameData {
 
 class Application : public EventDispatcher {
   public:
+#ifdef SERVER_CLIENT
+    void init(Network::ClientSettings settings);
+#endif
     void init();
     void start();
 
     void cleanup();
 
   private:
+#ifdef SERVER_CLIENT
+    Network::Node m_NetworkNode;
+    std::thread m_NetworkThread;
+#endif
+
     Window m_Window;
     VkInstance m_VkInstance;
     VkDebugUtilsMessengerEXT m_VkDebugMessenger;

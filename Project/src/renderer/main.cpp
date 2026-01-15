@@ -8,12 +8,35 @@
 
 #define VMA_IMPLEMENTATION
 
+// #define SERVER_CLIENT
+
 #include "application.hpp"
 
-int main()
+#ifdef SERVER_CLIENT
+#include "network/setup.hpp"
+
+#include <CLI/CLI.hpp>
+#endif
+
+int main(int argc, char** argv)
 {
+#ifdef SERVER_CLIENT
+    Network::ClientSettings settings;
+    CLI::App cliApp { "Client settings for application" };
+    argv = cliApp.ensure_utf8(argv);
+
+    cliApp.add_option("ip", settings.address, "The IP to target");
+    cliApp.add_option("port", settings.port, "The port to connect to");
+
+    CLI11_PARSE(cliApp, argc, argv);
+#endif
+
     Application app;
+#ifdef SERVER_CLIENT
+    app.init(settings);
+#else
     app.init();
+#endif
     app.start();
     app.cleanup();
 
