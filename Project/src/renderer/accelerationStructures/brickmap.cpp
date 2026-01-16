@@ -94,18 +94,22 @@ void BrickmapAS::fromLoader(std::unique_ptr<Loader>&& loader)
           });
 }
 
-void BrickmapAS::fromFile(std::filesystem::path path)
+void BrickmapAS::fromRaw(std::vector<uint8_t> rawData, bool shouldReset)
 {
-    vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
+    {
+        std::lock_guard lock(p_Info.graphicsQueue->getLock());
+        vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
+    }
 
     p_FileThread.request_stop();
 
-    reset();
+    if (shouldReset)
+        reset();
 
-    p_FileThread = std::jthread([this, path](std::stop_token stoken) {
+    p_RawThread = std::jthread([this, rawData](std::stop_token stoken) {
         p_Loading = true;
         Serializers::SerialInfo info;
-        auto data = Serializers::loadBrickmap(path);
+        auto data = Serializers::loadBrickmap(rawData);
 
         if (!data.has_value() || stoken.stop_requested()) {
             return;
@@ -122,6 +126,27 @@ void BrickmapAS::fromFile(std::filesystem::path path)
 
         m_UpdateBuffers = true;
         p_Loading = false;
+    });
+}
+
+void BrickmapAS::fromFile(std::filesystem::path path)
+{
+    {
+        std::lock_guard lock(p_Info.graphicsQueue->getLock());
+        vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
+    }
+
+    p_FileThread.request_stop();
+
+    reset();
+
+    p_FileThread = std::jthread([this, path](std::stop_token stoken) {
+        p_Loading = true;
+
+        std::ifstream inputStream = Serializers::loadBrickmapFile(path);
+        std::vector<uint8_t> data = Serializers::vectorFromStream(inputStream);
+
+        fromRaw(data, false);
     });
 }
 

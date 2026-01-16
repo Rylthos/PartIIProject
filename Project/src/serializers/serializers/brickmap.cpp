@@ -9,10 +9,7 @@
 
 namespace Serializers {
 
-std::optional<
-    std::tuple<SerialInfo, std::vector<Generators::BrickgridPtr>, std::vector<Generators::Brickmap>,
-        std::vector<Generators::BrickmapColour>, Modification::AnimationFrames>>
-loadBrickmap(std::filesystem::path directory)
+std::ifstream loadBrickmapFile(std::filesystem::path directory)
 {
     std::string foldername = directory.filename();
 
@@ -23,6 +20,27 @@ loadBrickmap(std::filesystem::path directory)
         LOG_ERROR("Failed to open file: {}\n", file.string());
         return {};
     }
+
+    return inputStream;
+}
+
+std::optional<
+    std::tuple<SerialInfo, std::vector<Generators::BrickgridPtr>, std::vector<Generators::Brickmap>,
+        std::vector<Generators::BrickmapColour>, Modification::AnimationFrames>>
+loadBrickmap(std::filesystem::path directory)
+{
+    std::ifstream inputStream = loadBrickmapFile(directory);
+    std::vector<uint8_t> data = vectorFromStream(inputStream);
+
+    return loadBrickmap(data);
+}
+
+std::optional<
+    std::tuple<SerialInfo, std::vector<Generators::BrickgridPtr>, std::vector<Generators::Brickmap>,
+        std::vector<Generators::BrickmapColour>, Modification::AnimationFrames>>
+loadBrickmap(const std::vector<uint8_t>& data)
+{
+    std::istringstream inputStream(std::string(data.begin(), data.end()));
 
     SerialInfo serialInfo;
     serialInfo.dimensions = Serializers::readUvec3(inputStream);
