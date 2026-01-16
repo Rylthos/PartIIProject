@@ -14,14 +14,29 @@ loadGrid(std::filesystem::path directory)
     std::string foldername = directory.filename();
 
     std::filesystem::path file = directory / (foldername + ".voxgrid");
-    std::ifstream inputStream(file.string(), std::ios::binary | std::ios::in);
+    std::ifstream inputStream(file.string(), std::ios::binary | std::ios::in | std::ios::ate);
 
     if (!inputStream.is_open()) {
         LOG_ERROR("Failed to open file: {}\n", file.string());
         return {};
     }
 
+    size_t fileSize = inputStream.tellg();
+    inputStream.seekg(0, std::ios::beg);
+
+    std::vector<uint8_t> data(fileSize);
+    inputStream.read((char*)data.data(), fileSize);
+
+    return loadGrid(data);
+}
+
+std::optional<
+    std::tuple<SerialInfo, std::vector<Generators::GridVoxel>, Modification::AnimationFrames>>
+loadGrid(std::vector<uint8_t> data)
+{
     SerialInfo serialInfo;
+
+    std::istringstream inputStream(std::string(data.begin(), data.end()));
 
     serialInfo.dimensions = Serializers::readUvec3(inputStream);
     serialInfo.voxels = Serializers::readUint64(inputStream);
@@ -45,39 +60,6 @@ loadGrid(std::filesystem::path directory)
     }
 
     Modification::AnimationFrames animation = readAnimationFrames(inputStream);
-
-    return std::make_tuple(serialInfo, voxels, animation);
-}
-
-std::optional<
-    std::tuple<SerialInfo, std::vector<Generators::GridVoxel>, Modification::AnimationFrames>>
-loadGrid(std::vector<uint8_t> data)
-{
-    SerialInfo serialInfo;
-
-    uint32_t index = 0;
-    serialInfo.dimensions = Serializers::readUvec3(data, index);
-    serialInfo.voxels = Serializers::readUint64(data, index);
-    serialInfo.nodes = Serializers::readUint64(data, index);
-    size_t voxelCount = Serializers::readUint64(data, index);
-
-    std::vector<Generators::GridVoxel> voxels;
-    voxels.reserve(voxelCount);
-
-    for (size_t i = 0; i < voxelCount; i++) {
-        glm::u8vec4 voxel = Serializers::readU8Vec4(data, index);
-
-        voxels.push_back(Generators::GridVoxel {
-                .visible = voxel.a > 0,
-                .colour = {
-                    voxel.r / 255.f,
-                    voxel.g / 255.f,
-                    voxel.b / 255.f,
-                },
-        });
-    }
-
-    Modification::AnimationFrames animation = readAnimationFrames(data, index);
 
     return std::make_tuple(serialInfo, voxels, animation);
 }
