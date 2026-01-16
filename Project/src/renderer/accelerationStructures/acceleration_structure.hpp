@@ -65,6 +65,7 @@ class IAccelerationStructure {
     virtual void init(ASStructInfo info) { p_Info = info; }
     virtual void fromLoader(std::unique_ptr<Loader>&& loader) = 0;
     virtual void fromFile(std::filesystem::path path) { }
+    virtual void fromRaw(std::vector<uint8_t> data) { }
     virtual void render(
         VkCommandBuffer cmd, Camera camera, VkDescriptorSet renderSet, VkExtent2D imageSize)
         = 0;

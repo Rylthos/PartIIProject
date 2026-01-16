@@ -7,6 +7,8 @@ void writeByte(uint8_t byte, std::ofstream& stream) { stream.put(byte); }
 
 uint8_t readByte(std::ifstream& stream) { return stream.get(); }
 
+uint8_t readByte(const std::vector<uint8_t>& data, uint32_t& index) { return data[index++]; }
+
 void writeUint32(uint32_t value, std::ofstream& stream)
 {
     for (size_t i = 0; i < 4; i++) {
@@ -25,6 +27,16 @@ uint32_t readUint32(std::ifstream& stream)
     return output;
 }
 
+uint32_t readUint32(const std::vector<uint8_t>& data, uint32_t& index)
+{
+    uint32_t output = 0;
+    for (size_t i = 0; i < 4; i++) {
+        uint8_t byte = readByte(data, index);
+        output |= ((uint32_t)byte) << (8 * i);
+    }
+    return output;
+}
+
 void writeFloat(float value, std::ofstream& stream)
 {
     uint32_t converted = std::bit_cast<uint32_t>(value);
@@ -35,6 +47,12 @@ void writeFloat(float value, std::ofstream& stream)
 float readFloat(std::ifstream& stream)
 {
     uint32_t converted = readUint32(stream);
+    return std::bit_cast<float>(converted);
+}
+
+float readFloat(const std::vector<uint8_t>& data, uint32_t& index)
+{
+    uint32_t converted = readUint32(data, index);
     return std::bit_cast<float>(converted);
 }
 
@@ -57,6 +75,16 @@ uint64_t readUint64(std::ifstream& stream)
     return output;
 }
 
+uint64_t readUint64(const std::vector<uint8_t>& data, uint32_t& index)
+{
+    uint64_t output = 0;
+    for (size_t i = 0; i < 8; i++) {
+        uint8_t byte = readByte(data, index);
+        output |= ((uint64_t)byte) << (8 * i);
+    }
+    return output;
+}
+
 void writeUvec3(glm::uvec3 vec, std::ofstream& stream)
 {
     writeUint32(vec.x, stream);
@@ -70,6 +98,15 @@ glm::uvec3 readUvec3(std::ifstream& stream)
     vec.x = readUint32(stream);
     vec.y = readUint32(stream);
     vec.z = readUint32(stream);
+    return vec;
+}
+
+glm::uvec3 readUvec3(const std::vector<uint8_t>& data, uint32_t& index)
+{
+    glm::uvec3 vec;
+    vec.x = readUint32(data, index);
+    vec.y = readUint32(data, index);
+    vec.z = readUint32(data, index);
     return vec;
 }
 
@@ -87,6 +124,17 @@ glm::vec3 readVec3(std::ifstream& stream)
     vec.x = readFloat(stream);
     vec.y = readFloat(stream);
     vec.z = readFloat(stream);
+
+    return vec;
+}
+
+glm::vec3 readVec3(const std::vector<uint8_t>& data, uint32_t& index)
+{
+    glm::vec3 vec;
+
+    vec.x = readFloat(data, index);
+    vec.y = readFloat(data, index);
+    vec.z = readFloat(data, index);
 
     return vec;
 }
@@ -109,6 +157,16 @@ glm::u8vec4 readU8Vec4(std::ifstream& stream)
     return vec;
 }
 
+glm::u8vec4 readU8Vec4(const std::vector<uint8_t>& data, uint32_t& index)
+{
+    glm::u8vec4 vec;
+    vec.x = readByte(data, index);
+    vec.y = readByte(data, index);
+    vec.z = readByte(data, index);
+    vec.w = readByte(data, index);
+    return vec;
+}
+
 void writeDiff(Modification::DiffType diff, std::ofstream& stream)
 {
     writeUint32(static_cast<uint32_t>(diff.first), stream);
@@ -119,6 +177,14 @@ Modification::DiffType readDiff(std::ifstream& stream)
 {
     Modification::Type type = static_cast<Modification::Type>(readUint32(stream));
     glm::vec3 colour = readVec3(stream);
+
+    return { type, colour };
+}
+
+Modification::DiffType readDiff(const std::vector<uint8_t>& data, uint32_t& index)
+{
+    Modification::Type type = static_cast<Modification::Type>(readUint32(data, index));
+    glm::vec3 colour = readVec3(data, index);
 
     return { type, colour };
 }
@@ -155,6 +221,29 @@ Modification::AnimationFrames readAnimationFrames(std::ifstream& stream)
             Modification::DiffType diff = readDiff(stream);
 
             animation[frame].insert({ index, diff });
+        }
+    }
+
+    return animation;
+}
+
+Modification::AnimationFrames readAnimationFrames(const std::vector<uint8_t>& data, uint32_t& index)
+{
+    Modification::AnimationFrames animation;
+
+    size_t animationFrames = readUint64(data, index);
+
+    animation.resize(animationFrames);
+
+    for (size_t frame = 0; frame < animationFrames; frame++) {
+        size_t changes = readUint64(data, index);
+
+        for (size_t change = 0; change < changes; change++) {
+            glm::ivec3 voxelIndex = readUvec3(data, index);
+
+            Modification::DiffType diff = readDiff(data, index);
+
+            animation[frame].insert({ voxelIndex, diff });
         }
     }
 

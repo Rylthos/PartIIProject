@@ -125,6 +125,37 @@ void GridAS::fromFile(std::filesystem::path path)
     });
 }
 
+void GridAS::fromRaw(std::vector<uint8_t> rawData)
+{
+    p_FileThread.request_stop();
+
+    reset();
+
+    p_FileThread = std::jthread([this, rawData](std::stop_token stoken) {
+        p_Loading = true;
+        Serializers::SerialInfo info;
+        auto data = Serializers::loadGrid(rawData);
+
+        if (!data.has_value() || stoken.stop_requested()) {
+            return;
+        }
+
+        std::tie(info, m_Voxels, p_AnimationFrames) = data.value();
+
+        m_Dimensions = info.dimensions;
+
+        p_GenerationInfo.voxelCount = info.voxels;
+        p_GenerationInfo.nodes = info.nodes;
+        p_GenerationInfo.generationTime = 0;
+        p_GenerationInfo.completionPercent = 1;
+
+        p_CurrentFrame = 0;
+
+        m_UpdateBuffers = true;
+        p_Loading = false;
+    });
+}
+
 void GridAS::render(
     VkCommandBuffer cmd, Camera camera, VkDescriptorSet renderSet, VkExtent2D imageSize)
 {

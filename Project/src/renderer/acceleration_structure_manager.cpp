@@ -168,6 +168,7 @@ void ASManager::loadAS(
 
         Network::Client::addSceneRequest(path / filename, [&](std::vector<uint8_t> data) {
             m_RequestedScene = false;
+            m_CurrentAS->fromRaw(data);
         });
     }
 #else
