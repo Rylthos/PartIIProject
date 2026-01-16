@@ -96,7 +96,7 @@ void BrickmapAS::fromLoader(std::unique_ptr<Loader>&& loader)
 
 void BrickmapAS::fromFile(std::filesystem::path path)
 {
-    vkQueueWaitIdle(p_Info.graphicsQueue);
+    vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
 
     p_FileThread.request_stop();
 
@@ -167,7 +167,7 @@ void BrickmapAS::update(float dt)
         }
 
         if (m_ReallocFreeBricks) {
-            vkQueueWaitIdle(p_Info.graphicsQueue);
+            vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
 
             m_FreeBricks.unmapMemory();
             m_FreeBricks.cleanup();
@@ -181,7 +181,7 @@ void BrickmapAS::update(float dt)
 
             m_ReallocFreeBricks = false;
         } else if (m_ReallocBricks) {
-            vkQueueWaitIdle(p_Info.graphicsQueue);
+            vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
 
             m_BrickmapsBuffer.cleanup();
             m_BrickmapsBuffer = m_TempBuffer;
@@ -211,7 +211,7 @@ void BrickmapAS::update(float dt)
 
             m_ReallocBricks = false;
         } else if (m_ReallocFreeColours) {
-            vkQueueWaitIdle(p_Info.graphicsQueue);
+            vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
 
             m_FreeColours.unmapMemory();
             m_FreeColours.cleanup();
@@ -225,7 +225,7 @@ void BrickmapAS::update(float dt)
 
             m_ReallocFreeColours = false;
         } else if (m_ReallocColour) {
-            vkQueueWaitIdle(p_Info.graphicsQueue);
+            vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
 
             m_ColourBuffer.cleanup();
             m_ColourBuffer = m_TempBuffer;
@@ -259,7 +259,7 @@ void BrickmapAS::update(float dt)
     }
 
     if (m_UpdateBuffers) {
-        vkQueueWaitIdle(p_Info.graphicsQueue);
+        vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
 
         freeBuffers();
         freeDescriptorSet();
@@ -370,8 +370,8 @@ void BrickmapAS::modRender(VkCommandBuffer cmd, Camera& camera)
                 .pNext = nullptr,
                 .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
                 .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
-                .srcQueueFamilyIndex = p_Info.graphicsQueueIndex,
-                .dstQueueFamilyIndex = p_Info.graphicsQueueIndex,
+                .srcQueueFamilyIndex = p_Info.graphicsQueue->getFamily(),
+                .dstQueueFamilyIndex = p_Info.graphicsQueue->getFamily(),
                 .offset = 0,
                 .size = VK_WHOLE_SIZE,
             };
@@ -401,8 +401,8 @@ void BrickmapAS::modRender(VkCommandBuffer cmd, Camera& camera)
         .pNext = nullptr,
         .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
         .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
-        .srcQueueFamilyIndex = p_Info.graphicsQueueIndex,
-        .dstQueueFamilyIndex = p_Info.graphicsQueueIndex,
+        .srcQueueFamilyIndex = p_Info.graphicsQueue->getFamily(),
+        .dstQueueFamilyIndex = p_Info.graphicsQueue->getFamily(),
         .buffer = m_ColourBuffer.getBuffer(),
         .offset = 0,
         .size = VK_WHOLE_SIZE,
@@ -425,8 +425,8 @@ void BrickmapAS::requestRender(VkCommandBuffer cmd)
         .pNext = nullptr,
         .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
         .dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT,
-        .srcQueueFamilyIndex = p_Info.graphicsQueueIndex,
-        .dstQueueFamilyIndex = p_Info.graphicsQueueIndex,
+        .srcQueueFamilyIndex = p_Info.graphicsQueue->getFamily(),
+        .dstQueueFamilyIndex = p_Info.graphicsQueue->getFamily(),
         .buffer = m_RequestBuffer.getBuffer(),
         .offset = 0,
         .size = VK_WHOLE_SIZE,

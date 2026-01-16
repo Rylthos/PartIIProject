@@ -20,6 +20,7 @@ set (SOURCE_LIST
   "performance_logger.cpp" "performance_logger.hpp"
   "modification_manager.cpp" "modification_manager.hpp"
   "animation_manager.cpp" "animation_manager.hpp"
+  "queue.cpp" "queue.hpp"
 )
 
 add_compile_definitions(GLM_ENABLE_EXPERIMENTAL)

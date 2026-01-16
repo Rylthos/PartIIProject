@@ -59,7 +59,7 @@ void ContreeAS::init(ASStructInfo info)
 
 void ContreeAS::fromLoader(std::unique_ptr<Loader>&& loader)
 {
-    vkQueueWaitIdle(p_Info.graphicsQueue);
+    vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
 
     reset();
 
@@ -75,7 +75,7 @@ void ContreeAS::fromLoader(std::unique_ptr<Loader>&& loader)
 
 void ContreeAS::fromFile(std::filesystem::path path)
 {
-    vkQueueWaitIdle(p_Info.graphicsQueue);
+    vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
 
     p_FileThread.request_stop();
 
@@ -146,7 +146,7 @@ void ContreeAS::render(
 void ContreeAS::update(float dt)
 {
     if (m_UpdateBuffers) {
-        vkQueueWaitIdle(p_Info.graphicsQueue);
+        vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
 
         freeDescriptorSet();
         destroyBuffers();

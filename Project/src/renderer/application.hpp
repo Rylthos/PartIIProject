@@ -4,6 +4,7 @@
 
 #include "camera.hpp"
 #include "image.hpp"
+#include "queue.hpp"
 #include "window.hpp"
 
 #include "vk_mem_alloc.h"
@@ -18,11 +19,6 @@
 struct Sphere {
     glm::vec3 origin;
     float radius;
-};
-
-struct Queue {
-    VkQueue queue;
-    uint32_t queueFamily;
 };
 
 struct PerFrameData {
@@ -61,7 +57,7 @@ class Application : public EventDispatcher {
     VkPhysicalDevice m_VkPhysicalDevice;
     VkDevice m_VkDevice;
 
-    Queue m_GraphicsQueue;
+    std::shared_ptr<Queue> m_GraphicsQueue;
 
     VmaAllocator m_VmaAllocator;
 

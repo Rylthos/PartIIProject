@@ -65,7 +65,7 @@ void TextureAS::init(ASStructInfo info)
 
 void TextureAS::fromLoader(std::unique_ptr<Loader>&& loader)
 {
-    vkQueueWaitIdle(p_Info.graphicsQueue);
+    vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
 
     reset();
 
@@ -81,7 +81,7 @@ void TextureAS::fromLoader(std::unique_ptr<Loader>&& loader)
 
 void TextureAS::fromFile(std::filesystem::path path)
 {
-    vkQueueWaitIdle(p_Info.graphicsQueue);
+    vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
 
     p_FileThread.request_stop();
 
@@ -168,8 +168,8 @@ void TextureAS::render(
                     .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
                     .oldLayout = VK_IMAGE_LAYOUT_GENERAL,
                     .newLayout = VK_IMAGE_LAYOUT_GENERAL,
-                    .srcQueueFamilyIndex = p_Info.graphicsQueueIndex,
-                    .dstQueueFamilyIndex = p_Info.graphicsQueueIndex,
+                    .srcQueueFamilyIndex = p_Info.graphicsQueue->getFamily(),
+                    .dstQueueFamilyIndex = p_Info.graphicsQueue->getFamily(),
                     .image = m_DataImage.getImage(),
                     .subresourceRange = { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
                                          .baseMipLevel = 0,
@@ -195,7 +195,7 @@ void TextureAS::render(
 void TextureAS::update(float dt)
 {
     if (m_UpdateBuffers) {
-        vkQueueWaitIdle(p_Info.graphicsQueue);
+        vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
 
         destroyImages();
         freeDescriptorSets();
@@ -244,8 +244,8 @@ void TextureAS::createImages()
     VkExtent3D extent = { m_Dimensions.x, m_Dimensions.y, m_Dimensions.z };
     VkFormat format = VK_FORMAT_B8G8R8A8_UNORM;
 
-    m_DataImage.init(p_Info.device, p_Info.allocator, p_Info.graphicsQueueIndex, extent, format,
-        VK_IMAGE_TYPE_3D, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT);
+    m_DataImage.init(p_Info.device, p_Info.allocator, p_Info.graphicsQueue->getFamily(), extent,
+        format, VK_IMAGE_TYPE_3D, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT);
     m_DataImage.setDebugName("Texture Data Image");
 
     m_DataImage.createView(VK_IMAGE_VIEW_TYPE_3D);

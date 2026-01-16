@@ -78,7 +78,7 @@ void GridAS::init(ASStructInfo info)
 
 void GridAS::fromLoader(std::unique_ptr<Loader>&& loader)
 {
-    vkQueueWaitIdle(p_Info.graphicsQueue);
+    vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
 
     reset();
 
@@ -94,7 +94,7 @@ void GridAS::fromLoader(std::unique_ptr<Loader>&& loader)
 
 void GridAS::fromFile(std::filesystem::path path)
 {
-    vkQueueWaitIdle(p_Info.graphicsQueue);
+    vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
 
     p_FileThread.request_stop();
 
@@ -198,8 +198,8 @@ void GridAS::render(
                     .pNext = nullptr,
                     .srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
                     .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-                    .srcQueueFamilyIndex = p_Info.graphicsQueueIndex,
-                    .dstQueueFamilyIndex = p_Info.graphicsQueueIndex,
+                    .srcQueueFamilyIndex = p_Info.graphicsQueue->getFamily(),
+                    .dstQueueFamilyIndex = p_Info.graphicsQueue->getFamily(),
                     .buffer = m_OccupancyBuffer.getBuffer(),
                     .offset = 0,
                     .size = VK_WHOLE_SIZE,
@@ -210,8 +210,8 @@ void GridAS::render(
                     .pNext = nullptr,
                     .srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
                     .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-                    .srcQueueFamilyIndex = p_Info.graphicsQueueIndex,
-                    .dstQueueFamilyIndex = p_Info.graphicsQueueIndex,
+                    .srcQueueFamilyIndex = p_Info.graphicsQueue->getFamily(),
+                    .dstQueueFamilyIndex = p_Info.graphicsQueue->getFamily(),
                     .buffer = m_ColourBuffer.getBuffer(),
                     .offset = 0,
                     .size = VK_WHOLE_SIZE,
@@ -234,7 +234,7 @@ void GridAS::render(
 void GridAS::update(float dt)
 {
     if (m_UpdateBuffers) {
-        vkQueueWaitIdle(p_Info.graphicsQueue);
+        vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
 
         freeBuffers();
         freeDescriptorSets();

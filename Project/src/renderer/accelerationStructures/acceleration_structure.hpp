@@ -10,6 +10,7 @@
 
 #include "../camera.hpp"
 #include "../modification_manager.hpp"
+#include "../queue.hpp"
 #include "../shader_manager.hpp"
 #include "loaders/loader.hpp"
 #include "modification/diff.hpp"
@@ -19,8 +20,7 @@
 struct ASStructInfo {
     VkDevice device;
     VmaAllocator allocator;
-    VkQueue graphicsQueue;
-    uint32_t graphicsQueueIndex;
+    std::shared_ptr<Queue> graphicsQueue;
     VkDescriptorPool descriptorPool;
 
     VkCommandPool commandPool;

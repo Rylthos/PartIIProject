@@ -68,7 +68,7 @@ void OctreeAS::init(ASStructInfo info)
 
 void OctreeAS::fromLoader(std::unique_ptr<Loader>&& loader)
 {
-    vkQueueWaitIdle(p_Info.graphicsQueue);
+    vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
 
     reset();
 
@@ -84,7 +84,7 @@ void OctreeAS::fromLoader(std::unique_ptr<Loader>&& loader)
 
 void OctreeAS::fromFile(std::filesystem::path path)
 {
-    vkQueueWaitIdle(p_Info.graphicsQueue);
+    vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
 
     p_FileThread.request_stop();
 
@@ -153,7 +153,7 @@ void OctreeAS::render(
 void OctreeAS::update(float dt)
 {
     if (m_UpdateBuffers) {
-        vkQueueWaitIdle(p_Info.graphicsQueue);
+        vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
 
         freeBuffers();
         freeDescriptorSet();

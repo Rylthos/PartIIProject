@@ -70,7 +70,7 @@ void Application::init()
 
     ShaderManager::getInstance()->init(m_VkDevice);
     FrameCommands::getInstance()->init(
-        m_VkDevice, m_VmaAllocator, m_GraphicsQueue.queue, m_GraphicsQueue.queueFamily);
+        m_VkDevice, m_VmaAllocator, m_GraphicsQueue->getQueue(), m_GraphicsQueue->getFamily());
 
     createSwapchain();
     createImages();
@@ -100,8 +100,7 @@ void Application::init()
     ASManager::getManager()->init({
         .device = m_VkDevice,
         .allocator = m_VmaAllocator,
-        .graphicsQueue = m_GraphicsQueue.queue,
-        .graphicsQueueIndex = m_GraphicsQueue.queueFamily,
+        .graphicsQueue = m_GraphicsQueue,
         .descriptorPool = m_VkDescriptorPool,
         .commandPool = m_GeneralPool,
         .renderDescriptorLayout = m_RenderDescriptorLayout,
@@ -255,8 +254,9 @@ void Application::initVulkan()
     m_VkPhysicalDevice = vkbPhysicalDevice.physical_device;
     m_VkDevice = vkbDevice.device;
 
-    m_GraphicsQueue.queue = vkbDevice.get_queue(vkb::QueueType::graphics).value();
-    m_GraphicsQueue.queueFamily = vkbDevice.get_queue_index(vkb::QueueType::graphics).value();
+    VkQueue queue = vkbDevice.get_queue(vkb::QueueType::graphics).value();
+    uint32_t queueFamily = vkbDevice.get_queue_index(vkb::QueueType::graphics).value();
+    m_GraphicsQueue = std::make_shared<Queue>(queue, queueFamily);
 
     VmaAllocatorCreateInfo allocatorCI {};
     allocatorCI.instance = m_VkInstance;
@@ -270,7 +270,7 @@ void Application::initVulkan()
 
     Debug::setDebugName(m_VkDevice, VK_OBJECT_TYPE_DEVICE, (uint64_t)m_VkDevice, "Device");
     Debug::setDebugName(
-        m_VkDevice, VK_OBJECT_TYPE_QUEUE, (uint64_t)m_GraphicsQueue.queue, "Graphics queue");
+        m_VkDevice, VK_OBJECT_TYPE_QUEUE, (uint64_t)m_GraphicsQueue->getQueue(), "Graphics queue");
 }
 
 void Application::createSwapchain()
@@ -328,7 +328,7 @@ void Application::createDrawImages()
     VkFormat format = VK_FORMAT_R16G16B16A16_SFLOAT;
 
     for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
-        m_PerFrameData[i].drawImage.init(m_VkDevice, m_VmaAllocator, m_GraphicsQueue.queueFamily,
+        m_PerFrameData[i].drawImage.init(m_VkDevice, m_VmaAllocator, m_GraphicsQueue->getFamily(),
             extent, format, VK_IMAGE_TYPE_2D,
             VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT
                 | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
@@ -338,7 +338,7 @@ void Application::createDrawImages()
         m_PerFrameData[i].drawImage.setDebugNameView("Draw image view");
     }
 
-    m_ScreenshotImage.init(m_VkDevice, m_VmaAllocator, m_GraphicsQueue.queueFamily, extent,
+    m_ScreenshotImage.init(m_VkDevice, m_VmaAllocator, m_GraphicsQueue->getFamily(), extent,
         VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TYPE_2D, VK_IMAGE_USAGE_TRANSFER_DST_BIT,
         VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_HOST,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -356,7 +356,7 @@ void Application::createRayDirectionImages()
 
     for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
         m_PerFrameData[i].rayDirectionImage.init(m_VkDevice, m_VmaAllocator,
-            m_GraphicsQueue.queueFamily, extent, format, VK_IMAGE_TYPE_2D,
+            m_GraphicsQueue->getFamily(), extent, format, VK_IMAGE_TYPE_2D,
             VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT
                 | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
         m_PerFrameData[i].rayDirectionImage.setDebugName("Ray direction image");
@@ -386,7 +386,7 @@ void Application::createCommandPools()
     commandPoolCI.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     commandPoolCI.pNext = nullptr;
     commandPoolCI.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    commandPoolCI.queueFamilyIndex = m_GraphicsQueue.queueFamily;
+    commandPoolCI.queueFamilyIndex = m_GraphicsQueue->getFamily();
 
     VkCommandBufferAllocateInfo commandBufferAI {};
     commandBufferAI.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -514,8 +514,8 @@ void Application::createImGuiStructures()
     vulkanII.Instance = m_VkInstance;
     vulkanII.PhysicalDevice = m_VkPhysicalDevice;
     vulkanII.Device = m_VkDevice;
-    vulkanII.QueueFamily = m_GraphicsQueue.queueFamily;
-    vulkanII.Queue = m_GraphicsQueue.queue;
+    vulkanII.QueueFamily = m_GraphicsQueue->getFamily();
+    vulkanII.Queue = m_GraphicsQueue->getQueue();
     vulkanII.DescriptorPoolSize = 8;
     vulkanII.RenderPass = VK_NULL_HANDLE;
     vulkanII.MinImageCount = 3;
@@ -983,8 +983,8 @@ void Application::render()
                 .dstAccessMask = VK_ACCESS_MEMORY_READ_BIT,
                 .oldLayout = VK_IMAGE_LAYOUT_GENERAL,
                 .newLayout = VK_IMAGE_LAYOUT_GENERAL,
-                .srcQueueFamilyIndex = m_GraphicsQueue.queueFamily,
-                .dstQueueFamilyIndex = m_GraphicsQueue.queueFamily,
+                .srcQueueFamilyIndex = m_GraphicsQueue->getFamily(),
+                .dstQueueFamilyIndex = m_GraphicsQueue->getFamily(),
                 .image = currentFrame.rayDirectionImage.getImage(),
                 .subresourceRange = {
                     .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -1033,8 +1033,8 @@ void Application::render()
                 .dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
                 .dstAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT, .oldLayout = VK_IMAGE_LAYOUT_GENERAL,
                 .newLayout = VK_IMAGE_LAYOUT_GENERAL,
-                .srcQueueFamilyIndex = m_GraphicsQueue.queueFamily,
-                .dstQueueFamilyIndex = m_GraphicsQueue.queueFamily,
+                .srcQueueFamilyIndex = m_GraphicsQueue->getFamily(),
+                .dstQueueFamilyIndex = m_GraphicsQueue->getFamily(),
                 .image = currentFrame.drawImage.getImage(),
                 .subresourceRange = {
                     .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -1151,8 +1151,8 @@ void Application::render()
         submit.signalSemaphoreInfoCount = 1;
         submit.pSignalSemaphoreInfos = &signalSI;
 
-        VK_CHECK(
-            vkQueueSubmit2(m_GraphicsQueue.queue, 1, &submit, currentFrame.fence), "Queue submit");
+        VK_CHECK(vkQueueSubmit2(m_GraphicsQueue->getQueue(), 1, &submit, currentFrame.fence),
+            "Queue submit");
 
         VkPresentInfoKHR presentInfo {};
         presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -1163,7 +1163,7 @@ void Application::render()
         presentInfo.pSwapchains = &m_VkSwapchain;
         presentInfo.pImageIndices = &swapchainImageIndex;
         presentInfo.pResults = nullptr;
-        vkQueuePresentKHR(m_GraphicsQueue.queue, &presentInfo);
+        vkQueuePresentKHR(m_GraphicsQueue->getQueue(), &presentInfo);
     }
 
     {
@@ -1182,7 +1182,7 @@ void Application::render()
         std::string filename = m_TakeScreenshot.value();
         m_TakeScreenshot.reset();
 
-        vkQueueWaitIdle(m_GraphicsQueue.queue);
+        vkQueueWaitIdle(m_GraphicsQueue->getQueue());
 
         LOG_INFO("Take Screenshot");
 
