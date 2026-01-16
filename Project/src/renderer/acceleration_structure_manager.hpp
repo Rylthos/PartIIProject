@@ -108,4 +108,8 @@ class ASManager {
     std::optional<uint32_t> m_PressedButton;
 
     float m_PreviousPlacement = 0.f;
+
+#ifdef SERVER_CLIENT
+    bool m_RequestedScene = false;
+#endif
 };

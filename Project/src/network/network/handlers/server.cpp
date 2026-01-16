@@ -4,6 +4,7 @@
 #include "../serializers.hpp"
 
 #include <filesystem>
+#include <fstream>
 #include <set>
 
 #include "string.h"
@@ -100,7 +101,43 @@ void dirEntryRequest(uint32_t childFD, const Header& header, const std::vector<u
     send(childFD, returnData.data(), returnData.size(), 0);
 }
 
+void sceneRequest(uint32_t childFD, const Header& header, const std::vector<uint8_t>& data,
+    size_t len, size_t& index)
+{
+    std::string file = Serializer::readString(data, len, index);
+
+    printf("Request Scene");
+
+    std::filesystem::path basePath(s_Settings.resPath);
+    basePath /= file;
+
+    printf("\tPath: %s\n", basePath.c_str());
+
+    std::ifstream input(basePath, std::ios::ate | std::ios::binary);
+    if (!input) {
+        fprintf(stderr, "Failed to read file: %s\n", basePath.string().c_str());
+        return;
     }
+
+    size_t size = input.tellg();
+    input.seekg(0, std::ios::beg);
+
+    std::vector<uint8_t> returnData;
+
+    std::vector<uint8_t> fileData(size);
+    input.read((char*)fileData.data(), fileData.size());
+    input.close();
+
+    Header returnHeader;
+    returnHeader.type = HeaderType::RETURN;
+    returnHeader.id = header.id;
+    returnHeader.size = fileData.size();
+    addHeader(returnHeader, returnData);
+
+    returnData.insert(returnData.end(), fileData.begin(), fileData.end());
+
+    printf("\tFile Data: %ld\n", fileData.size());
+    printf("\tBuffer Size: %ld\n", returnData.size());
 
     send(childFD, returnData.data(), returnData.size(), 0);
 }
@@ -116,6 +153,9 @@ void handleRequest(uint32_t childFD, const std::vector<uint8_t>& buffer, size_t 
         break;
     case HeaderType::REQUEST_DIR_ENTRIES:
         dirEntryRequest(childFD, header, buffer, len, index);
+        break;
+    case HeaderType::REQUEST_SCENE:
+        sceneRequest(childFD, header, buffer, len, index);
         break;
     default:
         fprintf(stderr, "Unhandled type: %d\n", static_cast<uint8_t>(header.type));

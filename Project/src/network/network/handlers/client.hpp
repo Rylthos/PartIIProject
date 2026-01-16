@@ -13,6 +13,7 @@ typedef std::function<void(std::vector<uint8_t>)> StandardCallback;
 
 void run(const Node& node);
 
+void addSceneRequest(std::string path, StandardCallback callback);
 void addDirEntryRequest(std::string path, StandardCallback callback);
 void addFileEntryRequest(std::string path, StandardCallback callback);
 

@@ -8,6 +8,7 @@ namespace Network {
 enum class HeaderType : uint8_t {
     REQUEST_FILE_ENTRIES = 0,
     REQUEST_DIR_ENTRIES = 1,
+    REQUEST_SCENE = 2,
     RETURN,
 };
 
