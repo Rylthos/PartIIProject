@@ -26,8 +26,6 @@ add_compile_definitions(GLM_ENABLE_EXPERIMENTAL)
 
 add_executable(${PROJECT_NAME} ${SOURCE_LIST})
 
-target_compile_definitions(${PROJECT_NAME} PRIVATE SERVER_CLIENT)
-
 add_subdirectory(accelerationStructures)
 
 target_compile_options(${PROJECT_NAME}
@@ -37,9 +35,9 @@ target_compile_options(${PROJECT_NAME}
 )
 
 
-if (RUN_SERVER STREQUAL "1")
+if (BUILD_SERVER STREQUAL "1")
   message("Building for server")
-  add_compile_definitions(SERVER_CLIENT)
+  target_compile_definitions(${PROJECT_NAME} PRIVATE SERVER_CLIENT)
 endif()
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
