@@ -1,0 +1,30 @@
+{
+  "defaults": {
+    "steps": 900,
+    "captures": 100,
+    "delay": 20,
+    "scene": "res/structures/barn_owl",
+    "cameras": [
+      {
+        "pos": [ 388, 281, -190 ],
+        "rot": [ -25, 14 ]
+      },
+      {
+        "pos": [ -160, -275, 230 ],
+        "rot": [ 95, -55 ]
+      },
+      {
+        "pos": [ 440, -35, 450 ],
+        "rot": [ 218, -32 ]
+      }
+    ],
+    "ids": [
+      "front",
+      "top",
+      "side"
+    ],
+    "test_all": true
+  },
+  "tests": [
+  ]
+}

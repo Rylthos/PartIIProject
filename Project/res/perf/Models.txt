@@ -9,4 +9,9 @@ Sponza:
 Cat Statue:
   sketchfab: https://sketchfab.com/3d-models/cat-statue-fb4f3bfccf6c404fbac221aa144e8540
   units: 16
-  res: 16
+  res: 32
+
+Barn owl:
+  sketchfab: https://sketchfab.com/3d-models/barn-owl-0e65de5934db4f0eae02835ba7227dcc
+  units: 16
+  res: 32
