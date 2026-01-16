@@ -167,7 +167,10 @@ void BrickmapAS::update(float dt)
         }
 
         if (m_ReallocFreeBricks) {
-            vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
+            {
+                std::lock_guard lock(p_Info.graphicsQueue->getLock());
+                vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
+            }
 
             m_FreeBricks.unmapMemory();
             m_FreeBricks.cleanup();
@@ -181,7 +184,10 @@ void BrickmapAS::update(float dt)
 
             m_ReallocFreeBricks = false;
         } else if (m_ReallocBricks) {
-            vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
+            {
+                std::lock_guard lock(p_Info.graphicsQueue->getLock());
+                vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
+            }
 
             m_BrickmapsBuffer.cleanup();
             m_BrickmapsBuffer = m_TempBuffer;
@@ -211,7 +217,10 @@ void BrickmapAS::update(float dt)
 
             m_ReallocBricks = false;
         } else if (m_ReallocFreeColours) {
-            vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
+            {
+                std::lock_guard lock(p_Info.graphicsQueue->getLock());
+                vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
+            }
 
             m_FreeColours.unmapMemory();
             m_FreeColours.cleanup();
@@ -225,7 +234,10 @@ void BrickmapAS::update(float dt)
 
             m_ReallocFreeColours = false;
         } else if (m_ReallocColour) {
-            vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
+            {
+                std::lock_guard lock(p_Info.graphicsQueue->getLock());
+                vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
+            }
 
             m_ColourBuffer.cleanup();
             m_ColourBuffer = m_TempBuffer;
@@ -259,7 +271,10 @@ void BrickmapAS::update(float dt)
     }
 
     if (m_UpdateBuffers) {
-        vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
+        {
+            std::lock_guard lock(p_Info.graphicsQueue->getLock());
+            vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
+        }
 
         freeBuffers();
         freeDescriptorSet();

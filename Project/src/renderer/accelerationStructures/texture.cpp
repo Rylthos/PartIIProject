@@ -65,7 +65,10 @@ void TextureAS::init(ASStructInfo info)
 
 void TextureAS::fromLoader(std::unique_ptr<Loader>&& loader)
 {
-    vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
+    {
+        std::lock_guard lock(p_Info.graphicsQueue->getLock());
+        vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
+    }
 
     reset();
 
@@ -81,7 +84,10 @@ void TextureAS::fromLoader(std::unique_ptr<Loader>&& loader)
 
 void TextureAS::fromFile(std::filesystem::path path)
 {
-    vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
+    {
+        std::lock_guard lock(p_Info.graphicsQueue->getLock());
+        vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
+    }
 
     p_FileThread.request_stop();
 
@@ -195,7 +201,10 @@ void TextureAS::render(
 void TextureAS::update(float dt)
 {
     if (m_UpdateBuffers) {
-        vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
+        {
+            std::lock_guard lock(p_Info.graphicsQueue->getLock());
+            vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
+        }
 
         destroyImages();
         freeDescriptorSets();

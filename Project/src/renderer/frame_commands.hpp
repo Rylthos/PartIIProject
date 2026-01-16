@@ -1,10 +1,13 @@
 #pragma once
 
+#include "queue.hpp"
+
 #include <cstdint>
 #include <cstdlib>
 
 #include <functional>
 
+#include <memory>
 #include <unordered_map>
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan_core.h>
@@ -22,7 +25,7 @@ class FrameCommands {
   public:
     static FrameCommands* getInstance();
 
-    void init(VkDevice device, VmaAllocator allocator, VkQueue queue, uint32_t queueFamily);
+    void init(VkDevice device, VmaAllocator allocator, std::shared_ptr<Queue> graphicsQueue);
     void cleanup();
 
     void commit();
@@ -36,7 +39,7 @@ class FrameCommands {
   private:
     VkDevice m_Device;
     VmaAllocator m_VmaAllocator;
-    VkQueue m_Queue;
+    std::shared_ptr<Queue> m_Queue;
 
     VkCommandPool m_CommandPool;
     VkCommandBuffer m_CommandBuffer;

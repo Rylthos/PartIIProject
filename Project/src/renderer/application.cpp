@@ -69,8 +69,7 @@ void Application::init()
     initVulkan();
 
     ShaderManager::getInstance()->init(m_VkDevice);
-    FrameCommands::getInstance()->init(
-        m_VkDevice, m_VmaAllocator, m_GraphicsQueue->getQueue(), m_GraphicsQueue->getFamily());
+    FrameCommands::getInstance()->init(m_VkDevice, m_VmaAllocator, m_GraphicsQueue);
 
     createSwapchain();
     createImages();
@@ -1118,6 +1117,8 @@ void Application::render()
     }
 
     {
+        std::lock_guard lock(m_GraphicsQueue->getLock());
+
         VkCommandBufferSubmitInfo commandBufferSI {};
         commandBufferSI.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
         commandBufferSI.pNext = nullptr;
@@ -1182,7 +1183,10 @@ void Application::render()
         std::string filename = m_TakeScreenshot.value();
         m_TakeScreenshot.reset();
 
-        vkQueueWaitIdle(m_GraphicsQueue->getQueue());
+        {
+            std::lock_guard lock(m_GraphicsQueue->getLock());
+            vkQueueWaitIdle(m_GraphicsQueue->getQueue());
+        }
 
         LOG_INFO("Take Screenshot");
 

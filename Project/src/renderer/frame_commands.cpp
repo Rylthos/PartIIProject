@@ -15,8 +15,7 @@ FrameCommands* FrameCommands::getInstance()
     return &frameCommands;
 }
 
-void FrameCommands::init(
-    VkDevice device, VmaAllocator allocator, VkQueue queue, uint32_t queueFamily)
+void FrameCommands::init(VkDevice device, VmaAllocator allocator, std::shared_ptr<Queue> queue)
 {
     m_Device = device;
     m_VmaAllocator = allocator;
@@ -26,7 +25,7 @@ void FrameCommands::init(
         .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
         .pNext = nullptr,
         .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-        .queueFamilyIndex = queueFamily,
+        .queueFamilyIndex = m_Queue->getFamily(),
     };
 
     VK_CHECK(vkCreateCommandPool(m_Device, &commandPoolCI, nullptr, &m_CommandPool),
@@ -114,8 +113,11 @@ void FrameCommands::commit()
         .pCommandBuffers = &m_CommandBuffer,
     };
 
-    VK_CHECK(
-        vkQueueSubmit(m_Queue, 1, &submitInfo, m_CommitFence), "Failed to submit frame command");
+    {
+        std::lock_guard lock(m_Queue->getLock());
+        VK_CHECK(vkQueueSubmit(m_Queue->getQueue(), 1, &submitInfo, m_CommitFence),
+            "Failed to submit frame command");
+    }
 
     vkWaitForFences(m_Device, 1, &m_CommitFence, VK_TRUE, 1e9);
     vkResetFences(m_Device, 1, &m_CommitFence);

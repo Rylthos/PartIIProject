@@ -78,7 +78,10 @@ void GridAS::init(ASStructInfo info)
 
 void GridAS::fromLoader(std::unique_ptr<Loader>&& loader)
 {
-    vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
+    {
+        std::lock_guard lock(p_Info.graphicsQueue->getLock());
+        vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
+    }
 
     reset();
 
@@ -94,7 +97,10 @@ void GridAS::fromLoader(std::unique_ptr<Loader>&& loader)
 
 void GridAS::fromFile(std::filesystem::path path)
 {
-    vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
+    {
+        std::lock_guard lock(p_Info.graphicsQueue->getLock());
+        vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
+    }
 
     p_FileThread.request_stop();
 
@@ -112,6 +118,11 @@ void GridAS::fromFile(std::filesystem::path path)
 
 void GridAS::fromRaw(std::vector<uint8_t> rawData, bool shouldReset)
 {
+    {
+        std::lock_guard lock(p_Info.graphicsQueue->getLock());
+        vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
+    }
+
     p_RawThread.request_stop();
 
     if (shouldReset)
@@ -234,7 +245,10 @@ void GridAS::render(
 void GridAS::update(float dt)
 {
     if (m_UpdateBuffers) {
-        vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
+        {
+            std::lock_guard lock(p_Info.graphicsQueue->getLock());
+            vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
+        }
 
         freeBuffers();
         freeDescriptorSets();
