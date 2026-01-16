@@ -95,7 +95,7 @@ void GridAS::fromLoader(std::unique_ptr<Loader>&& loader)
           });
 }
 
-void GridAS::fromRaw(std::vector<uint8_t> rawData, bool shouldReset)
+void GridAS::fromRaw(const std::vector<uint8_t>& rawData)
 {
     {
         std::lock_guard lock(p_Info.graphicsQueue->getLock());
@@ -104,8 +104,7 @@ void GridAS::fromRaw(std::vector<uint8_t> rawData, bool shouldReset)
 
     p_RawThread.request_stop();
 
-    if (shouldReset)
-        reset();
+    reset();
 
     p_RawThread = std::jthread([this, rawData](std::stop_token stoken) {
         p_Loading = true;
@@ -141,15 +140,13 @@ void GridAS::fromFile(std::filesystem::path path)
 
     p_FileThread.request_stop();
 
-    reset();
-
     p_FileThread = std::jthread([this, path](std::stop_token stoken) {
         p_Loading = true;
 
         std::ifstream inputStream = Serializers::loadGridFile(path);
         std::vector<uint8_t> data = Serializers::vectorFromStream(inputStream);
 
-        fromRaw(data, false);
+        fromRaw(data);
     });
 }
 

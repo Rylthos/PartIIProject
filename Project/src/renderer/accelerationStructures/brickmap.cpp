@@ -94,7 +94,7 @@ void BrickmapAS::fromLoader(std::unique_ptr<Loader>&& loader)
           });
 }
 
-void BrickmapAS::fromRaw(std::vector<uint8_t> rawData, bool shouldReset)
+void BrickmapAS::fromRaw(const std::vector<uint8_t>& rawData)
 {
     {
         std::lock_guard lock(p_Info.graphicsQueue->getLock());
@@ -103,8 +103,7 @@ void BrickmapAS::fromRaw(std::vector<uint8_t> rawData, bool shouldReset)
 
     p_FileThread.request_stop();
 
-    if (shouldReset)
-        reset();
+    reset();
 
     p_RawThread = std::jthread([this, rawData](std::stop_token stoken) {
         p_Loading = true;
@@ -138,15 +137,13 @@ void BrickmapAS::fromFile(std::filesystem::path path)
 
     p_FileThread.request_stop();
 
-    reset();
-
     p_FileThread = std::jthread([this, path](std::stop_token stoken) {
         p_Loading = true;
 
         std::ifstream inputStream = Serializers::loadBrickmapFile(path);
         std::vector<uint8_t> data = Serializers::vectorFromStream(inputStream);
 
-        fromRaw(data, false);
+        fromRaw(data);
     });
 }
 

@@ -82,7 +82,7 @@ void TextureAS::fromLoader(std::unique_ptr<Loader>&& loader)
           });
 }
 
-void TextureAS::fromRaw(std::vector<uint8_t> rawData, bool shouldReset)
+void TextureAS::fromRaw(const std::vector<uint8_t>& rawData)
 {
     {
         std::lock_guard lock(p_Info.graphicsQueue->getLock());
@@ -91,8 +91,7 @@ void TextureAS::fromRaw(std::vector<uint8_t> rawData, bool shouldReset)
 
     p_RawThread.request_stop();
 
-    if (shouldReset)
-        reset();
+    reset();
 
     p_RawThread = std::jthread([this, rawData](std::stop_token stoken) {
         p_Loading = true;
@@ -128,15 +127,13 @@ void TextureAS::fromFile(std::filesystem::path path)
 
     p_FileThread.request_stop();
 
-    reset();
-
     p_FileThread = std::jthread([this, path](std::stop_token stoken) {
         p_Loading = true;
 
         std::ifstream inputStream = Serializers::loadTextureFile(path);
         std::vector<uint8_t> data = Serializers::vectorFromStream(inputStream);
 
-        fromRaw(data, false);
+        fromRaw(data);
     });
 }
 
