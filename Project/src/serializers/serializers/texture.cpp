@@ -8,10 +8,9 @@
 
 namespace Serializers {
 
-std::optional<
-    std::tuple<SerialInfo, std::vector<Generators::TextureVoxel>, Modification::AnimationFrames>>
-loadTexture(std::filesystem::path directory)
+std::ifstream loadTextureFile(std::filesystem::path directory)
 {
+
     std::string foldername = directory.filename();
 
     std::filesystem::path file = directory / (foldername + ".voxtexture");
@@ -21,6 +20,25 @@ loadTexture(std::filesystem::path directory)
         LOG_ERROR("Failed to open file: {}\n", file.string());
         return {};
     }
+
+    return inputStream;
+}
+
+std::optional<
+    std::tuple<SerialInfo, std::vector<Generators::TextureVoxel>, Modification::AnimationFrames>>
+loadTexture(std::filesystem::path directory)
+{
+    std::ifstream inputStream = loadTextureFile(directory);
+    std::vector<uint8_t> data = vectorFromStream(inputStream);
+
+    return loadTexture(data);
+}
+
+std::optional<
+    std::tuple<SerialInfo, std::vector<Generators::TextureVoxel>, Modification::AnimationFrames>>
+loadTexture(const std::vector<uint8_t>& data)
+{
+    std::istringstream inputStream(std::string(data.begin(), data.end()));
 
     SerialInfo serialInfo;
     serialInfo.dimensions = Serializers::readUvec3(inputStream);
