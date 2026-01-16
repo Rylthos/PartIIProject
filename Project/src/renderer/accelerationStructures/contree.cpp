@@ -76,21 +76,22 @@ void ContreeAS::fromLoader(std::unique_ptr<Loader>&& loader)
           });
 }
 
-void ContreeAS::fromFile(std::filesystem::path path)
+void ContreeAS::fromRaw(std::vector<uint8_t> rawData, bool shouldReset)
 {
     {
         std::lock_guard lock(p_Info.graphicsQueue->getLock());
         vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
     }
 
-    p_FileThread.request_stop();
+    p_RawThread.request_stop();
 
-    reset();
+    if (shouldReset)
+        reset();
 
-    p_FileThread = std::jthread([this, path](std::stop_token stoken) {
+    p_RawThread = std::jthread([this, rawData](std::stop_token stoken) {
         p_Loading = true;
         Serializers::SerialInfo info;
-        auto data = Serializers::loadContree(path);
+        auto data = Serializers::loadContree(rawData);
 
         if (!data.has_value()) {
             return;
@@ -107,6 +108,27 @@ void ContreeAS::fromFile(std::filesystem::path path)
 
         m_UpdateBuffers = true;
         p_Loading = false;
+    });
+}
+
+void ContreeAS::fromFile(std::filesystem::path path)
+{
+    {
+        std::lock_guard lock(p_Info.graphicsQueue->getLock());
+        vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
+    }
+
+    p_FileThread.request_stop();
+
+    reset();
+
+    p_FileThread = std::jthread([this, path](std::stop_token stoken) {
+        p_Loading = true;
+
+        std::ifstream inputStream = Serializers::loadContreeFile(path);
+        std::vector<uint8_t> data = Serializers::vectorFromStream(inputStream);
+
+        fromRaw(data, false);
     });
 }
 

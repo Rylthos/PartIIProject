@@ -7,8 +7,7 @@
 
 namespace Serializers {
 
-std::optional<std::tuple<SerialInfo, std::vector<Generators::ContreeNode>>> loadContree(
-    std::filesystem::path directory)
+std::ifstream loadContreeFile(std::filesystem::path directory)
 {
     std::string foldername = directory.filename();
 
@@ -19,6 +18,22 @@ std::optional<std::tuple<SerialInfo, std::vector<Generators::ContreeNode>>> load
         LOG_ERROR("Failed to open file: {}\n", file.string());
         return {};
     }
+
+    return inputStream;
+}
+
+std::optional<std::tuple<SerialInfo, std::vector<Generators::ContreeNode>>> loadContree(
+    std::filesystem::path directory)
+{
+    std::ifstream inputStream = loadContreeFile(directory);
+    std::vector<uint8_t> data = vectorFromStream(inputStream);
+
+    return loadContree(data);
+}
+std::optional<std::tuple<SerialInfo, std::vector<Generators::ContreeNode>>> loadContree(
+    const std::vector<uint8_t>& data)
+{
+    std::istringstream inputStream(std::string(data.begin(), data.end()));
 
     SerialInfo serialInfo;
     serialInfo.dimensions = Serializers::readUvec3(inputStream);
