@@ -95,27 +95,6 @@ void GridAS::fromLoader(std::unique_ptr<Loader>&& loader)
           });
 }
 
-void GridAS::fromFile(std::filesystem::path path)
-{
-    {
-        std::lock_guard lock(p_Info.graphicsQueue->getLock());
-        vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
-    }
-
-    p_FileThread.request_stop();
-
-    reset();
-
-    p_FileThread = std::jthread([this, path](std::stop_token stoken) {
-        p_Loading = true;
-
-        std::ifstream inputStream = Serializers::loadGridFile(path);
-        std::vector<uint8_t> data = Serializers::vectorFromStream(inputStream);
-
-        fromRaw(data, false);
-    });
-}
-
 void GridAS::fromRaw(std::vector<uint8_t> rawData, bool shouldReset)
 {
     {
@@ -150,6 +129,27 @@ void GridAS::fromRaw(std::vector<uint8_t> rawData, bool shouldReset)
 
         m_UpdateBuffers = true;
         p_Loading = false;
+    });
+}
+
+void GridAS::fromFile(std::filesystem::path path)
+{
+    {
+        std::lock_guard lock(p_Info.graphicsQueue->getLock());
+        vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
+    }
+
+    p_FileThread.request_stop();
+
+    reset();
+
+    p_FileThread = std::jthread([this, path](std::stop_token stoken) {
+        p_Loading = true;
+
+        std::ifstream inputStream = Serializers::loadGridFile(path);
+        std::vector<uint8_t> data = Serializers::vectorFromStream(inputStream);
+
+        fromRaw(data, false);
     });
 }
 

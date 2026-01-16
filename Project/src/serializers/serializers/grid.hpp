@@ -20,7 +20,7 @@ loadGrid(std::filesystem::path directory);
 
 std::optional<
     std::tuple<SerialInfo, std::vector<Generators::GridVoxel>, Modification::AnimationFrames>>
-loadGrid(std::vector<uint8_t> data);
+loadGrid(const std::vector<uint8_t>& data);
 
 void storeGrid(std::filesystem::path output, const std::string& name, glm::uvec3 dimensions,
     std::vector<Generators::GridVoxel> grid, Generators::GenerationInfo generationInfo,

@@ -27,7 +27,6 @@ std::optional<
 loadGrid(std::filesystem::path directory)
 {
     std::ifstream inputStream = loadGridFile(directory);
-
     std::vector<uint8_t> data = vectorFromStream(inputStream);
 
     return loadGrid(data);
@@ -35,11 +34,11 @@ loadGrid(std::filesystem::path directory)
 
 std::optional<
     std::tuple<SerialInfo, std::vector<Generators::GridVoxel>, Modification::AnimationFrames>>
-loadGrid(std::vector<uint8_t> data)
+loadGrid(const std::vector<uint8_t>& data)
 {
-    SerialInfo serialInfo;
-
     std::istringstream inputStream(std::string(data.begin(), data.end()));
+
+    SerialInfo serialInfo;
 
     serialInfo.dimensions = Serializers::readUvec3(inputStream);
     serialInfo.voxels = Serializers::readUint64(inputStream);
