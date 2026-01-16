@@ -37,17 +37,20 @@ void fileEntryRequest(uint32_t childFD, const Header& header, const std::vector<
         }
     }
 
-    std::vector<uint8_t> returnData;
+    std::vector<uint8_t> contents;
+    Serializer::writeUint32_t(fileEntries.size(), contents);
+    for (const auto& str : fileEntries) {
+        Serializer::writeString(str, contents);
+    }
 
+    std::vector<uint8_t> returnData;
     Header returnHeader;
     returnHeader.type = HeaderType::RETURN;
     returnHeader.id = header.id;
-    addHeader(header, returnData);
+    returnHeader.size = contents.size();
+    addHeader(returnHeader, returnData);
 
-    Serializer::writeUint32_t(fileEntries.size(), returnData);
-    for (const auto& str : fileEntries) {
-        Serializer::writeString(str, returnData);
-    }
+    returnData.insert(returnData.end(), contents.begin(), contents.end());
 
     send(childFD, returnData.data(), returnData.size(), 0);
 }
@@ -75,16 +78,28 @@ void dirEntryRequest(uint32_t childFD, const Header& header, const std::vector<u
         }
     }
 
-    std::vector<uint8_t> returnData;
+    std::vector<uint8_t> contents;
+    Serializer::writeUint32_t(directories.size(), contents);
+    for (const auto& str : directories) {
+        Serializer::writeString(str, contents);
+    }
 
+    printf("\tContents Size: %ld\n", contents.size());
+
+    std::vector<uint8_t> returnData;
     Header returnHeader;
     returnHeader.type = HeaderType::RETURN;
     returnHeader.id = header.id;
-    addHeader(header, returnData);
+    returnHeader.size = contents.size();
+    addHeader(returnHeader, returnData);
 
-    Serializer::writeUint32_t(directories.size(), returnData);
-    for (const auto& str : directories) {
-        Serializer::writeString(str, returnData);
+    returnData.insert(returnData.end(), contents.begin(), contents.end());
+    printf("\tReturn data Size: %ld\n", returnData.size());
+    printf("\tHeader: %d %d %d\n", (uint8_t)header.type, header.id, header.size);
+
+    send(childFD, returnData.data(), returnData.size(), 0);
+}
+
     }
 
     send(childFD, returnData.data(), returnData.size(), 0);

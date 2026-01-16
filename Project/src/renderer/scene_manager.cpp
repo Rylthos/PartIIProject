@@ -70,10 +70,7 @@ void SceneManager::UI(const Event& event)
             ImGui::SameLine();
 
             if (ImGui::Button("Load structure")) {
-#ifdef SERVER_CLIENT
-#else
                 ASManager::getManager()->loadAS(m_SelectedPath, m_ValidStructures);
-#endif
             }
 
             {
