@@ -85,6 +85,43 @@ void OctreeAS::fromLoader(std::unique_ptr<Loader>&& loader)
           });
 }
 
+void OctreeAS::fromRaw(std::vector<uint8_t> rawData, bool shouldReset)
+{
+    {
+        std::lock_guard lock(p_Info.graphicsQueue->getLock());
+        vkQueueWaitIdle(p_Info.graphicsQueue->getQueue());
+    }
+
+    p_RawThread.request_stop();
+
+    if (shouldReset)
+        reset();
+
+    p_RawThread = std::jthread([this, rawData](std::stop_token stoken) {
+        p_Loading = true;
+        Serializers::SerialInfo info;
+        auto data = Serializers::loadOctree(rawData);
+
+        if (!data.has_value() || stoken.stop_requested()) {
+            return;
+        }
+
+        std::tie(info, m_Nodes) = data.value();
+
+        m_Dimensions = info.dimensions;
+
+        p_GenerationInfo.voxelCount = info.voxels;
+        p_GenerationInfo.nodes = info.nodes;
+        p_GenerationInfo.generationTime = 0;
+        p_GenerationInfo.completionPercent = 1;
+
+        p_CurrentFrame = 0;
+
+        m_UpdateBuffers = true;
+        p_Loading = false;
+    });
+}
+
 void OctreeAS::fromFile(std::filesystem::path path)
 {
     {
@@ -98,24 +135,11 @@ void OctreeAS::fromFile(std::filesystem::path path)
 
     p_FileThread = std::jthread([this, path](std::stop_token stoken) {
         p_Loading = true;
-        Serializers::SerialInfo info;
-        auto data = Serializers::loadOctree(path);
 
-        if (!data.has_value()) {
-            return;
-        }
+        std::ifstream inputStream = Serializers::loadOctreeFile(path);
+        std::vector<uint8_t> data = Serializers::vectorFromStream(inputStream);
 
-        std::tie(info, m_Nodes) = data.value();
-
-        m_Dimensions = info.dimensions;
-
-        p_GenerationInfo.voxelCount = info.voxels;
-        p_GenerationInfo.nodes = info.nodes;
-        p_GenerationInfo.generationTime = 0;
-        p_GenerationInfo.completionPercent = 1;
-
-        m_UpdateBuffers = true;
-        p_Loading = false;
+        fromRaw(data, false);
     });
 }
 

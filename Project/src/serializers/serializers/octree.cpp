@@ -9,8 +9,7 @@
 
 namespace Serializers {
 
-std::optional<std::tuple<SerialInfo, std::vector<Generators::OctreeNode>>> loadOctree(
-    std::filesystem::path directory)
+std::ifstream loadOctreeFile(std::filesystem::path directory)
 {
     std::string foldername = directory.filename();
 
@@ -21,6 +20,23 @@ std::optional<std::tuple<SerialInfo, std::vector<Generators::OctreeNode>>> loadO
         LOG_ERROR("Failed to open file: {}\n", file.string());
         return {};
     }
+
+    return inputStream;
+}
+
+std::optional<std::tuple<SerialInfo, std::vector<Generators::OctreeNode>>> loadOctree(
+    std::filesystem::path directory)
+{
+    std::ifstream inputStream = loadOctreeFile(directory);
+    std::vector<uint8_t> data = vectorFromStream(inputStream);
+
+    return loadOctree(data);
+}
+
+std::optional<std::tuple<SerialInfo, std::vector<Generators::OctreeNode>>> loadOctree(
+    const std::vector<uint8_t>& data)
+{
+    std::istringstream inputStream(std::string(data.begin(), data.end()));
 
     SerialInfo serialInfo;
     serialInfo.dimensions = Serializers::readUvec3(inputStream);
