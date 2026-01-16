@@ -12,6 +12,8 @@
 
 namespace Serializers {
 
+std::ifstream loadGridFile(std::filesystem::path directory);
+
 std::optional<
     std::tuple<SerialInfo, std::vector<Generators::GridVoxel>, Modification::AnimationFrames>>
 loadGrid(std::filesystem::path directory);

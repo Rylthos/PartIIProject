@@ -64,8 +64,8 @@ class IAccelerationStructure {
 
     virtual void init(ASStructInfo info) { p_Info = info; }
     virtual void fromLoader(std::unique_ptr<Loader>&& loader) = 0;
+    virtual void fromRaw(std::vector<uint8_t> data, bool shouldReset = true) { }
     virtual void fromFile(std::filesystem::path path) { }
-    virtual void fromRaw(std::vector<uint8_t> data) { }
     virtual void render(
         VkCommandBuffer cmd, Camera camera, VkDescriptorSet renderSet, VkExtent2D imageSize)
         = 0;
@@ -108,6 +108,7 @@ class IAccelerationStructure {
 
     std::jthread p_GenerationThread;
     std::jthread p_FileThread;
+    std::jthread p_RawThread;
 
     bool p_FinishedGeneration = false;
     bool p_Loading = false;

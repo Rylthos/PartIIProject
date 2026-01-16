@@ -7,9 +7,7 @@
 
 namespace Serializers {
 
-std::optional<
-    std::tuple<SerialInfo, std::vector<Generators::GridVoxel>, Modification::AnimationFrames>>
-loadGrid(std::filesystem::path directory)
+std::ifstream loadGridFile(std::filesystem::path directory)
 {
     std::string foldername = directory.filename();
 
@@ -21,11 +19,16 @@ loadGrid(std::filesystem::path directory)
         return {};
     }
 
-    size_t fileSize = inputStream.tellg();
-    inputStream.seekg(0, std::ios::beg);
+    return inputStream;
+}
 
-    std::vector<uint8_t> data(fileSize);
-    inputStream.read((char*)data.data(), fileSize);
+std::optional<
+    std::tuple<SerialInfo, std::vector<Generators::GridVoxel>, Modification::AnimationFrames>>
+loadGrid(std::filesystem::path directory)
+{
+    std::ifstream inputStream = loadGridFile(directory);
+
+    std::vector<uint8_t> data = vectorFromStream(inputStream);
 
     return loadGrid(data);
 }

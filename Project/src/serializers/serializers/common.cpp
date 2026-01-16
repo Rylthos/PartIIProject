@@ -3,6 +3,17 @@
 #include "modification/mod_type.hpp"
 
 namespace Serializers {
+std::vector<uint8_t> vectorFromStream(std::ifstream& inputStream)
+{
+    size_t fileSize = inputStream.tellg();
+    inputStream.seekg(0, std::ios::beg);
+
+    std::vector<uint8_t> data(fileSize);
+    inputStream.read((char*)data.data(), fileSize);
+
+    return data;
+}
+
 void writeByte(uint8_t byte, std::ofstream& stream) { stream.put(byte); }
 
 uint8_t readByte(std::istream& stream) { return stream.get(); }

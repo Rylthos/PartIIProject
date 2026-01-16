@@ -14,6 +14,8 @@ struct SerialInfo {
     uint64_t nodes;
 };
 
+std::vector<uint8_t> vectorFromStream(std::ifstream& file);
+
 void writeByte(uint8_t byte, std::ofstream& stream);
 
 uint8_t readByte(std::istream& stream);

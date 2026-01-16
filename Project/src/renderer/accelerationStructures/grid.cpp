@@ -102,36 +102,22 @@ void GridAS::fromFile(std::filesystem::path path)
 
     p_FileThread = std::jthread([this, path](std::stop_token stoken) {
         p_Loading = true;
-        Serializers::SerialInfo info;
-        auto data = Serializers::loadGrid(path);
 
-        if (!data.has_value() || stoken.stop_requested()) {
-            return;
-        }
+        std::ifstream inputStream = Serializers::loadGridFile(path);
+        std::vector<uint8_t> data = Serializers::vectorFromStream(inputStream);
 
-        std::tie(info, m_Voxels, p_AnimationFrames) = data.value();
-
-        m_Dimensions = info.dimensions;
-
-        p_GenerationInfo.voxelCount = info.voxels;
-        p_GenerationInfo.nodes = info.nodes;
-        p_GenerationInfo.generationTime = 0;
-        p_GenerationInfo.completionPercent = 1;
-
-        p_CurrentFrame = 0;
-
-        m_UpdateBuffers = true;
-        p_Loading = false;
+        fromRaw(data, false);
     });
 }
 
-void GridAS::fromRaw(std::vector<uint8_t> rawData)
+void GridAS::fromRaw(std::vector<uint8_t> rawData, bool shouldReset)
 {
-    p_FileThread.request_stop();
+    p_RawThread.request_stop();
 
-    reset();
+    if (shouldReset)
+        reset();
 
-    p_FileThread = std::jthread([this, rawData](std::stop_token stoken) {
+    p_RawThread = std::jthread([this, rawData](std::stop_token stoken) {
         p_Loading = true;
         Serializers::SerialInfo info;
         auto data = Serializers::loadGrid(rawData);
