@@ -5,6 +5,8 @@ import hashlib
 import matplotlib.pyplot as plt
 import numpy as np
 
+from pathlib import Path
+
 if (len(sys.argv) != 2):
     print("Wrong number of arguments")
     print(f"Usage: {sys.argv[0]} filepath")
@@ -144,6 +146,7 @@ def barpoints():
             ax.scatter([x[i] + offset] * len(cut_frames), cut_frames, alpha=0.1, color="red")
 
     plt.legend()
+    plt.savefig(Path(sys.argv[1]).parent.absolute() / (Path(sys.argv[1]).stem + "_frametimes.png"))
     plt.show()
 
 def memory_use():
