@@ -109,7 +109,6 @@ class ASManager {
 
     float m_PreviousPlacement = 0.f;
 
-#ifdef SERVER_CLIENT
+    // Networking
     bool m_RequestedScene = false;
-#endif
 };

@@ -9,24 +9,23 @@
 
 #include <imgui.h>
 
-#ifdef SERVER_CLIENT
 #include "network/handlers/client.hpp"
+#include "network/setup.hpp"
 #include <functional>
-#endif
 
 SceneManager::SceneManager()
 {
-#ifdef SERVER_CLIENT
-    m_CurrentPath = "/";
-    getDirectories();
-#else
-    m_CurrentPath = std::filesystem::current_path();
-    if (std::filesystem::exists(m_CurrentPath / "res" / "structures")) {
-        m_CurrentPath /= "res";
-        m_CurrentPath /= "structures";
+    if (Network::enabled()) {
+        m_CurrentPath = "/";
+        getDirectories();
+    } else {
+        m_CurrentPath = std::filesystem::current_path();
+        if (std::filesystem::exists(m_CurrentPath / "res" / "structures")) {
+            m_CurrentPath /= "res";
+            m_CurrentPath /= "structures";
+        }
+        getDirectories();
     }
-    getDirectories();
-#endif
 }
 
 void SceneManager::UI(const Event& event)
@@ -96,57 +95,56 @@ void SceneManager::UI(const Event& event)
 
 void SceneManager::getDirectories()
 {
-#ifdef SERVER_CLIENT
-    if (m_RequestedDirectories)
-        return;
+    if (Network::enabled()) {
+        if (m_RequestedDirectories)
+            return;
 
-    m_RequestedDirectories = true;
+        m_RequestedDirectories = true;
 
-    m_Directories.clear();
+        m_Directories.clear();
 
-    Network::Client::addDirEntryRequest(m_CurrentPath,
-        std::bind(&SceneManager::handleDirectoryEntries, this, std::placeholders::_1));
-#else
-    m_Directories.clear();
+        Network::Client::addDirEntryRequest(m_CurrentPath,
+            std::bind(&SceneManager::handleDirectoryEntries, this, std::placeholders::_1));
+    } else {
+        m_Directories.clear();
 
-    for (auto const& entry : std::filesystem::directory_iterator { m_CurrentPath }) {
-        if (entry.is_directory()) {
-            m_Directories.push_back(entry.path());
+        for (auto const& entry : std::filesystem::directory_iterator { m_CurrentPath }) {
+            if (entry.is_directory()) {
+                m_Directories.push_back(entry.path());
+            }
         }
-    }
 
-    std::sort(m_Directories.begin(), m_Directories.end());
-#endif
+        std::sort(m_Directories.begin(), m_Directories.end());
+    }
 }
 
 void SceneManager::getFileEntries()
 {
-#ifdef SERVER_CLIENT
-    if (m_RequestedEntries)
-        return;
+    if (Network::enabled()) {
+        if (m_RequestedEntries)
+            return;
 
-    m_RequestedEntries = true;
+        m_RequestedEntries = true;
 
-    m_FileEntries.clear();
+        m_FileEntries.clear();
 
-    Network::Client::addFileEntryRequest(
-        m_SelectedPath, std::bind(&SceneManager::handleFileEntries, this, std::placeholders::_1));
-#else
-    std::filesystem::path folderName = m_SelectedPath.filename();
+        Network::Client::addFileEntryRequest(m_SelectedPath,
+            std::bind(&SceneManager::handleFileEntries, this, std::placeholders::_1));
+    } else {
+        std::filesystem::path folderName = m_SelectedPath.filename();
 
-    m_FileEntries.clear();
+        m_FileEntries.clear();
 
-    for (auto const& entry : std::filesystem::directory_iterator { m_SelectedPath }) {
-        if (entry.is_regular_file()) {
-            if (entry.path().stem() == folderName) {
-                m_FileEntries.insert(entry.path().extension());
+        for (auto const& entry : std::filesystem::directory_iterator { m_SelectedPath }) {
+            if (entry.is_regular_file()) {
+                if (entry.path().stem() == folderName) {
+                    m_FileEntries.insert(entry.path().extension());
+                }
             }
         }
     }
-#endif
 }
 
-#ifdef SERVER_CLIENT
 void SceneManager::handleDirectoryEntries(std::vector<uint8_t> data)
 {
     using namespace Network;
@@ -186,4 +184,3 @@ void SceneManager::handleFileEntries(std::vector<uint8_t> data)
 
     m_RequestedEntries = false;
 }
-#endif

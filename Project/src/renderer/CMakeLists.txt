@@ -35,12 +35,6 @@ target_compile_options(${PROJECT_NAME}
   PRIVATE -Wall -Wpedantic
 )
 
-
-if (BUILD_SERVER STREQUAL "1")
-  message("Building for server")
-  target_compile_definitions(${PROJECT_NAME} PRIVATE SERVER_CLIENT)
-endif()
-
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
   target_compile_options(${PROJECT_NAME}
     PRIVATE -g -Og

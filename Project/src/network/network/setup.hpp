@@ -30,6 +30,8 @@ struct ClientSettings {
     std::string address;
 };
 
+bool enabled();
+
 Node initServer(ServerSettings settings);
 
 Node initClient(ClientSettings settings);
