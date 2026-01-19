@@ -12,7 +12,7 @@ std::ifstream loadGridFile(std::filesystem::path directory)
     std::string foldername = directory.filename();
 
     std::filesystem::path file = directory / (foldername + ".voxgrid");
-    std::ifstream inputStream(file.string(), std::ios::binary | std::ios::in | std::ios::ate);
+    std::ifstream inputStream(file.string(), std::ios::binary | std::ios::in);
 
     if (!inputStream.is_open()) {
         LOG_ERROR("Failed to open file: {}\n", file.string());

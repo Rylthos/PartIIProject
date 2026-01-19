@@ -5,6 +5,8 @@
 namespace Serializers {
 std::vector<uint8_t> vectorFromStream(std::ifstream& inputStream)
 {
+    inputStream.seekg(0, std::ios::end);
+
     size_t fileSize = inputStream.tellg();
     inputStream.seekg(0, std::ios::beg);
 
