@@ -22,6 +22,11 @@ class Image {
     static void transition(
         VkCommandBuffer cmd, VkImage image, VkImageLayout current, VkImageLayout target);
 
+    static VkImageMemoryBarrier2 memoryBarrier2(VkPipelineStageFlags2 srcStage,
+        VkPipelineStageFlags2 dstStage, VkAccessFlags2 srcAccess, VkAccessFlags2 dstAccess,
+        VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t srcQueueFamily,
+        uint32_t dstQueueFamily, Image& image);
+
     void transition(VkCommandBuffer cmd, VkImageLayout current, VkImageLayout target);
     void copyToImage(VkCommandBuffer cmd, VkImage dst, VkExtent3D srcSize, VkExtent3D dstSize);
 

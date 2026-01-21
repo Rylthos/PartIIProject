@@ -3,7 +3,7 @@
 #include "../default_defines.slang"
 #include "../hit_record.slang"
 #include "../ray.slang"
-#include "../render_descriptor.slang"
+#include "../as_descriptor.slang"
 #include "general.slang"
 
 struct PushConstants
@@ -106,6 +106,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
   int width, height;
   i_RayDirectionImage.GetDimensions(width, height);
 
-  o_Image[pixel_coord] = render<GridRayMarch>(pixel_coord, push_constants.camera_position,
+  render<GridRayMarch>(pixel_coord, push_constants.camera_position,
       i_RayDirectionImage[pixel_coord].xyz, int2(width, height), push_constants.hit_data_address);
 }

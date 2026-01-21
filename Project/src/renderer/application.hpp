@@ -19,15 +19,26 @@ struct Sphere {
     float radius;
 };
 
+struct GBuffer {
+    Image colours;
+    Image normals;
+    Image positions;
+    Image depth;
+};
+
 struct PerFrameData {
     VkCommandPool commandPool;
     VkCommandBuffer commandBuffer;
 
     VkFence fence;
 
+    GBuffer gBuffer;
+
     Image drawImage;
     Image rayDirectionImage;
+
     VkDescriptorSet setupDescriptorSet;
+    VkDescriptorSet gBufferDescriptorSet;
     VkDescriptorSet renderDescriptorSet;
 };
 
@@ -73,10 +84,14 @@ class Application : public EventDispatcher {
     VkDescriptorPool m_VkDescriptorPool;
 
     VkDescriptorSetLayout m_SetupDescriptorLayout;
+    VkDescriptorSetLayout m_GBufferDescriptorLayout;
     VkDescriptorSetLayout m_RenderDescriptorLayout;
 
     VkPipelineLayout m_VkSetupPipelineLayout;
     VkPipeline m_VkSetupPipeline;
+
+    VkPipelineLayout m_VkRenderPipelineLayout;
+    VkPipeline m_VkRenderPipeline;
 
     VkPipelineLayout m_VkUIPipelineLayout;
     VkPipeline m_VkUIPipeline;
@@ -103,6 +118,7 @@ class Application : public EventDispatcher {
     void destroySwapchain();
 
     void createImages();
+    void createGBuffers();
     void createDrawImages();
     void createRayDirectionImages();
     void destroyImages();
@@ -120,6 +136,7 @@ class Application : public EventDispatcher {
 
     void createDescriptorLayouts();
     void createSetupDescriptorLayout();
+    void createGBufferDescriptorLayout();
     void createRenderDescriptorLayout();
     void destroyDescriptorLayouts();
 
@@ -129,6 +146,12 @@ class Application : public EventDispatcher {
     void createSetupPipeline();
     void destroySetupPipeline();
 
+    void createRenderPipelineLayout();
+    void destroyRenderPipelineLayout();
+
+    void createRenderPipeline();
+    void destroyRenderPipeline();
+
     void createUIPipelineLayout();
     void destroyUIPipelineLayout();
 
@@ -137,6 +160,7 @@ class Application : public EventDispatcher {
 
     void createDescriptors();
     void createSetupDescriptor();
+    void createGBufferDescriptor();
     void createRenderDescriptor();
 
     void destroyDescriptorPool();

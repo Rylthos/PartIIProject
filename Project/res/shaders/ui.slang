@@ -1,4 +1,5 @@
-#include "render_descriptor.slang"
+[[vk::binding(0, 0)]]
+RWTexture2D<float4> o_Image;
 
 func drawRect(in top_left : int2,
               in size : int2,

@@ -85,6 +85,12 @@ void Application::init()
         std::bind(&Application::destroySetupPipeline, this));
     createSetupPipeline();
 
+    createRenderPipelineLayout();
+    ShaderManager::getInstance()->addModule("render",
+        std::bind(&Application::createRenderPipeline, this),
+        std::bind(&Application::destroyRenderPipeline, this));
+    createRenderPipeline();
+
     createUIPipelineLayout();
     ShaderManager::getInstance()->addModule("ui", std::bind(&Application::createUIPipeline, this),
         std::bind(&Application::destroyUIPipeline, this));
@@ -98,7 +104,7 @@ void Application::init()
         .graphicsQueue = m_GraphicsQueue,
         .descriptorPool = m_VkDescriptorPool,
         .commandPool = m_GeneralPool,
-        .renderDescriptorLayout = m_RenderDescriptorLayout,
+        .renderDescriptorLayout = m_GBufferDescriptorLayout,
     });
 
     PerformanceLogger::getLogger()->init(&m_Camera);
@@ -162,6 +168,8 @@ void Application::cleanup()
 
     destroyUIPipelineLayout();
     destroyUIPipeline();
+    destroyRenderPipelineLayout();
+    destroyRenderPipeline();
     destroySetupPipelineLayout();
     destroySetupPipeline();
 
@@ -315,6 +323,42 @@ void Application::createImages()
 {
     createRayDirectionImages();
     createDrawImages();
+    createGBuffers();
+}
+
+void Application::createGBuffers()
+{
+    VkExtent3D extent = { m_Window.getWindowSize().x, m_Window.getWindowSize().y, 1 };
+
+    for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
+        m_PerFrameData[i].gBuffer.positions.init(m_VkDevice, m_VmaAllocator,
+            m_GraphicsQueue->getFamily(), extent, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_TYPE_2D,
+            VK_IMAGE_USAGE_STORAGE_BIT);
+        m_PerFrameData[i].gBuffer.positions.setDebugName("GBuffer positions image");
+        m_PerFrameData[i].gBuffer.positions.createView(VK_IMAGE_VIEW_TYPE_2D);
+        m_PerFrameData[i].gBuffer.positions.setDebugNameView("GBuffer positions image view");
+
+        m_PerFrameData[i].gBuffer.colours.init(m_VkDevice, m_VmaAllocator,
+            m_GraphicsQueue->getFamily(), extent, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TYPE_2D,
+            VK_IMAGE_USAGE_STORAGE_BIT);
+        m_PerFrameData[i].gBuffer.colours.setDebugName("GBuffer colour image");
+        m_PerFrameData[i].gBuffer.colours.createView(VK_IMAGE_VIEW_TYPE_2D);
+        m_PerFrameData[i].gBuffer.colours.setDebugNameView("GBuffer colour image view");
+
+        m_PerFrameData[i].gBuffer.normals.init(m_VkDevice, m_VmaAllocator,
+            m_GraphicsQueue->getFamily(), extent, VK_FORMAT_R8G8B8A8_SNORM, VK_IMAGE_TYPE_2D,
+            VK_IMAGE_USAGE_STORAGE_BIT);
+        m_PerFrameData[i].gBuffer.normals.setDebugName("GBuffer normals image");
+        m_PerFrameData[i].gBuffer.normals.createView(VK_IMAGE_VIEW_TYPE_2D);
+        m_PerFrameData[i].gBuffer.normals.setDebugNameView("GBuffer normals image view");
+
+        m_PerFrameData[i].gBuffer.depth.init(m_VkDevice, m_VmaAllocator,
+            m_GraphicsQueue->getFamily(), extent, VK_FORMAT_R16_SFLOAT, VK_IMAGE_TYPE_2D,
+            VK_IMAGE_USAGE_STORAGE_BIT);
+        m_PerFrameData[i].gBuffer.depth.setDebugName("GBuffer depth image");
+        m_PerFrameData[i].gBuffer.depth.createView(VK_IMAGE_VIEW_TYPE_2D);
+        m_PerFrameData[i].gBuffer.depth.setDebugNameView("GBuffer depth image view");
+    }
 }
 
 void Application::createDrawImages()
@@ -368,6 +412,11 @@ void Application::destroyImages()
     for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
         m_PerFrameData[i].drawImage.cleanup();
         m_PerFrameData[i].rayDirectionImage.cleanup();
+
+        m_PerFrameData[i].gBuffer.colours.cleanup();
+        m_PerFrameData[i].gBuffer.depth.cleanup();
+        m_PerFrameData[i].gBuffer.normals.cleanup();
+        m_PerFrameData[i].gBuffer.positions.cleanup();
     }
 
     m_ScreenshotImage.cleanup();
@@ -565,6 +614,7 @@ void Application::createDescriptorPool()
 void Application::createDescriptorLayouts()
 {
     createSetupDescriptorLayout();
+    createGBufferDescriptorLayout();
     createRenderDescriptorLayout();
 }
 
@@ -594,7 +644,7 @@ void Application::createSetupDescriptorLayout()
         (uint64_t)m_SetupDescriptorLayout, "Setup descriptor layout");
 }
 
-void Application::createRenderDescriptorLayout()
+void Application::createGBufferDescriptorLayout()
 {
     std::vector<VkDescriptorSetLayoutBinding> bindings = {
         {
@@ -606,6 +656,55 @@ void Application::createRenderDescriptorLayout()
          },
         {
          .binding = 1,
+         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+         .descriptorCount = 1,
+         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+         .pImmutableSamplers = VK_NULL_HANDLE,
+         },
+        {
+         .binding = 2,
+         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+         .descriptorCount = 1,
+         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+         .pImmutableSamplers = VK_NULL_HANDLE,
+         },
+        {
+         .binding = 3,
+         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+         .descriptorCount = 1,
+         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+         .pImmutableSamplers = VK_NULL_HANDLE,
+         },
+        {
+         .binding = 4,
+         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+         .descriptorCount = 1,
+         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+         .pImmutableSamplers = VK_NULL_HANDLE,
+         }
+    };
+
+    VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCI {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+        .pNext = nullptr,
+        .flags = 0,
+        .bindingCount = static_cast<uint32_t>(bindings.size()),
+        .pBindings = bindings.data(),
+    };
+
+    VK_CHECK(vkCreateDescriptorSetLayout(
+                 m_VkDevice, &descriptorSetLayoutCI, nullptr, &m_GBufferDescriptorLayout),
+        "Failed to create gBuffer descriptor set layout");
+
+    Debug::setDebugName(m_VkDevice, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT,
+        (uint64_t)m_GBufferDescriptorLayout, "GBuffer descriptor layout");
+}
+
+void Application::createRenderDescriptorLayout()
+{
+    std::vector<VkDescriptorSetLayoutBinding> bindings = {
+        {
+         .binding = 0,
          .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
          .descriptorCount = 1,
          .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
@@ -630,6 +729,7 @@ void Application::createRenderDescriptorLayout()
 void Application::destroyDescriptorLayouts()
 {
     vkDestroyDescriptorSetLayout(m_VkDevice, m_SetupDescriptorLayout, nullptr);
+    vkDestroyDescriptorSetLayout(m_VkDevice, m_GBufferDescriptorLayout, nullptr);
     vkDestroyDescriptorSetLayout(m_VkDevice, m_RenderDescriptorLayout, nullptr);
 }
 
@@ -661,6 +761,34 @@ void Application::destroySetupPipeline()
     vkDestroyPipeline(m_VkDevice, m_VkSetupPipeline, nullptr);
 }
 
+void Application::createRenderPipelineLayout()
+{
+    m_VkRenderPipelineLayout
+        = PipelineLayoutGenerator::start(m_VkDevice)
+              .addDescriptorLayouts({ m_GBufferDescriptorLayout, m_RenderDescriptorLayout })
+              .addPushConstant(VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(SetupPushConstants))
+              .setDebugName("Render layout")
+              .build();
+}
+
+void Application::destroyRenderPipelineLayout()
+{
+    vkDestroyPipelineLayout(m_VkDevice, m_VkRenderPipelineLayout, nullptr);
+}
+
+void Application::createRenderPipeline()
+{
+    m_VkRenderPipeline = ComputePipelineGenerator::start(m_VkDevice, m_VkRenderPipelineLayout)
+                             .setShader("render")
+                             .setDebugName("Render pipeline")
+                             .build();
+}
+
+void Application::destroyRenderPipeline()
+{
+    vkDestroyPipeline(m_VkDevice, m_VkRenderPipeline, nullptr);
+}
+
 void Application::createUIPipelineLayout()
 {
     m_VkUIPipelineLayout = PipelineLayoutGenerator::start(m_VkDevice)
@@ -687,6 +815,7 @@ void Application::destroyUIPipeline() { vkDestroyPipeline(m_VkDevice, m_VkUIPipe
 void Application::createDescriptors()
 {
     createSetupDescriptor();
+    createGBufferDescriptor();
     createRenderDescriptor();
 }
 
@@ -743,6 +872,133 @@ void Application::createSetupDescriptor()
     LOG_DEBUG("Created setup descriptors");
 }
 
+void Application::createGBufferDescriptor()
+{
+    std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
+    for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
+        descriptorSetLayouts.push_back(m_GBufferDescriptorLayout);
+    }
+
+    VkDescriptorSetAllocateInfo descriptorSetAI {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+        .pNext = nullptr,
+        .descriptorPool = m_VkDescriptorPool,
+        .descriptorSetCount = static_cast<uint32_t>(descriptorSetLayouts.size()),
+        .pSetLayouts = descriptorSetLayouts.data(),
+    };
+
+    std::vector<VkDescriptorSet> descriptorSets;
+    descriptorSets.resize(FRAMES_IN_FLIGHT);
+    VK_CHECK(vkAllocateDescriptorSets(m_VkDevice, &descriptorSetAI, descriptorSets.data()),
+        "Failed to allocate descriptor set");
+
+    for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
+        VkDescriptorImageInfo positionImageInfo {
+            .sampler = VK_NULL_HANDLE,
+            .imageView = m_PerFrameData[i].gBuffer.positions.getImageView(),
+            .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
+        };
+
+        VkDescriptorImageInfo colourImageInfo {
+            .sampler = VK_NULL_HANDLE,
+            .imageView = m_PerFrameData[i].gBuffer.colours.getImageView(),
+            .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
+        };
+
+        VkDescriptorImageInfo normalImageInfo {
+            .sampler = VK_NULL_HANDLE,
+            .imageView = m_PerFrameData[i].gBuffer.normals.getImageView(),
+            .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
+        };
+
+        VkDescriptorImageInfo depthImageInfo {
+            .sampler = VK_NULL_HANDLE,
+            .imageView = m_PerFrameData[i].gBuffer.depth.getImageView(),
+            .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
+        };
+
+        VkDescriptorImageInfo rayDirectionImageInfo {
+            .sampler = VK_NULL_HANDLE,
+            .imageView = m_PerFrameData[i].rayDirectionImage.getImageView(),
+            .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
+        };
+
+        std::vector<VkWriteDescriptorSet> writeSets = {
+            {
+             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+             .pNext = nullptr,
+             .dstSet = descriptorSets[i],
+             .dstBinding = 0,
+             .dstArrayElement = 0,
+             .descriptorCount = 1,
+             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+             .pImageInfo = &positionImageInfo,
+             .pBufferInfo = nullptr,
+             .pTexelBufferView = nullptr,
+             },
+            {
+             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+             .pNext = nullptr,
+             .dstSet = descriptorSets[i],
+             .dstBinding = 1,
+             .dstArrayElement = 0,
+             .descriptorCount = 1,
+             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+             .pImageInfo = &colourImageInfo,
+             .pBufferInfo = nullptr,
+             .pTexelBufferView = nullptr,
+             },
+            {
+             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+             .pNext = nullptr,
+             .dstSet = descriptorSets[i],
+             .dstBinding = 2,
+             .dstArrayElement = 0,
+             .descriptorCount = 1,
+             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+             .pImageInfo = &normalImageInfo,
+             .pBufferInfo = nullptr,
+             .pTexelBufferView = nullptr,
+             },
+            {
+             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+             .pNext = nullptr,
+             .dstSet = descriptorSets[i],
+             .dstBinding = 3,
+             .dstArrayElement = 0,
+             .descriptorCount = 1,
+             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+             .pImageInfo = &depthImageInfo,
+             .pBufferInfo = nullptr,
+             .pTexelBufferView = nullptr,
+             },
+            {
+             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+             .pNext = nullptr,
+             .dstSet = descriptorSets[i],
+             .dstBinding = 4,
+             .dstArrayElement = 0,
+             .descriptorCount = 1,
+             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+             .pImageInfo = &rayDirectionImageInfo,
+             .pBufferInfo = nullptr,
+             .pTexelBufferView = nullptr,
+             },
+        };
+
+        vkUpdateDescriptorSets(m_VkDevice, writeSets.size(), writeSets.data(), 0, nullptr);
+
+        Debug::setDebugName(m_VkDevice, VK_OBJECT_TYPE_DESCRIPTOR_SET, (uint64_t)descriptorSets[i],
+            "GBuffer descriptor");
+    }
+
+    for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
+        m_PerFrameData[i].gBufferDescriptorSet = descriptorSets[i];
+    }
+
+    LOG_DEBUG("Created GBuffer descriptors");
+}
+
 void Application::createRenderDescriptor()
 {
     std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
@@ -768,11 +1024,6 @@ void Application::createRenderDescriptor()
         renderImageInfo.imageView = m_PerFrameData[i].drawImage.getImageView();
         renderImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
-        VkDescriptorImageInfo rayDirectionImageInfo {};
-        rayDirectionImageInfo.sampler = VK_NULL_HANDLE;
-        rayDirectionImageInfo.imageView = m_PerFrameData[i].rayDirectionImage.getImageView();
-        rayDirectionImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-
         std::vector<VkWriteDescriptorSet> writeSets = {
             {
              .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -785,19 +1036,7 @@ void Application::createRenderDescriptor()
              .pImageInfo = &renderImageInfo,
              .pBufferInfo = nullptr,
              .pTexelBufferView = nullptr,
-             },
-            {
-             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-             .pNext = nullptr,
-             .dstSet = descriptorSets[i],
-             .dstBinding = 1,
-             .dstArrayElement = 0,
-             .descriptorCount = 1,
-             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-             .pImageInfo = &rayDirectionImageInfo,
-             .pBufferInfo = nullptr,
-             .pTexelBufferView = nullptr,
-             },
+             }
         };
 
         vkUpdateDescriptorSets(m_VkDevice, writeSets.size(), writeSets.data(), 0, nullptr);
@@ -969,26 +1208,11 @@ void Application::render()
         }
 
         {
-            VkImageMemoryBarrier2 imageBarrier = {
-                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-                .pNext = nullptr,
-                .srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-                .srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT,
-                .dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-                .dstAccessMask = VK_ACCESS_MEMORY_READ_BIT,
-                .oldLayout = VK_IMAGE_LAYOUT_GENERAL,
-                .newLayout = VK_IMAGE_LAYOUT_GENERAL,
-                .srcQueueFamilyIndex = m_GraphicsQueue->getFamily(),
-                .dstQueueFamilyIndex = m_GraphicsQueue->getFamily(),
-                .image = currentFrame.rayDirectionImage.getImage(),
-                .subresourceRange = {
-                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                    .baseMipLevel = 0,
-                    .levelCount = VK_REMAINING_MIP_LEVELS,
-                    .baseArrayLayer = 0,
-                    .layerCount = VK_REMAINING_MIP_LEVELS,
-                },
-            };
+            VkImageMemoryBarrier2 imageBarrier = Image::memoryBarrier2(
+                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                VK_ACCESS_MEMORY_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT, VK_IMAGE_LAYOUT_GENERAL,
+                VK_IMAGE_LAYOUT_GENERAL, m_GraphicsQueue->getFamily(), m_GraphicsQueue->getFamily(),
+                currentFrame.rayDirectionImage);
 
             VkDependencyInfo dependency = {
                 .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
@@ -1005,6 +1229,15 @@ void Application::render()
             vkCmdPipelineBarrier2(commandBuffer, &dependency);
         }
 
+        currentFrame.gBuffer.positions.transition(
+            commandBuffer, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+        currentFrame.gBuffer.colours.transition(
+            commandBuffer, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+        currentFrame.gBuffer.normals.transition(
+            commandBuffer, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+        currentFrame.gBuffer.depth.transition(
+            commandBuffer, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+
         vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_VkQueryPool,
             m_CurrentFrameIndex * 4 + 2);
 
@@ -1014,31 +1247,80 @@ void Application::render()
         };
 
         ASManager::getManager()->render(
-            commandBuffer, m_Camera, currentFrame.renderDescriptorSet, imageSize);
+            commandBuffer, m_Camera, currentFrame.gBufferDescriptorSet, imageSize);
 
         vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_VkQueryPool,
             m_CurrentFrameIndex * 4 + 3);
 
-        {
-            VkImageMemoryBarrier2 imageMB
-            {
-                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2, .pNext = nullptr,
-                .srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-                .srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT,
-                .dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-                .dstAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT, .oldLayout = VK_IMAGE_LAYOUT_GENERAL,
-                .newLayout = VK_IMAGE_LAYOUT_GENERAL,
-                .srcQueueFamilyIndex = m_GraphicsQueue->getFamily(),
-                .dstQueueFamilyIndex = m_GraphicsQueue->getFamily(),
-                .image = currentFrame.drawImage.getImage(),
-                .subresourceRange = {
-                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                    .baseMipLevel = 0,
-                    .levelCount = VK_REMAINING_MIP_LEVELS,
-                    .baseArrayLayer = 0,
-                    .layerCount = VK_REMAINING_ARRAY_LAYERS,
-                },
+        { // GBuffer
+            VkImageMemoryBarrier2 positionBarrier = Image::memoryBarrier2(
+                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                VK_ACCESS_MEMORY_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT, VK_IMAGE_LAYOUT_GENERAL,
+                VK_IMAGE_LAYOUT_GENERAL, m_GraphicsQueue->getFamily(), m_GraphicsQueue->getFamily(),
+                currentFrame.gBuffer.positions);
+
+            VkImageMemoryBarrier2 colourBarrier = Image::memoryBarrier2(
+                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                VK_ACCESS_MEMORY_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT, VK_IMAGE_LAYOUT_GENERAL,
+                VK_IMAGE_LAYOUT_GENERAL, m_GraphicsQueue->getFamily(), m_GraphicsQueue->getFamily(),
+                currentFrame.gBuffer.colours);
+
+            VkImageMemoryBarrier2 normalsBarrier = Image::memoryBarrier2(
+                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                VK_ACCESS_MEMORY_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT, VK_IMAGE_LAYOUT_GENERAL,
+                VK_IMAGE_LAYOUT_GENERAL, m_GraphicsQueue->getFamily(), m_GraphicsQueue->getFamily(),
+                currentFrame.gBuffer.normals);
+
+            VkImageMemoryBarrier2 depthBarrier = Image::memoryBarrier2(
+                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                VK_ACCESS_MEMORY_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT, VK_IMAGE_LAYOUT_GENERAL,
+                VK_IMAGE_LAYOUT_GENERAL, m_GraphicsQueue->getFamily(), m_GraphicsQueue->getFamily(),
+                currentFrame.gBuffer.depth);
+
+            std::vector<VkImageMemoryBarrier2> barriers
+                = { positionBarrier, colourBarrier, normalsBarrier, depthBarrier };
+
+            VkDependencyInfo dependency = {
+                .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+                .pNext = nullptr,
+                .dependencyFlags = 0,
+                .memoryBarrierCount = 0,
+                .pMemoryBarriers = nullptr,
+                .bufferMemoryBarrierCount = 0,
+                .pBufferMemoryBarriers = nullptr,
+                .imageMemoryBarrierCount = static_cast<uint32_t>(barriers.size()),
+                .pImageMemoryBarriers = barriers.data(),
             };
+
+            vkCmdPipelineBarrier2(commandBuffer, &dependency);
+        }
+
+        {
+            Debug::beginCmdDebugLabel(commandBuffer, "Render", { 0.f, 0.f, 1.f, 1.f });
+
+            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_VkRenderPipeline);
+
+            std::vector<VkDescriptorSet> descriptorSets = {
+                currentFrame.gBufferDescriptorSet,
+                currentFrame.renderDescriptorSet,
+            };
+
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+                m_VkRenderPipelineLayout, 0, descriptorSets.size(), descriptorSets.data(), 0,
+                nullptr);
+
+            vkCmdDispatch(commandBuffer, std::ceil(currentFrame.drawImage.getExtent().width / 8.f),
+                std::ceil(currentFrame.drawImage.getExtent().height / 8.f), 1);
+
+            Debug::endCmdDebugLabel(commandBuffer);
+        }
+
+        {
+            VkImageMemoryBarrier2 imageBarrier = Image::memoryBarrier2(
+                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                VK_ACCESS_MEMORY_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT, VK_IMAGE_LAYOUT_GENERAL,
+                VK_IMAGE_LAYOUT_GENERAL, m_GraphicsQueue->getFamily(), m_GraphicsQueue->getFamily(),
+                currentFrame.drawImage);
 
             VkDependencyInfo dependency = {
                 .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
@@ -1049,7 +1331,7 @@ void Application::render()
                 .bufferMemoryBarrierCount = 0,
                 .pBufferMemoryBarriers = nullptr,
                 .imageMemoryBarrierCount = 1,
-                .pImageMemoryBarriers = &imageMB,
+                .pImageMemoryBarriers = &imageBarrier,
             };
 
             vkCmdPipelineBarrier2(commandBuffer, &dependency);
@@ -1316,6 +1598,7 @@ void Application::handleWindow(const Event& event)
 
         for (auto& frame : m_PerFrameData) {
             vkFreeDescriptorSets(m_VkDevice, m_VkDescriptorPool, 1, &frame.setupDescriptorSet);
+            vkFreeDescriptorSets(m_VkDevice, m_VkDescriptorPool, 1, &frame.gBufferDescriptorSet);
             vkFreeDescriptorSets(m_VkDevice, m_VkDescriptorPool, 1, &frame.renderDescriptorSet);
         }
 

@@ -5,6 +5,7 @@
 #include "../lighting.slang"
 #include "../ray.slang"
 #include "../intersection_colour.slang"
+#include "../as_descriptor.slang"
 
 interface IRayMarch
 {
@@ -15,7 +16,7 @@ func render<T>(in pixel_coord : int2,
                in origin : float3,
                in direction : float3,
                in image_size : int2,
-               in hit_data_address : uint64_t) -> float4
+               in hit_data_address : uint64_t) -> void
   where T : IRayMarch
 {
   #ifdef CYCLES
@@ -56,10 +57,18 @@ func render<T>(in pixel_coord : int2,
 
         return calculateColour(hit, shadow.hit);
       #else
-        return calculateColour(hit);
+
+      // float4 colour = calculateColour(hit);
+      o_Positions[pixel_coord] = float4(hit.hit_position, 0.);
+      o_Colours[pixel_coord] = float4(hit.colour, 1.);
+      o_Normals[pixel_coord] = float4(hit.normal, 0.);
+      o_Depth[pixel_coord] = hit.t;
+
+        // return calculateColour(hit);
       #endif
     } else {
-      return missColour();
+      o_Colours[pixel_coord] = float4(0);
+      // return missColour();
     }
   #endif
 }

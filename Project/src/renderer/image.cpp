@@ -114,6 +114,33 @@ void Image::transition(
     vkCmdPipelineBarrier2(cmd, &dependencyInfo);
 }
 
+VkImageMemoryBarrier2 Image::memoryBarrier2(VkPipelineStageFlags2 srcStage,
+    VkPipelineStageFlags2 dstStage, VkAccessFlags2 srcAccess, VkAccessFlags2 dstAccess,
+    VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t srcQueueFamily,
+    uint32_t dstQueueFamily, Image& image)
+{
+    return VkImageMemoryBarrier2 {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+                .pNext = nullptr,
+                .srcStageMask = srcStage,
+                .srcAccessMask = srcAccess,
+                .dstStageMask = dstStage,
+                .dstAccessMask = dstAccess,
+                .oldLayout = oldLayout,
+                .newLayout = newLayout,
+                .srcQueueFamilyIndex = srcQueueFamily,
+                .dstQueueFamilyIndex = dstQueueFamily,
+                .image = image.getImage(),
+                .subresourceRange = {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel = 0,
+                    .levelCount = VK_REMAINING_MIP_LEVELS,
+                    .baseArrayLayer = 0,
+                    .layerCount = VK_REMAINING_MIP_LEVELS,
+                },
+            };
+}
+
 void Image::transition(VkCommandBuffer cmd, VkImageLayout current, VkImageLayout target)
 {
     Image::transition(cmd, m_Image, current, target);
