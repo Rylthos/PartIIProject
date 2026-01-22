@@ -10,10 +10,13 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
   int width, height;
   o_Image.GetDimensions(width, height);
 
-  int2 pixelCoord    = int2(dispatchThreadID.xy);
+  int2 pixelCoord = int2(dispatchThreadID.xy);
 
   if (o_Colours[pixelCoord].a > 0) {
-    o_Image[pixelCoord] = float4(o_Colours[pixelCoord].xyz, 1.);
+    float3 pos = o_Positions[pixelCoord].xyz;
+    float3 normal = o_Normals[pixelCoord].xyz;
+    float3 colour = o_Colours[pixelCoord].rgb;
+    o_Image[pixelCoord] = calculateColour(pos, normal, colour, false);
   } else {
     o_Image[pixelCoord] = missColour();
   }
