@@ -60,6 +60,7 @@ struct TextureRayMarch : IRayMarch
         hit.hit = true;
         hit.normal = normal;
         hit.hit_position = ray.calculate(t);
+        hit.t = t;
 
         hit.voxel_index = voxel_pos;
 

@@ -70,6 +70,7 @@ struct GridRayMarch : IRayMarch
         hit.hit          = true;
         hit.normal       = normal;
         hit.hit_position = ray.calculate(t);
+        hit.t = t;
 
         uint64_t colour_index = index * 3;
         hit.colour.r          = i_Colour[colour_index + 0];

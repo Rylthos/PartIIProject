@@ -117,6 +117,7 @@ struct OctreeRayMarch : IRayMarch
         hit.colour = node.colour;
         hit.normal = normal;
         hit.voxel_index = int3(pos.xyz / pos.w);
+        hit.t = length(hit.hit_position - ray.origin) / length(ray.direction);
 
         return hit;
       }

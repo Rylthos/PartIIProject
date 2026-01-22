@@ -58,17 +58,14 @@ func render<T>(in pixel_coord : int2,
         return calculateColour(hit, shadow.hit);
       #else
 
-      // float4 colour = calculateColour(hit);
       o_Positions[pixel_coord] = float4(hit.hit_position, 0.);
-      o_Colours[pixel_coord] = float4(hit.colour, 1.);
+      o_Colours[pixel_coord] = float4(hit.colour, 0.);
       o_Normals[pixel_coord] = float4(hit.normal, 0.);
-      o_Depth[pixel_coord] = hit.t;
-
-        // return calculateColour(hit);
+      o_Depth[pixel_coord] = 1.f / hit.t;
       #endif
     } else {
       o_Colours[pixel_coord] = float4(0);
-      // return missColour();
+      o_Depth[pixel_coord] = 0.f;
     }
   #endif
 }

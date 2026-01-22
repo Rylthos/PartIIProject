@@ -70,6 +70,7 @@ func traverse_brick(in ray : Ray,
       hit.voxel_index = int3(min_bound * 8) + voxel_pos;
 
       hit.hit_position = ray.calculate(t);
+      hit.t = t;
 
       return true;
     }
