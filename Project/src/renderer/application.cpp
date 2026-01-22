@@ -1121,6 +1121,77 @@ void Application::UI(const Event& event)
     }
     ImGui::End();
 
+    if (ImGui::Begin("G Buffer")) {
+        {
+            std::vector<std::string> options = {
+                "Full",
+                "Positions",
+                "Colours",
+                "Normals",
+                "Depth",
+            };
+
+            bool change = false;
+
+            ImGui::Text("G Buffer rendering");
+            static size_t selected = 0;
+            size_t previousSelect = selected;
+            if (ImGui::BeginCombo("##CurrentGBufferStyle", options[selected].c_str())) {
+                for (uint8_t i = 0; i < options.size(); i++) {
+                    const bool isSelected = (selected == i);
+                    if (ImGui::Selectable(options[i].c_str(), isSelected)) {
+                        selected = i;
+                        change = true;
+                    }
+
+                    if (isSelected)
+                        ImGui::SetItemDefaultFocus();
+                }
+
+                ImGui::EndCombo();
+            }
+
+            if (change) {
+                switch (previousSelect) {
+                case 0: // Full
+                    break;
+                case 1: // Position
+                    ShaderManager::getInstance()->removeMacro("GBUFFER_RENDER_POS");
+                    break;
+                case 2: // Colours
+                    ShaderManager::getInstance()->removeMacro("GBUFFER_RENDER_COL");
+                    break;
+                case 3: // Normals
+                    ShaderManager::getInstance()->removeMacro("GBUFFER_RENDER_NOR");
+                    break;
+                case 4: // Depth
+                    ShaderManager::getInstance()->removeMacro("GBUFFER_RENDER_DEP");
+                    break;
+                }
+
+                switch (selected) {
+                case 0: // Full
+                    break;
+                case 1: // Position
+                    ShaderManager::getInstance()->defineMacro("GBUFFER_RENDER_POS");
+                    break;
+                case 2: // Colours
+                    ShaderManager::getInstance()->defineMacro("GBUFFER_RENDER_COL");
+                    break;
+                case 3: // Normals
+                    ShaderManager::getInstance()->defineMacro("GBUFFER_RENDER_NOR");
+                    break;
+                case 4: // Depth
+                    ShaderManager::getInstance()->defineMacro("GBUFFER_RENDER_DEP");
+                    break;
+                }
+
+                ShaderManager::getInstance()->moduleUpdated("render");
+            }
+        }
+    }
+    ImGui::End();
+
     ImGui::ShowDemoWindow();
 }
 
