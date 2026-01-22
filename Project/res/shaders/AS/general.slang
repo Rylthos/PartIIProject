@@ -5,7 +5,7 @@
 #include "../lighting.slang"
 #include "../ray.slang"
 #include "../intersection_colour.slang"
-#include "../as_descriptor.slang"
+#include "../gBuffer_descriptor.slang"
 
 interface IRayMarch
 {

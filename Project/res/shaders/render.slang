@@ -1,4 +1,4 @@
-#include "as_descriptor.slang"
+#include "gBuffer_descriptor.slang"
 #include "render_descriptor.slang"
 
 #include "lighting.slang"

@@ -1,7 +1,7 @@
 #include "../default_defines.slang"
 #include "../hit_record.slang"
 #include "../ray.slang"
-#include "../as_descriptor.slang"
+#include "../gBuffer_descriptor.slang"
 #include "general.slang"
 #include "structures/contree.slang"
 
