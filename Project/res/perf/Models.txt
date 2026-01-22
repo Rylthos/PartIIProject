@@ -15,3 +15,12 @@ Barn owl:
   sketchfab: https://sketchfab.com/3d-models/barn-owl-0e65de5934db4f0eae02835ba7227dcc
   units: 16
   res: 32
+
+Bistro:
+  https://developer.nvidia.com/orca/amazon-lumberyard-bistro
+  Bistro Inside:
+    units: 32
+    res: 32
+  Bistro Outside:
+    units: 32
+    res: 32

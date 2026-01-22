@@ -1,0 +1,30 @@
+{
+  "defaults": {
+    "steps": 1000,
+    "captures": 50,
+    "delay": 50,
+    "scene": "res/structures/bistro_inside",
+    "cameras": [
+      {
+        "pos": [ 177, 390, 300],
+        "rot": [ 30, 0 ]
+      },
+      {
+        "pos": [ 180, 255, 570 ],
+        "rot": [ 130, -14 ]
+      },
+      {
+        "pos": [ 545, 290, 50 ],
+        "rot": [ -24, -5 ]
+      }
+    ],
+    "ids": [
+      "hall",
+      "tables",
+      "window"
+    ],
+    "test_all": true
+  },
+  "tests": [
+  ]
+}

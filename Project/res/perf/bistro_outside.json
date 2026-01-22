@@ -1,0 +1,30 @@
+{
+  "defaults": {
+    "steps": 1000,
+    "captures": 50,
+    "delay": 50,
+    "scene": "res/structures/bistro_outside",
+    "cameras": [
+      {
+        "pos": [ 395, 225, 445 ],
+        "rot": [ 110, 9.6 ]
+      },
+      {
+        "pos": [ 202, 170, 581 ],
+        "rot": [ 104, -17]
+      },
+      {
+        "pos": [ -57, -463, 760 ],
+        "rot": [ 112, -52 ]
+      }
+    ],
+    "ids": [
+      "street_tree",
+      "street",
+      "top"
+    ],
+    "test_all": true
+  },
+  "tests": [
+  ]
+}
