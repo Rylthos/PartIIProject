@@ -41,14 +41,15 @@ func render<T>(in pixel_coord : int2,
 
   #ifdef HEATMAP
     if (hit.intersection_checks != 0) {
-      return float4(viridis(hit.intersection_checks), 1.);
+      o_Colours[pixel_coord] = float4(viridis(hit.intersection_checks), 1.);
     } else {
-      return float4(0);
+      o_Colours[pixel_coord] = float4(float3(0), 1.);
     }
   #elif defined(CYCLES)
     float3 mix = lerp(
         MIN_CYCLE_COLOUR, MAX_CYCLE_COLOUR, float3((end_cycles - start_cycles) / float(CYCLE_MAX)));
-    return float4(mix, 1.);
+
+      o_Colours[pixel_coord] = float4(mix, 2.);
   #else
     if (hit.hit) {
       #ifdef SHADOW_RAY
