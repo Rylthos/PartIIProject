@@ -6,3 +6,4 @@ imgui.ini
 res/meshes/*
 res/structures/*
 res/perf_output/*
+scripts/__pycache__/*
