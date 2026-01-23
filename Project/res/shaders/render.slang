@@ -22,7 +22,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 #elif defined(GBUFFER_RENDER_NOR)
     o_Image[pixelCoord] = float4((o_Normals[pixelCoord].rgb + 1) / 2, 1.);
 #elif defined(GBUFFER_RENDER_DEP)
-    o_Image[pixelCoord] = float4(float3(o_Depth[pixelCoord]), 1.);
+    o_Image[pixelCoord] = float4(float3(pow(o_Depth[pixelCoord], 0.5)), 1.);
 #else
     switch (type) {
       case 0: // Normal

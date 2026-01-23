@@ -39,9 +39,12 @@ func render<T>(in pixel_coord : int2,
     setHitRecord((HitData*)hit_data_address, hit);
   }
 
+  o_Depth[pixel_coord] = 0.f;
+
   #ifdef HEATMAP
     if (hit.intersection_checks != 0) {
       o_Colours[pixel_coord] = float4(viridis(hit.intersection_checks), 1.);
+      o_Depth[pixel_coord] = 1.f;
     } else {
       o_Colours[pixel_coord] = float4(float3(0), 1.);
     }
@@ -50,6 +53,7 @@ func render<T>(in pixel_coord : int2,
         MIN_CYCLE_COLOUR, MAX_CYCLE_COLOUR, float3((end_cycles - start_cycles) / float(CYCLE_MAX)));
 
       o_Colours[pixel_coord] = float4(mix, 2.);
+      o_Depth[pixel_coord] = 1.f;
   #else
     if (hit.hit) {
       #ifdef SHADOW_RAY
@@ -66,7 +70,6 @@ func render<T>(in pixel_coord : int2,
       #endif
     } else {
       o_Colours[pixel_coord] = float4(0);
-      o_Depth[pixel_coord] = 0.f;
     }
   #endif
 }
