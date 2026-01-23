@@ -184,6 +184,9 @@ void PerformanceLogger::getEntries()
             }
         }
     }
+
+    std::sort(m_Directories.begin(), m_Directories.end());
+    std::sort(m_FileEntries.begin(), m_FileEntries.end());
 }
 
 void PerformanceLogger::startLog(std::filesystem::path file)
@@ -199,6 +202,9 @@ void PerformanceLogger::startLog(std::filesystem::path file)
     }
 
     LOG_INFO("Running Perf: {}", file.filename().string());
+
+    m_PerfEntries.clear();
+    m_PerfEntryMap.clear();
 
     m_PerfName = file.stem().string();
     parseJson(file);
