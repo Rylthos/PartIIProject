@@ -63,7 +63,7 @@ struct OctreeRayMarch : IRayMarch
     const float4 direction_w
       = mul(float4(ray_original.direction, 1), push_constants.octree_scale_inverse);
 
-    Ray ray = Ray(origin_w.xyz / origin_w.w, normalize(direction_w.xyz / direction_w.w));
+    const Ray ray = Ray(origin_w.xyz / origin_w.w, normalize(direction_w.xyz / direction_w.w));
 
     HitRecord hit;
     float boundingTMin, boundingTMax;
@@ -73,7 +73,7 @@ struct OctreeRayMarch : IRayMarch
 
     uint stack[MAX_DEPTH];
 
-    uint scale_exp = 22;
+    uint scale_exp = MAX_DEPTH-1;
 
     uint node_index = 0;
     OctreeNode node = i_Octree[node_index];
@@ -127,6 +127,7 @@ struct OctreeRayMarch : IRayMarch
       float3 cell_min = floorScale(position, scale_exp);
       float3 side_dist
         = (cell_min + (max(step_dir, int3(0)) * scale) - ray.origin) * ray.inverse_direction;
+
       float tmax = min(min(side_dist.x, side_dist.y), side_dist.z);
       normal = -step_dir * (tmax == side_dist);
 
@@ -137,27 +138,15 @@ struct OctreeRayMarch : IRayMarch
       float3 previous_position = position;
       position = clamp(ray.calculate(tmax), neighbour_min, neighbour_max);
 
-      // Ascend if the parent bounds now differ
-      float3 parent_cell_min = floorScale(previous_position, scale_exp + 1);
-      float3 new_cell_min = floorScale(position, scale_exp + 1);
-      bool3 diff = abs(parent_cell_min - new_cell_min) > EPS;
-      while (diff.x || diff.y || diff.z) {
-        #ifdef HEATMAP
-        hit.intersection_checks++;
-        #endif
+      uint3 diff_pos = asuint(position) ^ asuint(cell_min);
+      int diff_exp = firstbithigh((diff_pos.x | diff_pos.y | diff_pos.z));
 
-        scale_exp++;
-
-        if (scale_exp >= MAX_DEPTH) {
-          return hit;
-        }
+      if (diff_exp > scale_exp) {
+        scale_exp = diff_exp;
+        if (diff_exp > 22) break;
 
         node_index = stack[scale_exp];
         node = i_Octree[node_index];
-
-        parent_cell_min = floorScale(previous_position, scale_exp + 1);
-        new_cell_min = floorScale(position, scale_exp + 1);
-        diff = abs(parent_cell_min - new_cell_min) > EPS;
       }
     }
 

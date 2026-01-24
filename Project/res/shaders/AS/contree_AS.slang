@@ -70,7 +70,7 @@ struct ContreeRayMarch : IRayMarch
     }
 
     uint stack[MAX_DEPTH];
-    uint scale_exp = 21;
+    uint scale_exp = MAX_DEPTH - 2;
 
     uint node_index = 0;
     ContreeNode node = i_Contree[node_index];
@@ -131,27 +131,15 @@ struct ContreeRayMarch : IRayMarch
       float3 previous_position = position;
       position = clamp(ray.calculate(tmax), neighbour_min, neighbour_max);
 
-      // Ascend if the parent bounds now differ
-      float3 parent_cell_min = floorScale(previous_position, scale_exp + 2);
-      float3 new_cell_min = floorScale(position, scale_exp + 2);
-      bool3 diff = abs(parent_cell_min - new_cell_min) > EPS;
-      while (diff.x || diff.y || diff.z) {
-        #ifdef HEATMAP
-        hit.intersection_checks++;
-        #endif
+      uint3 diff_pos = asuint(position) ^ asuint(cell_min);
+      int diff_exp = firstbithigh((diff_pos.x | diff_pos.y | diff_pos.z) & 0xFFAAAAAA);
 
-        scale_exp += 2;
-
-        if (scale_exp >= MAX_DEPTH) {
-          return hit;
-        }
+      if (diff_exp > scale_exp) {
+        scale_exp = diff_exp;
+        if (diff_exp > 21) break;
 
         node_index = stack[scale_exp];
         node = i_Contree[node_index];
-
-        parent_cell_min = floorScale(previous_position, scale_exp + 2);
-        new_cell_min = floorScale(position, scale_exp + 2);
-        diff = abs(parent_cell_min - new_cell_min) > EPS;
       }
     }
 
