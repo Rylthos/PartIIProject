@@ -39,6 +39,7 @@ void ShaderManager::init(VkDevice device)
     static std::vector<slang::CompilerOptionEntry> options = {
         { slang::CompilerOptionName::EmitSpirvDirectly,
          { slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr }                    },
+#ifdef DEBUG
         { slang::CompilerOptionName::DebugInformation,
          { slang::CompilerOptionValueKind::Int,
                 SlangDebugInfoLevel::SLANG_DEBUG_INFO_LEVEL_STANDARD, 0, nullptr, nullptr } },
@@ -46,6 +47,10 @@ void ShaderManager::init(VkDevice device)
          { slang::CompilerOptionValueKind::Int,
                 m_GlobalSession->findCapability("SPV_KHR_non_semantic_info"), 0, nullptr,
                 nullptr }                                                                   },
+#else
+        { slang::CompilerOptionName::Optimization,
+            { slang::CompilerOptionValueKind::Int, 3, 0, nullptr, nullptr } },
+#endif
         { slang::CompilerOptionName::Capability,
          { slang::CompilerOptionValueKind::Int,
                 m_GlobalSession->findCapability("spvShaderClockKHR"), 0, nullptr, nullptr } },
