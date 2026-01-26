@@ -1,4 +1,4 @@
-#include "window.hpp"
+#include "glfw_window.hpp"
 
 #include "events/events.hpp"
 
@@ -9,14 +9,14 @@
 
 #include <GLFW/glfw3.h>
 
-void Window::init()
+void GLFWWindow::init()
 {
     if (!glfwInit()) {
         LOG_CRITICAL("Failed to initialise GLFW");
         exit(-1);
     }
 
-    m_WindowSize = glm::ivec2 { 1600, 900 };
+    p_WindowSize = glm::ivec2 { 1600, 900 };
 
     LOG_DEBUG("Initialised GLFW");
 
@@ -26,7 +26,7 @@ void Window::init()
     glfwWindowHintString(GLFW_WAYLAND_APP_ID, "GLFW");
 
     m_Window
-        = glfwCreateWindow(m_WindowSize.x, m_WindowSize.y, "Voxel Raymarching", nullptr, nullptr);
+        = glfwCreateWindow(p_WindowSize.x, p_WindowSize.y, "Voxel Raymarching", nullptr, nullptr);
 
     if (!m_Window) {
         LOG_CRITICAL("Failed to create GLFW window");
@@ -44,13 +44,13 @@ void Window::init()
     LOG_DEBUG("Created GLFW window");
 }
 
-void Window::cleanup()
+void GLFWWindow::cleanup()
 {
     glfwDestroyWindow(m_Window);
     glfwTerminate();
 }
 
-VkSurfaceKHR Window::createSurface(const VkInstance& instance)
+VkSurfaceKHR GLFWWindow::createSurface(const VkInstance& instance)
 {
     VkSurfaceKHR surface;
     VK_CHECK(glfwCreateWindowSurface(instance, m_Window, nullptr, &surface),
@@ -58,13 +58,13 @@ VkSurfaceKHR Window::createSurface(const VkInstance& instance)
     return surface;
 }
 
-void Window::pollEvents() { glfwPollEvents(); }
-void Window::swapBuffers() { glfwSwapBuffers(m_Window); }
-bool Window::shouldClose() { return glfwWindowShouldClose(m_Window); };
+void GLFWWindow::pollEvents() { glfwPollEvents(); }
+void GLFWWindow::swapBuffers() { glfwSwapBuffers(m_Window); }
+bool GLFWWindow::shouldClose() { return glfwWindowShouldClose(m_Window); };
 
-void Window::handleKeyInput(GLFWwindow* glfwWindow, int key, int scancode, int action, int mods)
+void GLFWWindow::handleKeyInput(GLFWwindow* glfwWindow, int key, int scancode, int action, int mods)
 {
-    Window* window = (Window*)glfwGetWindowUserPointer(glfwWindow);
+    GLFWWindow* window = (GLFWWindow*)glfwGetWindowUserPointer(glfwWindow);
 
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
         glfwSetWindowShouldClose(window->m_Window, GLFW_TRUE);
@@ -97,7 +97,7 @@ void Window::handleKeyInput(GLFWwindow* glfwWindow, int key, int scancode, int a
     }
 }
 
-void Window::handleMouseButton(GLFWwindow* glfwWindow, int button, int action, int mods)
+void GLFWWindow::handleMouseButton(GLFWwindow* glfwWindow, int button, int action, int mods)
 {
     Window* window = (Window*)glfwGetWindowUserPointer(glfwWindow);
 
@@ -115,9 +115,9 @@ void Window::handleMouseButton(GLFWwindow* glfwWindow, int button, int action, i
     }
 }
 
-void Window::handleMouseMove(GLFWwindow* glfwWindow, double xPos, double yPos)
+void GLFWWindow::handleMouseMove(GLFWwindow* glfwWindow, double xPos, double yPos)
 {
-    Window* window = (Window*)glfwGetWindowUserPointer(glfwWindow);
+    GLFWWindow* window = (GLFWWindow*)glfwGetWindowUserPointer(glfwWindow);
 
     static double prevX;
     static double prevY;
@@ -150,9 +150,9 @@ void Window::handleMouseMove(GLFWwindow* glfwWindow, double xPos, double yPos)
     }
 }
 
-void Window::handleMouseEnter(GLFWwindow* glfwWindow, int entered)
+void GLFWWindow::handleMouseEnter(GLFWwindow* glfwWindow, int entered)
 {
-    Window* window = (Window*)glfwGetWindowUserPointer(glfwWindow);
+    GLFWWindow* window = (GLFWWindow*)glfwGetWindowUserPointer(glfwWindow);
 
     if (!entered)
         window->m_ResetDeltas = true;
@@ -162,11 +162,11 @@ void Window::handleMouseEnter(GLFWwindow* glfwWindow, int entered)
     window->post(event);
 }
 
-void Window::handleWindowResize(GLFWwindow* glfwWindow, int width, int height)
+void GLFWWindow::handleWindowResize(GLFWwindow* glfwWindow, int width, int height)
 {
-    Window* window = (Window*)glfwGetWindowUserPointer(glfwWindow);
+    GLFWWindow* window = (GLFWWindow*)glfwGetWindowUserPointer(glfwWindow);
 
-    window->m_WindowSize = glm::ivec2(width, height);
+    window->p_WindowSize = glm::ivec2(width, height);
 
     WindowResizeEvent event;
     event.newSize = glm::ivec2(width, height);

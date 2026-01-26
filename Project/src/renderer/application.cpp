@@ -9,6 +9,9 @@
 #include "animation_manager.hpp"
 #include "events/events.hpp"
 
+#include "window/glfw_window.hpp"
+#include "window/headless_window.hpp"
+
 #include "VkBootstrap.h"
 #include "acceleration_structure_manager.hpp"
 #include "compute_pipeline.hpp"
@@ -56,8 +59,12 @@ void Application::init(InitSettings settings)
     Logger::init();
 
     if (clientSide()) {
-        m_Window.init();
+        m_Window = std::make_unique<GLFWWindow>();
+    } else {
+        m_Window = std::make_unique<HeadlessWindow>();
     }
+
+    m_Window->init();
 
     initVulkan();
 
@@ -74,7 +81,8 @@ void Application::init(InitSettings settings)
 
     createSyncStructures();
 
-    createImGuiStructures();
+    if (clientSide())
+        createImGuiStructures();
 
     createDescriptorPool();
     createDescriptorLayouts();
@@ -111,13 +119,10 @@ void Application::init(InitSettings settings)
 
     createQueryPool();
 
-    if (clientSide()) {
-        m_Window.subscribe(
-            EventFamily::KEYBOARD, std::bind(&Application::handleKeyInput, this, _1));
-        m_Window.subscribe(EventFamily::MOUSE, std::bind(&Application::handleMouse, this, _1));
-        m_Window.subscribe(EventFamily::WINDOW, std::bind(&Application::handleWindow, this, _1));
-        m_Window.subscribe(EventFamily::MOUSE, ASManager::getManager()->getMouseEvent());
-    }
+    m_Window->subscribe(EventFamily::KEYBOARD, std::bind(&Application::handleKeyInput, this, _1));
+    m_Window->subscribe(EventFamily::MOUSE, std::bind(&Application::handleMouse, this, _1));
+    m_Window->subscribe(EventFamily::WINDOW, std::bind(&Application::handleWindow, this, _1));
+    m_Window->subscribe(EventFamily::MOUSE, ASManager::getManager()->getMouseEvent());
 
     subscribe(EventFamily::FRAME, std::bind(&Application::UI, this, _1));
     subscribe(EventFamily::FRAME, Logger::getFrameEvent());
@@ -130,8 +135,8 @@ void Application::init(InitSettings settings)
     PerformanceLogger::getLogger()->setScreenshotFunction(
         std::bind(&Application::takeScreenshot, this, _1));
 
-    m_Window.subscribe(EventFamily::KEYBOARD, m_Camera.getKeyboardEvent());
-    m_Window.subscribe(EventFamily::MOUSE, m_Camera.getMouseEvent());
+    m_Window->subscribe(EventFamily::KEYBOARD, m_Camera.getKeyboardEvent());
+    m_Window->subscribe(EventFamily::MOUSE, m_Camera.getMouseEvent());
     subscribe(EventFamily::FRAME, m_Camera.getFrameEvent());
 
     LOG_DEBUG("Initialised application");
@@ -142,17 +147,23 @@ void Application::start()
     std::chrono::steady_clock timer;
     auto previous = timer.now();
 
-    while (!m_Window.shouldClose()) {
+    while (!m_Window->shouldClose()) {
         TRACE_FRAME_MARK;
 
-        m_Window.pollEvents();
+        if (clientSide()) {
+            GLFWWindow* glfwWindow = dynamic_cast<GLFWWindow*>(m_Window.get());
+            assert(glfwWindow && "Expected window to be a glfw window");
+            glfwWindow->pollEvents();
+        }
 
         auto current = timer.now();
         std::chrono::duration<float, std::milli> difference = current - previous;
         float delta = difference.count() / 1000.f;
         previous = current;
 
-        requestUIRender();
+        if (clientSide())
+            requestUIRender();
+
         render();
         update(delta);
     }
@@ -179,7 +190,8 @@ void Application::cleanup()
     destroyDescriptorLayouts();
     destroyDescriptorPool();
 
-    destroyImGuiStructures();
+    if (clientSide())
+        destroyImGuiStructures();
 
     destroySyncStructures();
 
@@ -196,9 +208,7 @@ void Application::cleanup()
     vkb::destroy_debug_utils_messenger(m_VkInstance, m_VkDebugMessenger);
     vkDestroyInstance(m_VkInstance, nullptr);
 
-    if (clientSide()) {
-        m_Window.cleanup();
-    }
+    m_Window->cleanup();
 
     LOG_DEBUG("Cleaned up");
 }
@@ -220,8 +230,9 @@ void Application::initVulkan()
     vkb::Instance vkbInst = builderRet.value();
     m_VkInstance = vkbInst.instance;
     m_VkDebugMessenger = vkbInst.debug_messenger;
-    if (clientSide())
-        m_VkSurface = m_Window.createSurface(m_VkInstance);
+    if (clientSide()) {
+        m_VkSurface = ((GLFWWindow*)m_Window.get())->createSurface(m_VkInstance);
+    }
 
     VkPhysicalDeviceVulkan14Features features14 {};
     VkPhysicalDeviceVulkan13Features features13 {};
@@ -301,7 +312,7 @@ void Application::createSwapchain()
                   .colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
               })
               .set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR)
-              .set_desired_extent(m_Window.getWindowSize().x, m_Window.getWindowSize().y)
+              .set_desired_extent(m_Window->getWindowSize().x, m_Window->getWindowSize().y)
               .add_image_usage_flags(VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT)
               .build()
               .value();
@@ -341,7 +352,7 @@ void Application::createImages()
 
 void Application::createGBuffers()
 {
-    VkExtent3D extent = { m_Window.getWindowSize().x, m_Window.getWindowSize().y, 1 };
+    VkExtent3D extent = { m_Window->getWindowSize().x, m_Window->getWindowSize().y, 1 };
 
     for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
         m_PerFrameData[i].gBuffer.positions.init(m_VkDevice, m_VmaAllocator,
@@ -376,7 +387,7 @@ void Application::createGBuffers()
 
 void Application::createDrawImages()
 {
-    VkExtent3D extent = { m_Window.getWindowSize().x, m_Window.getWindowSize().y, 1 };
+    VkExtent3D extent = { m_Window->getWindowSize().x, m_Window->getWindowSize().y, 1 };
     VkFormat format = VK_FORMAT_R16G16B16A16_SFLOAT;
 
     for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
@@ -403,7 +414,7 @@ void Application::createDrawImages()
 
 void Application::createRayDirectionImages()
 {
-    VkExtent3D extent = { m_Window.getWindowSize().x, m_Window.getWindowSize().y, 1 };
+    VkExtent3D extent = { m_Window->getWindowSize().x, m_Window->getWindowSize().y, 1 };
     VkFormat format = VK_FORMAT_R16G16B16A16_SFLOAT;
 
     for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
@@ -551,7 +562,9 @@ void Application::createImGuiStructures()
     bgColour.w = 0.5;
     colours[ImGuiCol_WindowBg] = bgColour;
 
-    ImGui_ImplGlfw_InitForVulkan(m_Window.getWindow(), true);
+    GLFWWindow* glfwWindow = dynamic_cast<GLFWWindow*>(m_Window.get());
+    assert(glfwWindow && "Expected window to be a glfw window");
+    ImGui_ImplGlfw_InitForVulkan(glfwWindow->getWindow(), true);
 
     std::vector<VkFormat> formats = {
         m_PerFrameData[0].drawImage.getFormat(),
@@ -1326,7 +1339,9 @@ void Application::render()
     render_FinaliseScreenshot();
 
     if (clientSide()) {
-        m_Window.swapBuffers();
+        GLFWWindow* glfwWindow = dynamic_cast<GLFWWindow*>(m_Window.get());
+        assert(glfwWindow && "Expected window to be a glfw window");
+        glfwWindow->swapBuffers();
     }
 }
 
@@ -1578,7 +1593,7 @@ void Application::render_FinaliseScreenshot()
 
         std::ofstream file(filename, std::ios::out | std::ios::binary);
 
-        glm::uvec2 size = m_Window.getWindowSize();
+        glm::uvec2 size = m_Window->getWindowSize();
 
         file << "P6\n" << size.x << "\n" << size.y << "\n" << 255 << "\n";
 

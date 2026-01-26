@@ -1,7 +1,6 @@
 set (SOURCE_LIST
   "main.cpp"
   "application.cpp" "application.hpp"
-  "window.cpp" "window.hpp"
   "shader_manager.cpp" "shader_manager.hpp"
   "file_watcher.cpp" "file_watcher.hpp"
   "camera.cpp" "camera.hpp"
@@ -28,6 +27,7 @@ add_compile_definitions(GLM_ENABLE_EXPERIMENTAL)
 add_executable(Renderer ${SOURCE_LIST})
 
 add_subdirectory(accelerationStructures)
+add_subdirectory(window)
 
 target_compile_options(Renderer
   PUBLIC

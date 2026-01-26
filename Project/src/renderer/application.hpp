@@ -5,7 +5,7 @@
 #include "camera.hpp"
 #include "image.hpp"
 #include "queue.hpp"
-#include "window.hpp"
+#include "window/base_window.hpp"
 
 #include "vk_mem_alloc.h"
 #include "vulkan/vulkan.h"
@@ -64,7 +64,8 @@ class Application : public EventDispatcher {
   private:
     InitSettings m_Settings;
 
-    Window m_Window;
+    std::unique_ptr<Window> m_Window;
+
     VkInstance m_VkInstance;
     VkDebugUtilsMessengerEXT m_VkDebugMessenger;
     VkSurfaceKHR m_VkSurface;
