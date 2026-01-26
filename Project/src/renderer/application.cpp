@@ -47,27 +47,27 @@ struct SetupPushConstants {
     alignas(16) glm::vec3 cameraUp;
 };
 
-void Application::init(Network::ClientSettings settings)
-{
-    m_NetworkNode = Network::initClient(settings);
-
-    m_NetworkThread = std::thread([&]() { Network::Client::run(m_NetworkNode); });
-
-    init();
-}
-
-void Application::init()
+void Application::init(InitSettings settings)
 {
     using namespace std::placeholders;
+
+    m_Settings = settings;
+
     Logger::init();
 
-    m_Window.init();
+    if (clientSide()) {
+        m_Window.init();
+    }
+
     initVulkan();
 
     ShaderManager::getInstance()->init(m_VkDevice);
     FrameCommands::getInstance()->init(m_VkDevice, m_VmaAllocator, m_GraphicsQueue);
 
-    createSwapchain();
+    if (clientSide()) {
+        createSwapchain();
+    }
+
     createImages();
 
     createCommandPools();
@@ -111,10 +111,13 @@ void Application::init()
 
     createQueryPool();
 
-    m_Window.subscribe(EventFamily::KEYBOARD, std::bind(&Application::handleKeyInput, this, _1));
-    m_Window.subscribe(EventFamily::MOUSE, std::bind(&Application::handleMouse, this, _1));
-    m_Window.subscribe(EventFamily::WINDOW, std::bind(&Application::handleWindow, this, _1));
-    m_Window.subscribe(EventFamily::MOUSE, ASManager::getManager()->getMouseEvent());
+    if (clientSide()) {
+        m_Window.subscribe(
+            EventFamily::KEYBOARD, std::bind(&Application::handleKeyInput, this, _1));
+        m_Window.subscribe(EventFamily::MOUSE, std::bind(&Application::handleMouse, this, _1));
+        m_Window.subscribe(EventFamily::WINDOW, std::bind(&Application::handleWindow, this, _1));
+        m_Window.subscribe(EventFamily::MOUSE, ASManager::getManager()->getMouseEvent());
+    }
 
     subscribe(EventFamily::FRAME, std::bind(&Application::UI, this, _1));
     subscribe(EventFamily::FRAME, Logger::getFrameEvent());
@@ -182,8 +185,10 @@ void Application::cleanup()
 
     destroyCommandPools();
 
-    destroyImages();
-    destroySwapchain();
+    if (clientSide()) {
+        destroyImages();
+        destroySwapchain();
+    }
 
     vmaDestroyAllocator(m_VmaAllocator);
     vkDestroyDevice(m_VkDevice, nullptr);
@@ -191,7 +196,9 @@ void Application::cleanup()
     vkb::destroy_debug_utils_messenger(m_VkInstance, m_VkDebugMessenger);
     vkDestroyInstance(m_VkInstance, nullptr);
 
-    m_Window.cleanup();
+    if (clientSide()) {
+        m_Window.cleanup();
+    }
 
     LOG_DEBUG("Cleaned up");
 }
@@ -207,12 +214,14 @@ void Application::initVulkan()
 #endif
                           .use_default_debug_messenger()
                           .require_api_version(1, 4, 0)
+                          .set_headless(m_Settings.enableServerSide)
                           .build();
 
     vkb::Instance vkbInst = builderRet.value();
     m_VkInstance = vkbInst.instance;
     m_VkDebugMessenger = vkbInst.debug_messenger;
-    m_VkSurface = m_Window.createSurface(m_VkInstance);
+    if (clientSide())
+        m_VkSurface = m_Window.createSurface(m_VkInstance);
 
     VkPhysicalDeviceVulkan14Features features14 {};
     VkPhysicalDeviceVulkan13Features features13 {};
@@ -230,15 +239,19 @@ void Application::initVulkan()
     features.shaderInt64 = true;
 
     vkb::PhysicalDeviceSelector selector { vkbInst };
-    auto vkbDeviceSelector = selector.set_minimum_version(1, 4)
-                                 .set_required_features_14(features14)
-                                 .set_required_features_13(features13)
-                                 .set_required_features_12(features12)
-                                 .set_required_features_11(features11)
-                                 .set_required_features(features)
-                                 .set_surface(m_VkSurface)
-                                 .add_required_extension("VK_KHR_shader_clock")
-                                 .select();
+    auto deviceSelector = selector.set_minimum_version(1, 4)
+                              .set_required_features_14(features14)
+                              .set_required_features_13(features13)
+                              .set_required_features_12(features12)
+                              .set_required_features_11(features11)
+                              .set_required_features(features)
+                              .add_required_extension("VK_KHR_shader_clock");
+
+    if (clientSide()) {
+        deviceSelector.set_surface(m_VkSurface);
+    }
+
+    auto vkbDeviceSelector = deviceSelector.select();
 
     if (!vkbDeviceSelector.has_value()) {
         LOG_CRITICAL(
@@ -1211,8 +1224,10 @@ void Application::render()
     VK_CHECK(vkResetFences(m_VkDevice, 1, &currentFrame.fence), "Reset fence");
 
     uint32_t swapchainImageIndex = 0;
-    result = vkAcquireNextImageKHR(m_VkDevice, m_VkSwapchain, timeout,
-        m_AcquireSemaphore[m_CurrentFrameIndex], nullptr, &swapchainImageIndex);
+    if (!m_Settings.enableServerSide) {
+        result = vkAcquireNextImageKHR(m_VkDevice, m_VkSwapchain, timeout,
+            m_AcquireSemaphore[m_CurrentFrameIndex], nullptr, &swapchainImageIndex);
+    }
 
     if (result == VK_NOT_READY) {
         return;
@@ -1230,6 +1245,14 @@ void Application::render()
     {
         VK_CHECK(vkBeginCommandBuffer(commandBuffer, &commandBufferBI), "Begin command buffer");
 
+        currentFrame.drawImage.transition(
+            commandBuffer, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+
+        if (clientSide()) {
+            Image::transition(commandBuffer, m_VkSwapchainImages[swapchainImageIndex],
+                VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        }
+
         {
             Debug::beginCmdDebugLabel(commandBuffer, "Setup", { 0.f, 1.f, 0.f, 1.f });
 
@@ -1238,40 +1261,44 @@ void Application::render()
             vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, m_VkQueryPool,
                 m_CurrentFrameIndex * 4);
 
-            Image::transition(commandBuffer, m_VkSwapchainImages[swapchainImageIndex],
-                VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-            currentFrame.drawImage.transition(
-                commandBuffer, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-
             Debug::endCmdDebugLabel(commandBuffer);
         }
 
-        render_RayGeneration(commandBuffer, currentFrame);
+        if (serverSide()) {
 
-        render_ASRender(commandBuffer, currentFrame);
+            render_RayGeneration(commandBuffer, currentFrame);
 
-        render_GBuffer(commandBuffer, currentFrame);
+            render_ASRender(commandBuffer, currentFrame);
 
-        render_Screenshot(commandBuffer, currentFrame);
+            render_GBuffer(commandBuffer, currentFrame);
 
-        render_UI(commandBuffer, currentFrame);
+            render_Screenshot(commandBuffer, currentFrame);
+
+            render_UI(commandBuffer, currentFrame);
+        } else {
+            // Render image from network
+        }
 
         currentFrame.drawImage.transition(
             commandBuffer, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
-        renderImGui(commandBuffer, currentFrame);
+        if (clientSide()) {
+            renderImGui(commandBuffer, currentFrame);
+        }
 
         {
             Debug::beginCmdDebugLabel(commandBuffer, "Present", { 0.f, 1.f, 0.f, 1.f });
             currentFrame.drawImage.transition(commandBuffer,
                 VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
-            currentFrame.drawImage.copyToImage(commandBuffer,
-                m_VkSwapchainImages[swapchainImageIndex], currentFrame.drawImage.getExtent(),
-                m_VkSwapchainImageExtent);
+            if (clientSide()) {
+                currentFrame.drawImage.copyToImage(commandBuffer,
+                    m_VkSwapchainImages[swapchainImageIndex], currentFrame.drawImage.getExtent(),
+                    m_VkSwapchainImageExtent);
 
-            Image::transition(commandBuffer, m_VkSwapchainImages[swapchainImageIndex],
-                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+                Image::transition(commandBuffer, m_VkSwapchainImages[swapchainImageIndex],
+                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+            }
 
             Debug::endCmdDebugLabel(commandBuffer);
         }
@@ -1298,7 +1325,9 @@ void Application::render()
 
     render_FinaliseScreenshot();
 
-    m_Window.swapBuffers();
+    if (clientSide()) {
+        m_Window.swapBuffers();
+    }
 }
 
 void Application::render_RayGeneration(VkCommandBuffer& commandBuffer, PerFrameData& currentFrame)
@@ -1471,46 +1500,53 @@ void Application::render_Present(
     commandBufferSI.commandBuffer = commandBuffer;
     commandBufferSI.deviceMask = 0;
 
-    VkSemaphoreSubmitInfo waitSI {};
-    waitSI.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-    waitSI.pNext = nullptr;
-    waitSI.semaphore = m_AcquireSemaphore[m_CurrentFrameIndex];
-    waitSI.value = 1;
-    waitSI.stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR;
-    waitSI.deviceIndex = 0;
+    VkSemaphoreSubmitInfo waitSI;
+    VkSemaphoreSubmitInfo signalSI;
 
-    VkSemaphoreSubmitInfo signalSI {};
-    signalSI.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-    signalSI.pNext = nullptr;
-    signalSI.semaphore = m_SubmitSemaphore[swapchainImageIndex];
-    signalSI.value = 1;
-    signalSI.stageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
-    signalSI.deviceIndex = 0;
+    if (clientSide()) {
+        waitSI.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+        waitSI.pNext = nullptr;
+        waitSI.semaphore = m_AcquireSemaphore[m_CurrentFrameIndex];
+        waitSI.value = 1;
+        waitSI.stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR;
+        waitSI.deviceIndex = 0;
+
+        signalSI.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+        signalSI.pNext = nullptr;
+        signalSI.semaphore = m_SubmitSemaphore[swapchainImageIndex];
+        signalSI.value = 1;
+        signalSI.stageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
+        signalSI.deviceIndex = 0;
+    }
 
     VkSubmitInfo2 submit {};
     submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
     submit.pNext = nullptr;
     submit.flags = 0;
-    submit.waitSemaphoreInfoCount = 1;
-    submit.pWaitSemaphoreInfos = &waitSI;
     submit.commandBufferInfoCount = 1;
     submit.pCommandBufferInfos = &commandBufferSI;
-    submit.signalSemaphoreInfoCount = 1;
-    submit.pSignalSemaphoreInfos = &signalSI;
+    if (clientSide()) {
+        submit.waitSemaphoreInfoCount = 1;
+        submit.pWaitSemaphoreInfos = &waitSI;
+        submit.signalSemaphoreInfoCount = 1;
+        submit.pSignalSemaphoreInfos = &signalSI;
+    }
 
     VK_CHECK(vkQueueSubmit2(m_GraphicsQueue->getQueue(), 1, &submit, currentFrame.fence),
         "Queue submit");
 
-    VkPresentInfoKHR presentInfo {};
-    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-    presentInfo.pNext = nullptr;
-    presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = &m_SubmitSemaphore[swapchainImageIndex];
-    presentInfo.swapchainCount = 1;
-    presentInfo.pSwapchains = &m_VkSwapchain;
-    presentInfo.pImageIndices = &swapchainImageIndex;
-    presentInfo.pResults = nullptr;
-    vkQueuePresentKHR(m_GraphicsQueue->getQueue(), &presentInfo);
+    if (clientSide()) {
+        VkPresentInfoKHR presentInfo {};
+        presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+        presentInfo.pNext = nullptr;
+        presentInfo.waitSemaphoreCount = 1;
+        presentInfo.pWaitSemaphores = &m_SubmitSemaphore[swapchainImageIndex];
+        presentInfo.swapchainCount = 1;
+        presentInfo.pSwapchains = &m_VkSwapchain;
+        presentInfo.pImageIndices = &swapchainImageIndex;
+        presentInfo.pResults = nullptr;
+        vkQueuePresentKHR(m_GraphicsQueue->getQueue(), &presentInfo);
+    }
 }
 
 void Application::render_FinaliseScreenshot()

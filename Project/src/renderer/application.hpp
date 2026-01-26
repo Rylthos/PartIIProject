@@ -43,18 +43,26 @@ struct PerFrameData {
     VkDescriptorSet renderDescriptorSet;
 };
 
+struct InitSettings {
+    bool enableServerSide = false;
+    bool enableClientSide = false;
+
+    std::string targetIP;
+    uint16_t targetPort;
+
+    bool networked;
+};
+
 class Application : public EventDispatcher {
   public:
-    void init(Network::ClientSettings settings);
-    void init();
+    void init(InitSettings settings);
 
     void start();
 
     void cleanup();
 
   private:
-    Network::Node m_NetworkNode;
-    std::thread m_NetworkThread;
+    InitSettings m_Settings;
 
     Window m_Window;
     VkInstance m_VkInstance;
@@ -191,4 +199,7 @@ class Application : public EventDispatcher {
     void handleWindow(const Event& event);
 
     void takeScreenshot(std::string filename);
+
+    bool serverSide() { return !m_Settings.networked || m_Settings.enableServerSide; }
+    bool clientSide() { return !m_Settings.networked || m_Settings.enableClientSide; }
 };

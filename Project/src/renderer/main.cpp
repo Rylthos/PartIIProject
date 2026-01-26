@@ -15,25 +15,23 @@
 
 int main(int argc, char** argv)
 {
-    Network::ClientSettings settings;
     CLI::App cliApp { "Client settings for application" };
     argv = cliApp.ensure_utf8(argv);
 
-    bool enabled = false;
-    cliApp.add_flag("-e,--enable", enabled, "Enable networking");
+    InitSettings settings;
+    cliApp.add_flag("--enable-server-side", settings.enableServerSide, "Enable server side");
+    cliApp.add_flag("--enable-client-side", settings.enableClientSide, "Enable client side");
 
-    cliApp.add_option("-i,--ip", settings.address, "The IP to target");
-    cliApp.add_option("-p,--port", settings.port, "The port to connect to");
+    cliApp.add_option("-i,--ip", settings.targetIP, "The IP to target");
+    cliApp.add_option("-p,--port", settings.targetPort, "The port to connect to");
 
     CLI11_PARSE(cliApp, argc, argv);
 
+    settings.networked = settings.enableClientSide | settings.enableServerSide;
+
     Application app;
 
-    if (enabled) {
-        app.init(settings);
-    } else {
-        app.init();
-    }
+    app.init(settings);
 
     app.start();
     app.cleanup();

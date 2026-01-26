@@ -25,7 +25,7 @@ class Window : public EventDispatcher {
 
     bool m_ResetDeltas = false;
 
-    glm::uvec2 m_WindowSize;
+    glm::uvec2 m_WindowSize { 1, 1 };
 
   private:
     static void handleKeyInput(GLFWwindow* window, int key, int scancode, int action, int mods);
