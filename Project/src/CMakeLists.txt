@@ -10,8 +10,6 @@ add_subdirectory(loaders)
 add_subdirectory(modification)
 add_subdirectory(generators)
 add_subdirectory(serializers)
-add_subdirectory(network)
 
 add_subdirectory(renderer)
-add_subdirectory(server)
 add_subdirectory(voxelizer)

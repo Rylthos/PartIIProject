@@ -12,6 +12,8 @@
 #include "window/glfw_window.hpp"
 #include "window/headless_window.hpp"
 
+#include "network/setup.hpp"
+
 #include "VkBootstrap.h"
 #include "acceleration_structure_manager.hpp"
 #include "compute_pipeline.hpp"
@@ -55,6 +57,19 @@ void Application::init(InitSettings settings)
     m_Settings = settings;
 
     Logger::init();
+
+    if (m_Settings.networked) {
+        if (m_Settings.enableClientSide) {
+            m_Node = Network::initClient(settings.targetIP.c_str(), settings.targetPort);
+
+            LOG_INFO("Connected to server: {}:{}", settings.targetIP, settings.targetPort);
+        } else if (m_Settings.enableServerSide) {
+
+            m_Node = Network::initServer(settings.targetPort);
+
+            LOG_INFO("Setup server: Listening on port {}", settings.targetPort);
+        }
+    }
 
     if (clientSide()) {
         m_Window = std::make_unique<GLFWWindow>();
@@ -205,6 +220,10 @@ void Application::cleanup()
     vkDestroySurfaceKHR(m_VkInstance, m_VkSurface, nullptr);
     vkb::destroy_debug_utils_messenger(m_VkInstance, m_VkDebugMessenger);
     vkDestroyInstance(m_VkInstance, nullptr);
+
+    if (m_Settings.networked) {
+        Network::cleanup(m_Node);
+    }
 
     m_Window->cleanup();
 

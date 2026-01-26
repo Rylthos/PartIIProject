@@ -28,6 +28,7 @@ add_executable(Renderer ${SOURCE_LIST})
 
 add_subdirectory(accelerationStructures)
 add_subdirectory(window)
+add_subdirectory(network)
 
 target_compile_options(Renderer
   PUBLIC
@@ -48,7 +49,6 @@ target_link_libraries(Renderer PRIVATE
   generators
   events
   serializers
-  network
 
   glm::glm
   Vulkan::UtilityHeaders

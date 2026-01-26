@@ -12,6 +12,8 @@
 
 #include <vulkan/vulkan_core.h>
 
+#include "network/node.hpp"
+
 #define FRAMES_IN_FLIGHT 2
 
 struct Sphere {
@@ -62,6 +64,8 @@ class Application : public EventDispatcher {
 
   private:
     InitSettings m_Settings;
+
+    Network::Node m_Node;
 
     std::unique_ptr<Window> m_Window;
 
