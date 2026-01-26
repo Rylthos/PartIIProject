@@ -10,7 +10,6 @@
 
 #include "application.hpp"
 
-#include "network/setup.hpp"
 #include <CLI/CLI.hpp>
 
 int main(int argc, char** argv)

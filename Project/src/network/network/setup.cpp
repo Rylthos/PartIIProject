@@ -5,10 +5,6 @@
 
 namespace Network {
 
-static bool s_Enabled = false;
-
-bool enabled() { return s_Enabled; }
-
 Node initServer(ServerSettings settings)
 {
     Node server;
@@ -43,8 +39,6 @@ Node initServer(ServerSettings settings)
         server.clientSockets.push_back(client_fd);
     }
 
-    s_Enabled = true;
-
     return server;
 }
 
@@ -68,8 +62,6 @@ Node initClient(ClientSettings settings)
         fprintf(stderr, "Failed to connect to %s:%d\n", settings.address.c_str(), settings.port);
         exit(-1);
     }
-
-    s_Enabled = true;
 
     return client;
 }

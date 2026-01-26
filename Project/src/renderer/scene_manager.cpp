@@ -5,27 +5,19 @@
 #include "logger/logger.hpp"
 
 #include "acceleration_structure_manager.hpp"
-#include "network/serializers.hpp"
 
 #include <imgui.h>
 
-#include "network/handlers/client.hpp"
-#include "network/setup.hpp"
 #include <functional>
 
 SceneManager::SceneManager()
 {
-    if (Network::enabled()) {
-        m_CurrentPath = "/";
-        getDirectories();
-    } else {
-        m_CurrentPath = std::filesystem::current_path();
-        if (std::filesystem::exists(m_CurrentPath / "res" / "structures")) {
-            m_CurrentPath /= "res";
-            m_CurrentPath /= "structures";
-        }
-        getDirectories();
+    m_CurrentPath = std::filesystem::current_path();
+    if (std::filesystem::exists(m_CurrentPath / "res" / "structures")) {
+        m_CurrentPath /= "res";
+        m_CurrentPath /= "structures";
     }
+    getDirectories();
 }
 
 void SceneManager::UI(const Event& event)
@@ -95,92 +87,28 @@ void SceneManager::UI(const Event& event)
 
 void SceneManager::getDirectories()
 {
-    if (Network::enabled()) {
-        if (m_RequestedDirectories)
-            return;
+    m_Directories.clear();
 
-        m_RequestedDirectories = true;
-
-        m_Directories.clear();
-
-        Network::Client::addDirEntryRequest(m_CurrentPath,
-            std::bind(&SceneManager::handleDirectoryEntries, this, std::placeholders::_1));
-    } else {
-        m_Directories.clear();
-
-        for (auto const& entry : std::filesystem::directory_iterator { m_CurrentPath }) {
-            if (entry.is_directory()) {
-                m_Directories.push_back(entry.path());
-            }
+    for (auto const& entry : std::filesystem::directory_iterator { m_CurrentPath }) {
+        if (entry.is_directory()) {
+            m_Directories.push_back(entry.path());
         }
-
-        std::sort(m_Directories.begin(), m_Directories.end());
     }
+
+    std::sort(m_Directories.begin(), m_Directories.end());
 }
 
 void SceneManager::getFileEntries()
 {
-    if (Network::enabled()) {
-        if (m_RequestedEntries)
-            return;
-
-        m_RequestedEntries = true;
-
-        m_FileEntries.clear();
-
-        Network::Client::addFileEntryRequest(m_SelectedPath,
-            std::bind(&SceneManager::handleFileEntries, this, std::placeholders::_1));
-    } else {
-        std::filesystem::path folderName = m_SelectedPath.filename();
-
-        m_FileEntries.clear();
-
-        for (auto const& entry : std::filesystem::directory_iterator { m_SelectedPath }) {
-            if (entry.is_regular_file()) {
-                if (entry.path().stem() == folderName) {
-                    m_FileEntries.insert(entry.path().extension());
-                }
-            }
-        }
-    }
-}
-
-void SceneManager::handleDirectoryEntries(std::vector<uint8_t> data)
-{
-    using namespace Network;
-
-    LOG_INFO("Received directory entries");
-
-    m_Directories.clear();
-
-    size_t index = 0;
-    uint32_t elements = Serializer::readUint32_t(data, data.size(), index);
-
-    for (uint32_t i = 0; i < elements; i++) {
-        std::string str = Serializer::readString(data, data.size(), index);
-        m_Directories.push_back(str);
-    }
-
-    std::sort(m_Directories.begin(), m_Directories.end());
-
-    m_RequestedDirectories = false;
-}
-
-void SceneManager::handleFileEntries(std::vector<uint8_t> data)
-{
-    using namespace Network;
-
-    LOG_INFO("Received file entries");
+    std::filesystem::path folderName = m_SelectedPath.filename();
 
     m_FileEntries.clear();
 
-    size_t index = 0;
-    uint32_t elements = Serializer::readUint32_t(data, data.size(), index);
-
-    for (uint32_t i = 0; i < elements; i++) {
-        std::string str = Serializer::readString(data, data.size(), index);
-        m_FileEntries.insert(str);
+    for (auto const& entry : std::filesystem::directory_iterator { m_SelectedPath }) {
+        if (entry.is_regular_file()) {
+            if (entry.path().stem() == folderName) {
+                m_FileEntries.insert(entry.path().extension());
+            }
+        }
     }
-
-    m_RequestedEntries = false;
 }

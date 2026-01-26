@@ -38,8 +38,6 @@
 #include "spdlog/fmt/bundled/base.h"
 #include "spdlog/spdlog.h"
 
-#include "network/handlers/client.hpp"
-
 #define STORAGE_IMAGE_SIZE 1000
 #define STORAGE_BUFFER_SIZE 1000
 

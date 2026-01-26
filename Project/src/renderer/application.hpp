@@ -10,7 +10,6 @@
 #include "vk_mem_alloc.h"
 #include "vulkan/vulkan.h"
 
-#include "network/setup.hpp"
 #include <vulkan/vulkan_core.h>
 
 #define FRAMES_IN_FLIGHT 2

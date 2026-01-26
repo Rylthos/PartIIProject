@@ -28,9 +28,6 @@ class SceneManager {
     void getDirectories();
     void getFileEntries();
 
-    void handleDirectoryEntries(std::vector<uint8_t> data);
-    void handleFileEntries(std::vector<uint8_t> data);
-
   private:
     std::filesystem::path m_CurrentPath;
     std::filesystem::path m_SelectedPath;
@@ -39,7 +36,4 @@ class SceneManager {
 
     std::set<std::string> m_FileEntries;
     std::vector<std::filesystem::path> m_Directories;
-
-    bool m_RequestedDirectories = false;
-    bool m_RequestedEntries = false;
 };

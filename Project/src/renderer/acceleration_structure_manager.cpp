@@ -30,8 +30,6 @@
 
 #include <vulkan/vulkan_core.h>
 
-#include "network/handlers/client.hpp"
-
 static std::map<RenderStyle, const char*> styleToStringMap {
     { RenderStyle::NORMAL, "Normal"  },
     { RenderStyle::HEAT,   "Heatmap" },
@@ -138,40 +136,7 @@ void ASManager::loadAS(
     }
     LOG_INFO("Load scene {}", path.string());
 
-    if (Network::enabled()) {
-        if (!m_RequestedScene) {
-            std::string filename = path.filename();
-            switch (m_CurrentType) {
-            case ASType::GRID:
-                filename += ".voxgrid";
-                break;
-            case ASType::TEXTURE:
-                filename += ".voxtexture";
-                break;
-            case ASType::OCTREE:
-                filename += ".voxoctree";
-                break;
-            case ASType::CONTREE:
-                filename += ".voxcontree";
-                break;
-            case ASType::BRICKMAP:
-                filename += ".voxbrick";
-                break;
-            default:
-                LOG_ERROR("Unknown structure");
-                return;
-            }
-
-            m_RequestedScene = true;
-
-            Network::Client::addSceneRequest(path / filename, [&](std::vector<uint8_t> data) {
-                m_RequestedScene = false;
-                m_CurrentAS->fromRaw(data);
-            });
-        }
-    } else {
-        m_CurrentAS->fromFile(path);
-    }
+    m_CurrentAS->fromFile(path);
 }
 
 void ASManager::updateShaders()
