@@ -149,7 +149,7 @@ void Application::start()
         float delta = difference.count() / 1000.f;
         previous = current;
 
-        renderUI();
+        requestUIRender();
         render();
         update(delta);
     }
@@ -1082,7 +1082,7 @@ void Application::createQueryPool()
 
 void Application::destroyQueryPool() { vkDestroyQueryPool(m_VkDevice, m_VkQueryPool, nullptr); }
 
-void Application::renderUI()
+void Application::requestUIRender()
 {
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();
@@ -1246,198 +1246,15 @@ void Application::render()
             Debug::endCmdDebugLabel(commandBuffer);
         }
 
-        {
-            Debug::beginCmdDebugLabel(commandBuffer, "Ray generation", { 0.f, 0.f, 1.f, 1.f });
+        render_RayGeneration(commandBuffer, currentFrame);
 
-            currentFrame.rayDirectionImage.transition(
-                commandBuffer, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+        render_ASRender(commandBuffer, currentFrame);
 
-            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_VkSetupPipeline);
+        render_GBuffer(commandBuffer, currentFrame);
 
-            std::vector<VkDescriptorSet> descriptorSets = {
-                currentFrame.setupDescriptorSet,
-            };
+        render_Screenshot(commandBuffer, currentFrame);
 
-            SetupPushConstants setupPushConstant = {
-                .cameraPosition = m_Camera.getPosition(),
-                .cameraFront = m_Camera.getForwardVector(),
-                .cameraRight = m_Camera.getRightVector(),
-                .cameraUp = m_Camera.getUpVector(),
-            };
-
-            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-                m_VkSetupPipelineLayout, 0, descriptorSets.size(), descriptorSets.data(), 0,
-                nullptr);
-            vkCmdPushConstants(commandBuffer, m_VkSetupPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT,
-                0, sizeof(SetupPushConstants), &setupPushConstant);
-
-            vkCmdDispatch(commandBuffer,
-                std::ceil(currentFrame.rayDirectionImage.getExtent().width / 8.f),
-                std::ceil(currentFrame.rayDirectionImage.getExtent().height / 8.f), 1);
-
-            Debug::endCmdDebugLabel(commandBuffer);
-        }
-
-        {
-            VkImageMemoryBarrier2 imageBarrier = Image::memoryBarrier2(
-                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-                VK_ACCESS_MEMORY_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT, VK_IMAGE_LAYOUT_GENERAL,
-                VK_IMAGE_LAYOUT_GENERAL, m_GraphicsQueue->getFamily(), m_GraphicsQueue->getFamily(),
-                currentFrame.rayDirectionImage);
-
-            VkDependencyInfo dependency = {
-                .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-                .pNext = nullptr,
-                .dependencyFlags = 0,
-                .memoryBarrierCount = 0,
-                .pMemoryBarriers = nullptr,
-                .bufferMemoryBarrierCount = 0,
-                .pBufferMemoryBarriers = nullptr,
-                .imageMemoryBarrierCount = 1,
-                .pImageMemoryBarriers = &imageBarrier,
-            };
-
-            vkCmdPipelineBarrier2(commandBuffer, &dependency);
-        }
-
-        currentFrame.gBuffer.positions.transition(
-            commandBuffer, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-        currentFrame.gBuffer.colours.transition(
-            commandBuffer, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-        currentFrame.gBuffer.normals.transition(
-            commandBuffer, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-        currentFrame.gBuffer.depth.transition(
-            commandBuffer, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-
-        vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_VkQueryPool,
-            m_CurrentFrameIndex * 4 + 2);
-
-        VkExtent2D imageSize = {
-            .width = currentFrame.drawImage.getExtent().width,
-            .height = currentFrame.drawImage.getExtent().height,
-        };
-
-        ASManager::getManager()->render(
-            commandBuffer, m_Camera, currentFrame.gBufferDescriptorSet, imageSize);
-
-        vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_VkQueryPool,
-            m_CurrentFrameIndex * 4 + 3);
-
-        { // GBuffer
-            VkImageMemoryBarrier2 positionBarrier = Image::memoryBarrier2(
-                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-                VK_ACCESS_MEMORY_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT, VK_IMAGE_LAYOUT_GENERAL,
-                VK_IMAGE_LAYOUT_GENERAL, m_GraphicsQueue->getFamily(), m_GraphicsQueue->getFamily(),
-                currentFrame.gBuffer.positions);
-
-            VkImageMemoryBarrier2 colourBarrier = Image::memoryBarrier2(
-                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-                VK_ACCESS_MEMORY_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT, VK_IMAGE_LAYOUT_GENERAL,
-                VK_IMAGE_LAYOUT_GENERAL, m_GraphicsQueue->getFamily(), m_GraphicsQueue->getFamily(),
-                currentFrame.gBuffer.colours);
-
-            VkImageMemoryBarrier2 normalsBarrier = Image::memoryBarrier2(
-                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-                VK_ACCESS_MEMORY_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT, VK_IMAGE_LAYOUT_GENERAL,
-                VK_IMAGE_LAYOUT_GENERAL, m_GraphicsQueue->getFamily(), m_GraphicsQueue->getFamily(),
-                currentFrame.gBuffer.normals);
-
-            VkImageMemoryBarrier2 depthBarrier = Image::memoryBarrier2(
-                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-                VK_ACCESS_MEMORY_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT, VK_IMAGE_LAYOUT_GENERAL,
-                VK_IMAGE_LAYOUT_GENERAL, m_GraphicsQueue->getFamily(), m_GraphicsQueue->getFamily(),
-                currentFrame.gBuffer.depth);
-
-            std::vector<VkImageMemoryBarrier2> barriers
-                = { positionBarrier, colourBarrier, normalsBarrier, depthBarrier };
-
-            VkDependencyInfo dependency = {
-                .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-                .pNext = nullptr,
-                .dependencyFlags = 0,
-                .memoryBarrierCount = 0,
-                .pMemoryBarriers = nullptr,
-                .bufferMemoryBarrierCount = 0,
-                .pBufferMemoryBarriers = nullptr,
-                .imageMemoryBarrierCount = static_cast<uint32_t>(barriers.size()),
-                .pImageMemoryBarriers = barriers.data(),
-            };
-
-            vkCmdPipelineBarrier2(commandBuffer, &dependency);
-        }
-
-        {
-            Debug::beginCmdDebugLabel(commandBuffer, "Render", { 0.f, 0.f, 1.f, 1.f });
-
-            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_VkRenderPipeline);
-
-            std::vector<VkDescriptorSet> descriptorSets = {
-                currentFrame.gBufferDescriptorSet,
-                currentFrame.renderDescriptorSet,
-            };
-
-            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-                m_VkRenderPipelineLayout, 0, descriptorSets.size(), descriptorSets.data(), 0,
-                nullptr);
-
-            vkCmdDispatch(commandBuffer, std::ceil(currentFrame.drawImage.getExtent().width / 8.f),
-                std::ceil(currentFrame.drawImage.getExtent().height / 8.f), 1);
-
-            Debug::endCmdDebugLabel(commandBuffer);
-        }
-
-        {
-            VkImageMemoryBarrier2 imageBarrier = Image::memoryBarrier2(
-                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-                VK_ACCESS_MEMORY_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT, VK_IMAGE_LAYOUT_GENERAL,
-                VK_IMAGE_LAYOUT_GENERAL, m_GraphicsQueue->getFamily(), m_GraphicsQueue->getFamily(),
-                currentFrame.drawImage);
-
-            VkDependencyInfo dependency = {
-                .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-                .pNext = nullptr,
-                .dependencyFlags = 0,
-                .memoryBarrierCount = 0,
-                .pMemoryBarriers = nullptr,
-                .bufferMemoryBarrierCount = 0,
-                .pBufferMemoryBarriers = nullptr,
-                .imageMemoryBarrierCount = 1,
-                .pImageMemoryBarriers = &imageBarrier,
-            };
-
-            vkCmdPipelineBarrier2(commandBuffer, &dependency);
-        }
-
-        if (m_TakeScreenshot.has_value()) {
-            currentFrame.drawImage.transition(
-                commandBuffer, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-
-            m_ScreenshotImage.transition(
-                commandBuffer, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-
-            currentFrame.drawImage.copyToImage(commandBuffer, m_ScreenshotImage.getImage(),
-                currentFrame.drawImage.getExtent(), m_ScreenshotImage.getExtent());
-
-            currentFrame.drawImage.transition(
-                commandBuffer, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
-        }
-
-        {
-            Debug::beginCmdDebugLabel(commandBuffer, "UI Rendering", { 0.f, 0.f, 1.f, 1.f });
-
-            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_VkUIPipeline);
-            std::vector<VkDescriptorSet> descriptorSets = {
-                currentFrame.renderDescriptorSet,
-            };
-
-            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-                m_VkUIPipelineLayout, 0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);
-
-            vkCmdDispatch(commandBuffer, std::ceil(imageSize.width / 8.f),
-                std::ceil(imageSize.height / 8.f), 1);
-
-            Debug::endCmdDebugLabel(commandBuffer);
-        }
+        render_UI(commandBuffer, currentFrame);
 
         currentFrame.drawImage.transition(
             commandBuffer, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
@@ -1465,56 +1282,7 @@ void Application::render()
         VK_CHECK(vkEndCommandBuffer(commandBuffer), "End command buffer");
     }
 
-    {
-        std::lock_guard lock(m_GraphicsQueue->getLock());
-
-        VkCommandBufferSubmitInfo commandBufferSI {};
-        commandBufferSI.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
-        commandBufferSI.pNext = nullptr;
-        commandBufferSI.commandBuffer = commandBuffer;
-        commandBufferSI.deviceMask = 0;
-
-        VkSemaphoreSubmitInfo waitSI {};
-        waitSI.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-        waitSI.pNext = nullptr;
-        waitSI.semaphore = m_AcquireSemaphore[m_CurrentFrameIndex];
-        waitSI.value = 1;
-        waitSI.stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR;
-        waitSI.deviceIndex = 0;
-
-        VkSemaphoreSubmitInfo signalSI {};
-        signalSI.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-        signalSI.pNext = nullptr;
-        signalSI.semaphore = m_SubmitSemaphore[swapchainImageIndex];
-        signalSI.value = 1;
-        signalSI.stageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
-        signalSI.deviceIndex = 0;
-
-        VkSubmitInfo2 submit {};
-        submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
-        submit.pNext = nullptr;
-        submit.flags = 0;
-        submit.waitSemaphoreInfoCount = 1;
-        submit.pWaitSemaphoreInfos = &waitSI;
-        submit.commandBufferInfoCount = 1;
-        submit.pCommandBufferInfos = &commandBufferSI;
-        submit.signalSemaphoreInfoCount = 1;
-        submit.pSignalSemaphoreInfos = &signalSI;
-
-        VK_CHECK(vkQueueSubmit2(m_GraphicsQueue->getQueue(), 1, &submit, currentFrame.fence),
-            "Queue submit");
-
-        VkPresentInfoKHR presentInfo {};
-        presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-        presentInfo.pNext = nullptr;
-        presentInfo.waitSemaphoreCount = 1;
-        presentInfo.pWaitSemaphores = &m_SubmitSemaphore[swapchainImageIndex];
-        presentInfo.swapchainCount = 1;
-        presentInfo.pSwapchains = &m_VkSwapchain;
-        presentInfo.pImageIndices = &swapchainImageIndex;
-        presentInfo.pResults = nullptr;
-        vkQueuePresentKHR(m_GraphicsQueue->getQueue(), &presentInfo);
-    }
+    render_Present(commandBuffer, currentFrame, swapchainImageIndex);
 
     {
         static uint64_t timeQueryBuffer[4];
@@ -1528,6 +1296,225 @@ void Application::render()
         }
     }
 
+    render_FinaliseScreenshot();
+
+    m_Window.swapBuffers();
+}
+
+void Application::render_RayGeneration(VkCommandBuffer& commandBuffer, PerFrameData& currentFrame)
+{
+    Debug::beginCmdDebugLabel(commandBuffer, "Ray generation", { 0.f, 0.f, 1.f, 1.f });
+
+    currentFrame.rayDirectionImage.transition(
+        commandBuffer, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_VkSetupPipeline);
+
+    std::vector<VkDescriptorSet> descriptorSets = {
+        currentFrame.setupDescriptorSet,
+    };
+
+    SetupPushConstants setupPushConstant = {
+        .cameraPosition = m_Camera.getPosition(),
+        .cameraFront = m_Camera.getForwardVector(),
+        .cameraRight = m_Camera.getRightVector(),
+        .cameraUp = m_Camera.getUpVector(),
+    };
+
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_VkSetupPipelineLayout,
+        0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);
+    vkCmdPushConstants(commandBuffer, m_VkSetupPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
+        sizeof(SetupPushConstants), &setupPushConstant);
+
+    vkCmdDispatch(commandBuffer, std::ceil(currentFrame.rayDirectionImage.getExtent().width / 8.f),
+        std::ceil(currentFrame.rayDirectionImage.getExtent().height / 8.f), 1);
+
+    Debug::endCmdDebugLabel(commandBuffer);
+}
+
+void Application::render_ASRender(VkCommandBuffer& commandBuffer, PerFrameData& currentFrame)
+{
+    VkExtent2D imageSize = {
+        .width = currentFrame.drawImage.getExtent().width,
+        .height = currentFrame.drawImage.getExtent().height,
+    };
+
+    {
+        VkImageMemoryBarrier2 imageBarrier = Image::memoryBarrier2(
+            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+            VK_ACCESS_MEMORY_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT, VK_IMAGE_LAYOUT_GENERAL,
+            VK_IMAGE_LAYOUT_GENERAL, m_GraphicsQueue->getFamily(), m_GraphicsQueue->getFamily(),
+            currentFrame.rayDirectionImage);
+
+        VkDependencyInfo dependency = {
+            .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+            .pNext = nullptr,
+            .dependencyFlags = 0,
+            .memoryBarrierCount = 0,
+            .pMemoryBarriers = nullptr,
+            .bufferMemoryBarrierCount = 0,
+            .pBufferMemoryBarriers = nullptr,
+            .imageMemoryBarrierCount = 1,
+            .pImageMemoryBarriers = &imageBarrier,
+        };
+
+        vkCmdPipelineBarrier2(commandBuffer, &dependency);
+    }
+
+    currentFrame.gBuffer.positions.transition(
+        commandBuffer, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+    currentFrame.gBuffer.colours.transition(
+        commandBuffer, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+    currentFrame.gBuffer.normals.transition(
+        commandBuffer, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+    currentFrame.gBuffer.depth.transition(
+        commandBuffer, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+
+    vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_VkQueryPool,
+        m_CurrentFrameIndex * 4 + 2);
+
+    ASManager::getManager()->render(
+        commandBuffer, m_Camera, currentFrame.gBufferDescriptorSet, imageSize);
+
+    vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_VkQueryPool,
+        m_CurrentFrameIndex * 4 + 3);
+}
+
+void Application::render_GBuffer(VkCommandBuffer& commandBuffer, PerFrameData& currentFrame)
+{
+    VkImageMemoryBarrier2 positionBarrier = Image::memoryBarrier2(
+        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+        VK_ACCESS_MEMORY_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT, VK_IMAGE_LAYOUT_GENERAL,
+        VK_IMAGE_LAYOUT_GENERAL, m_GraphicsQueue->getFamily(), m_GraphicsQueue->getFamily(),
+        currentFrame.gBuffer.positions);
+
+    VkImageMemoryBarrier2 colourBarrier = Image::memoryBarrier2(
+        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+        VK_ACCESS_MEMORY_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT, VK_IMAGE_LAYOUT_GENERAL,
+        VK_IMAGE_LAYOUT_GENERAL, m_GraphicsQueue->getFamily(), m_GraphicsQueue->getFamily(),
+        currentFrame.gBuffer.colours);
+
+    VkImageMemoryBarrier2 normalsBarrier = Image::memoryBarrier2(
+        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+        VK_ACCESS_MEMORY_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT, VK_IMAGE_LAYOUT_GENERAL,
+        VK_IMAGE_LAYOUT_GENERAL, m_GraphicsQueue->getFamily(), m_GraphicsQueue->getFamily(),
+        currentFrame.gBuffer.normals);
+
+    VkImageMemoryBarrier2 depthBarrier
+        = Image::memoryBarrier2(VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_MEMORY_WRITE_BIT,
+            VK_ACCESS_MEMORY_READ_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
+            m_GraphicsQueue->getFamily(), m_GraphicsQueue->getFamily(), currentFrame.gBuffer.depth);
+
+    std::vector<VkImageMemoryBarrier2> barriers
+        = { positionBarrier, colourBarrier, normalsBarrier, depthBarrier };
+
+    VkDependencyInfo dependency = {
+        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .pNext = nullptr,
+        .dependencyFlags = 0,
+        .memoryBarrierCount = 0,
+        .pMemoryBarriers = nullptr,
+        .bufferMemoryBarrierCount = 0,
+        .pBufferMemoryBarriers = nullptr,
+        .imageMemoryBarrierCount = static_cast<uint32_t>(barriers.size()),
+        .pImageMemoryBarriers = barriers.data(),
+    };
+
+    vkCmdPipelineBarrier2(commandBuffer, &dependency);
+
+    {
+        Debug::beginCmdDebugLabel(commandBuffer, "Render", { 0.f, 0.f, 1.f, 1.f });
+
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_VkRenderPipeline);
+
+        std::vector<VkDescriptorSet> descriptorSets = {
+            currentFrame.gBufferDescriptorSet,
+            currentFrame.renderDescriptorSet,
+        };
+
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+            m_VkRenderPipelineLayout, 0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);
+
+        vkCmdDispatch(commandBuffer, std::ceil(currentFrame.drawImage.getExtent().width / 8.f),
+            std::ceil(currentFrame.drawImage.getExtent().height / 8.f), 1);
+
+        Debug::endCmdDebugLabel(commandBuffer);
+    }
+}
+
+void Application::render_Screenshot(VkCommandBuffer& commandBuffer, PerFrameData& currentFrame)
+{
+    if (m_TakeScreenshot.has_value()) {
+        currentFrame.drawImage.transition(
+            commandBuffer, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+
+        m_ScreenshotImage.transition(
+            commandBuffer, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+        currentFrame.drawImage.copyToImage(commandBuffer, m_ScreenshotImage.getImage(),
+            currentFrame.drawImage.getExtent(), m_ScreenshotImage.getExtent());
+
+        currentFrame.drawImage.transition(
+            commandBuffer, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
+    }
+}
+
+void Application::render_Present(
+    VkCommandBuffer& commandBuffer, PerFrameData& currentFrame, uint32_t swapchainImageIndex)
+{
+    std::lock_guard lock(m_GraphicsQueue->getLock());
+
+    VkCommandBufferSubmitInfo commandBufferSI {};
+    commandBufferSI.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+    commandBufferSI.pNext = nullptr;
+    commandBufferSI.commandBuffer = commandBuffer;
+    commandBufferSI.deviceMask = 0;
+
+    VkSemaphoreSubmitInfo waitSI {};
+    waitSI.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+    waitSI.pNext = nullptr;
+    waitSI.semaphore = m_AcquireSemaphore[m_CurrentFrameIndex];
+    waitSI.value = 1;
+    waitSI.stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR;
+    waitSI.deviceIndex = 0;
+
+    VkSemaphoreSubmitInfo signalSI {};
+    signalSI.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+    signalSI.pNext = nullptr;
+    signalSI.semaphore = m_SubmitSemaphore[swapchainImageIndex];
+    signalSI.value = 1;
+    signalSI.stageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
+    signalSI.deviceIndex = 0;
+
+    VkSubmitInfo2 submit {};
+    submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+    submit.pNext = nullptr;
+    submit.flags = 0;
+    submit.waitSemaphoreInfoCount = 1;
+    submit.pWaitSemaphoreInfos = &waitSI;
+    submit.commandBufferInfoCount = 1;
+    submit.pCommandBufferInfos = &commandBufferSI;
+    submit.signalSemaphoreInfoCount = 1;
+    submit.pSignalSemaphoreInfos = &signalSI;
+
+    VK_CHECK(vkQueueSubmit2(m_GraphicsQueue->getQueue(), 1, &submit, currentFrame.fence),
+        "Queue submit");
+
+    VkPresentInfoKHR presentInfo {};
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    presentInfo.pNext = nullptr;
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = &m_SubmitSemaphore[swapchainImageIndex];
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = &m_VkSwapchain;
+    presentInfo.pImageIndices = &swapchainImageIndex;
+    presentInfo.pResults = nullptr;
+    vkQueuePresentKHR(m_GraphicsQueue->getQueue(), &presentInfo);
+}
+
+void Application::render_FinaliseScreenshot()
+{
     if (m_TakeScreenshot.has_value()) {
         std::string filename = m_TakeScreenshot.value();
         m_TakeScreenshot.reset();
@@ -1573,8 +1560,29 @@ void Application::render()
 
         vmaUnmapMemory(m_VmaAllocator, m_ScreenshotImage.getAllocation());
     }
+}
 
-    m_Window.swapBuffers();
+void Application::render_UI(VkCommandBuffer& commandBuffer, PerFrameData& currentFrame)
+{
+    VkExtent2D imageSize = {
+        .width = currentFrame.drawImage.getExtent().width,
+        .height = currentFrame.drawImage.getExtent().height,
+    };
+
+    Debug::beginCmdDebugLabel(commandBuffer, "UI Rendering", { 0.f, 0.f, 1.f, 1.f });
+
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_VkUIPipeline);
+    std::vector<VkDescriptorSet> descriptorSets = {
+        currentFrame.renderDescriptorSet,
+    };
+
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_VkUIPipelineLayout, 0,
+        descriptorSets.size(), descriptorSets.data(), 0, nullptr);
+
+    vkCmdDispatch(
+        commandBuffer, std::ceil(imageSize.width / 8.f), std::ceil(imageSize.height / 8.f), 1);
+
+    Debug::endCmdDebugLabel(commandBuffer);
 }
 
 void Application::renderImGui(VkCommandBuffer& commandBuffer, const PerFrameData& currentFrame)

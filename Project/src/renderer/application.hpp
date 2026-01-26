@@ -11,6 +11,7 @@
 #include "vulkan/vulkan.h"
 
 #include "network/setup.hpp"
+#include <vulkan/vulkan_core.h>
 
 #define FRAMES_IN_FLIGHT 2
 
@@ -168,10 +169,18 @@ class Application : public EventDispatcher {
     void createQueryPool();
     void destroyQueryPool();
 
-    void renderUI();
+    void requestUIRender();
     void UI(const Event& event);
 
     void render();
+    void render_RayGeneration(VkCommandBuffer& commandBuffer, PerFrameData& currentFrame);
+    void render_ASRender(VkCommandBuffer& commandBuffer, PerFrameData& currentFrame);
+    void render_GBuffer(VkCommandBuffer& commandBuffer, PerFrameData& currentFrame);
+    void render_Screenshot(VkCommandBuffer& commandBuffer, PerFrameData& currentFrame);
+    void render_UI(VkCommandBuffer& commandBuffer, PerFrameData& currentFrame);
+    void render_Present(
+        VkCommandBuffer& commandBuffer, PerFrameData& currentFrame, uint32_t swapchainImageIndex);
+    void render_FinaliseScreenshot();
 
     void renderImGui(VkCommandBuffer& commandBuffer, const PerFrameData& currentFrame);
 
