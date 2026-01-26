@@ -25,23 +25,23 @@ set (SOURCE_LIST
 
 add_compile_definitions(GLM_ENABLE_EXPERIMENTAL)
 
-add_executable(${PROJECT_NAME} ${SOURCE_LIST})
+add_executable(Renderer ${SOURCE_LIST})
 
 add_subdirectory(accelerationStructures)
 
-target_compile_options(${PROJECT_NAME}
+target_compile_options(Renderer
   PUBLIC
     -Wnullability-extension
   PRIVATE -Wall -Wpedantic
 )
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-  target_compile_options(${PROJECT_NAME}
+  target_compile_options(Renderer
     PRIVATE -g -Og
   )
 endif()
 
-target_link_libraries(${PROJECT_NAME} PRIVATE
+target_link_libraries(Renderer PRIVATE
   loaders
   logger
   modification

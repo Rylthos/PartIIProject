@@ -1,4 +1,4 @@
-target_sources(${PROJECT_NAME} PRIVATE
+target_sources(Renderer PRIVATE
   "grid.cpp" "grid.hpp"
   "octree.cpp" "octree.hpp"
   "contree.cpp" "contree.hpp"
