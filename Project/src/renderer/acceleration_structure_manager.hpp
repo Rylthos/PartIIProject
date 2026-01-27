@@ -73,18 +73,18 @@ class ASManager {
         return std::bind(&ASManager::mouse, this, std::placeholders::_1);
     }
 
-    uint64_t getMemoryUsage() { return m_CurrentAS->getMemoryUsage(); }
-    uint64_t getVoxels() { return m_CurrentAS->getTotalVoxels(); }
-    uint64_t getNodes() { return m_CurrentAS->getNodes(); }
+    uint64_t getMemoryUsage();
+    uint64_t getVoxels();
+    uint64_t getNodes();
 
-    glm::uvec3 getDimensions() { return m_CurrentAS->getDimensions(); };
+    glm::uvec3 getDimensions();
 
-    bool animationEnabled() { return m_CurrentAS->canAnimate(); }
-    size_t getAnimationFrames() { return m_CurrentAS->getAnimationFrames(); }
-    uint32_t getAnimationFrame() { return m_CurrentAS->getAnimationFrame(); }
-    void setAnimationFrame(uint32_t target) { m_CurrentAS->setAnimationFrame(target); }
+    bool animationEnabled();
+    size_t getAnimationFrames();
+    uint32_t getAnimationFrame();
+    void setAnimationFrame(uint32_t target);
 
-    bool finishedGeneration() { return m_CurrentAS->finishedGeneration(); }
+    bool finishedGeneration();
 
   private:
     ASManager() { };

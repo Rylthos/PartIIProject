@@ -17,6 +17,8 @@
 
 #include <filesystem>
 
+#include "../network/node.hpp"
+
 struct ASStructInfo {
     VkDevice device;
     VmaAllocator allocator;
@@ -26,6 +28,8 @@ struct ASStructInfo {
     VkCommandPool commandPool;
     VkDescriptorSetLayout renderDescriptorLayout;
     VkDeviceAddress hitDataAddress;
+
+    Network::NetworkingInfo netInfo;
 };
 
 struct ModInfo {

@@ -40,19 +40,24 @@ void ASManager::init(ASStructInfo initInfo)
 {
     m_InitInfo = initInfo;
 
-    m_HitDataBuffer.init(initInfo.device, initInfo.allocator, sizeof(HitData),
-        VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT, VMA_MEMORY_USAGE_AUTO);
+    if (!m_InitInfo.netInfo.enableClientSide) {
+        m_HitDataBuffer.init(initInfo.device, initInfo.allocator, sizeof(HitData),
+            VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT, VMA_MEMORY_USAGE_AUTO);
 
-    m_InitInfo.hitDataAddress = m_HitDataBuffer.getBufferAddress();
+        m_InitInfo.hitDataAddress = m_HitDataBuffer.getBufferAddress();
 
-    m_MappedHitData = (HitData*)m_HitDataBuffer.mapMemory();
+        m_MappedHitData = (HitData*)m_HitDataBuffer.mapMemory();
 
-    setAS(m_CurrentType);
+        setAS(m_CurrentType);
+    }
 }
 
 void ASManager::cleanup()
 {
+    if (m_InitInfo.netInfo.enableClientSide)
+        return;
+
     m_HitDataBuffer.unmapMemory();
     m_HitDataBuffer.cleanup();
 
@@ -62,6 +67,9 @@ void ASManager::cleanup()
 void ASManager::render(
     VkCommandBuffer cmd, Camera camera, VkDescriptorSet renderSet, VkExtent2D imageSize)
 {
+    if (m_InitInfo.netInfo.enableClientSide)
+        return;
+
     assert(m_CurrentAS);
 
     m_CurrentAS->render(cmd, camera, renderSet, imageSize);
@@ -69,6 +77,9 @@ void ASManager::render(
 
 void ASManager::update(float dt)
 {
+    if (m_InitInfo.netInfo.enableClientSide)
+        return;
+
     assert(m_CurrentAS);
 
     m_CurrentAS->update(dt);
@@ -94,6 +105,9 @@ void ASManager::update(float dt)
 
 void ASManager::setAS(ASType type)
 {
+    if (m_InitInfo.netInfo.enableClientSide)
+        return;
+
     m_CurrentType = type;
     vkDeviceWaitIdle(m_InitInfo.device);
 
@@ -129,7 +143,11 @@ void ASManager::setAS(ASType type)
 void ASManager::loadAS(
     std::filesystem::path path, bool validStructures[static_cast<uint8_t>(ASType::MAX_TYPE)])
 {
+    if (m_InitInfo.netInfo.enableClientSide)
+        return;
+
     assert(m_CurrentAS);
+
     if (!validStructures[static_cast<uint8_t>(m_CurrentType)]) {
         LOG_ERROR("Model is not supported for this structure");
         return;
@@ -141,8 +159,81 @@ void ASManager::loadAS(
 
 void ASManager::updateShaders()
 {
+    if (m_InitInfo.netInfo.enableClientSide)
+        return;
+
     assert(m_CurrentAS);
     m_CurrentAS->updateShaders();
+}
+
+uint64_t ASManager::getMemoryUsage()
+{
+    if (m_InitInfo.netInfo.enableClientSide)
+        return 0;
+
+    return m_CurrentAS->getMemoryUsage();
+}
+
+uint64_t ASManager::getVoxels()
+{
+    if (m_InitInfo.netInfo.enableClientSide)
+        return 0;
+
+    return m_CurrentAS->getTotalVoxels();
+}
+
+uint64_t ASManager::getNodes()
+{
+    if (m_InitInfo.netInfo.enableClientSide)
+        return 0;
+
+    return m_CurrentAS->getNodes();
+}
+
+glm::uvec3 ASManager::getDimensions()
+{
+    if (m_InitInfo.netInfo.enableClientSide)
+        return glm::uvec3(0);
+
+    return m_CurrentAS->getDimensions();
+};
+
+bool ASManager::animationEnabled()
+{
+    if (m_InitInfo.netInfo.enableClientSide)
+        return false;
+    return m_CurrentAS->canAnimate();
+}
+
+size_t ASManager::getAnimationFrames()
+{
+    if (m_InitInfo.netInfo.enableClientSide)
+        return 0;
+
+    return m_CurrentAS->getAnimationFrames();
+}
+
+uint32_t ASManager::getAnimationFrame()
+{
+    if (m_InitInfo.netInfo.enableClientSide)
+        return 0;
+
+    return m_CurrentAS->getAnimationFrame();
+}
+
+void ASManager::setAnimationFrame(uint32_t target)
+{
+    if (!m_InitInfo.netInfo.enableClientSide) {
+        m_CurrentAS->setAnimationFrame(target);
+    }
+}
+
+bool ASManager::finishedGeneration()
+{
+    if (m_InitInfo.netInfo.enableClientSide)
+        return false;
+
+    return m_CurrentAS->finishedGeneration();
 }
 
 void ASManager::UI(const Event& event)
@@ -341,51 +432,54 @@ void ASManager::UI(const Event& event)
         }
         ImGui::End();
 
-        if (ImGui::Begin("AS Stats")) {
-            uint64_t bytes = m_CurrentAS->getMemoryUsage();
-            ImGui::Text("Total Memory");
-            ImGui::Text(" %lu bytes", bytes);
-            ImGui::Text(" %lu KiB", bytes / 1024);
-            ImGui::Text(" %lu MiB", bytes / (1024 * 1024));
-            ImGui::Text(" %lu GiB", bytes / (1024 * 1024 * 1024));
+        if (!m_InitInfo.netInfo.enableClientSide) {
+            if (ImGui::Begin("AS Stats")) {
+                uint64_t bytes = m_CurrentAS->getMemoryUsage();
+                ImGui::Text("Total Memory");
+                ImGui::Text(" %lu bytes", bytes);
+                ImGui::Text(" %lu KiB", bytes / 1024);
+                ImGui::Text(" %lu MiB", bytes / (1024 * 1024));
+                ImGui::Text(" %lu GiB", bytes / (1024 * 1024 * 1024));
 
-            uint64_t voxels = m_CurrentAS->getTotalVoxels();
-            ImGui::Text("Voxels");
-            ImGui::Text(" %lu", voxels);
+                uint64_t voxels = m_CurrentAS->getTotalVoxels();
+                ImGui::Text("Voxels");
+                ImGui::Text(" %lu", voxels);
 
-            uint64_t nodes = m_CurrentAS->getNodes();
-            ImGui::Text("Nodes");
-            ImGui::Text(" %lu", nodes);
+                uint64_t nodes = m_CurrentAS->getNodes();
+                ImGui::Text("Nodes");
+                ImGui::Text(" %lu", nodes);
 
-            ImGui::Text("Bytes / Voxel");
-            ImGui::Text(" %5.2f", (float)bytes / (float)voxels);
+                ImGui::Text("Bytes / Voxel");
+                ImGui::Text(" %5.2f", (float)bytes / (float)voxels);
+            }
+            ImGui::End();
+
+            if (ImGui::Begin("AS Generation")) {
+                const char* status = m_CurrentAS->isGenerating() ? "Generating"
+                    : m_CurrentAS->isLoading()                   ? "Loading"
+                                                                 : "Idle";
+                ImGui::Text("Status: %s", status);
+                float time = m_CurrentAS->getGenerationTime();
+                float percent = m_CurrentAS->getGenerationCompletion();
+                float timeRemaining = (time / percent) - time;
+                ImGui::Text("  Time       : %6.2f", time);
+                ImGui::Text("  Completion : %6.5f", percent);
+                ImGui::Text("  Remaining  : %6.5f", timeRemaining);
+            }
+            ImGui::End();
+
+            if (ImGui::Begin("Hit Data")) {
+                ImGui::Text("Hit         : %b", m_MappedHitData->hit);
+                glm::vec4 hitPos = m_MappedHitData->hitPosition;
+                ImGui::Text("Hit position: %5.2f %5.2f %5.2f", hitPos.x, hitPos.y, hitPos.z);
+                glm::ivec4 hitIndex = m_MappedHitData->voxelIndex;
+                ImGui::Text("Voxel Index : %d %d %d", hitIndex.x, hitIndex.y, hitIndex.z);
+                glm::vec4 hitNormal = m_MappedHitData->normal;
+                ImGui::Text(
+                    "Normal      : %5.2f %5.2f %5.2f", hitNormal.x, hitNormal.y, hitNormal.z);
+            }
+            ImGui::End();
         }
-        ImGui::End();
-
-        if (ImGui::Begin("AS Generation")) {
-            const char* status = m_CurrentAS->isGenerating() ? "Generating"
-                : m_CurrentAS->isLoading()                   ? "Loading"
-                                                             : "Idle";
-            ImGui::Text("Status: %s", status);
-            float time = m_CurrentAS->getGenerationTime();
-            float percent = m_CurrentAS->getGenerationCompletion();
-            float timeRemaining = (time / percent) - time;
-            ImGui::Text("  Time       : %6.2f", time);
-            ImGui::Text("  Completion : %6.5f", percent);
-            ImGui::Text("  Remaining  : %6.5f", timeRemaining);
-        }
-        ImGui::End();
-
-        if (ImGui::Begin("Hit Data")) {
-            ImGui::Text("Hit         : %b", m_MappedHitData->hit);
-            glm::vec4 hitPos = m_MappedHitData->hitPosition;
-            ImGui::Text("Hit position: %5.2f %5.2f %5.2f", hitPos.x, hitPos.y, hitPos.z);
-            glm::ivec4 hitIndex = m_MappedHitData->voxelIndex;
-            ImGui::Text("Voxel Index : %d %d %d", hitIndex.x, hitIndex.y, hitIndex.z);
-            glm::vec4 hitNormal = m_MappedHitData->normal;
-            ImGui::Text("Normal      : %5.2f %5.2f %5.2f", hitNormal.x, hitNormal.y, hitNormal.z);
-        }
-        ImGui::End();
 
         if (ImGui::Begin("Lighting")) {
             bool value = (ShaderManager::getInstance()->getMacro("SHADOW_RAY").value_or(" ") == "");
@@ -409,7 +503,7 @@ void ASManager::mouse(const Event& event)
 {
     const MouseEvent& mouseEvent = static_cast<const MouseEvent&>(event);
 
-    if (mouseEvent.type() == MouseEventType::CLICK) {
+    if (mouseEvent.type() == MouseEventType::CLICK && !m_InitInfo.netInfo.networked) {
         const MouseClickEvent& clickEvent = static_cast<const MouseClickEvent&>(event);
 
         if (!m_MappedHitData->hit)

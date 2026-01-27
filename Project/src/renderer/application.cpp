@@ -100,26 +100,30 @@ void Application::init(InitSettings settings)
     }
 
     createDescriptorPool();
-    createDescriptorLayouts();
 
-    createSetupPipelineLayout();
-    ShaderManager::getInstance()->addModule("ray_generation",
-        std::bind(&Application::createSetupPipeline, this),
-        std::bind(&Application::destroySetupPipeline, this));
-    createSetupPipeline();
+    if (serverSide()) {
+        createDescriptorLayouts();
 
-    createRenderPipelineLayout();
-    ShaderManager::getInstance()->addModule("render",
-        std::bind(&Application::createRenderPipeline, this),
-        std::bind(&Application::destroyRenderPipeline, this));
-    createRenderPipeline();
+        createSetupPipelineLayout();
+        ShaderManager::getInstance()->addModule("ray_generation",
+            std::bind(&Application::createSetupPipeline, this),
+            std::bind(&Application::destroySetupPipeline, this));
+        createSetupPipeline();
 
-    createUIPipelineLayout();
-    ShaderManager::getInstance()->addModule("ui", std::bind(&Application::createUIPipeline, this),
-        std::bind(&Application::destroyUIPipeline, this));
-    createUIPipeline();
+        createRenderPipelineLayout();
+        ShaderManager::getInstance()->addModule("render",
+            std::bind(&Application::createRenderPipeline, this),
+            std::bind(&Application::destroyRenderPipeline, this));
+        createRenderPipeline();
 
-    createDescriptors();
+        createUIPipelineLayout();
+        ShaderManager::getInstance()->addModule("ui",
+            std::bind(&Application::createUIPipeline, this),
+            std::bind(&Application::destroyUIPipeline, this));
+        createUIPipeline();
+
+        createDescriptors();
+    }
 
     ASManager::getManager()->init({
         .device = m_VkDevice,
@@ -128,6 +132,7 @@ void Application::init(InitSettings settings)
         .descriptorPool = m_VkDescriptorPool,
         .commandPool = m_GeneralPool,
         .renderDescriptorLayout = m_GBufferDescriptorLayout,
+        .netInfo = m_Settings.netInfo,
     });
 
     PerformanceLogger::getLogger()->init(&m_Camera);
@@ -212,14 +217,17 @@ void Application::cleanup()
 
     destroyQueryPool();
 
-    destroyUIPipelineLayout();
-    destroyUIPipeline();
-    destroyRenderPipelineLayout();
-    destroyRenderPipeline();
-    destroySetupPipelineLayout();
-    destroySetupPipeline();
+    if (serverSide()) {
+        destroyUIPipelineLayout();
+        destroyUIPipeline();
+        destroyRenderPipelineLayout();
+        destroyRenderPipeline();
+        destroySetupPipelineLayout();
+        destroySetupPipeline();
 
-    destroyDescriptorLayouts();
+        destroyDescriptorLayouts();
+    }
+
     destroyDescriptorPool();
 
     if (clientSide())
@@ -1769,20 +1777,30 @@ void Application::handleWindow(const Event& event)
         LOG_DEBUG("Resizing window");
         vkDeviceWaitIdle(m_VkDevice);
 
-        for (auto& frame : m_PerFrameData) {
-            vkFreeDescriptorSets(m_VkDevice, m_VkDescriptorPool, 1, &frame.setupDescriptorSet);
-            vkFreeDescriptorSets(m_VkDevice, m_VkDescriptorPool, 1, &frame.gBufferDescriptorSet);
-            vkFreeDescriptorSets(m_VkDevice, m_VkDescriptorPool, 1, &frame.renderDescriptorSet);
+        if (serverSide()) {
+            for (auto& frame : m_PerFrameData) {
+                vkFreeDescriptorSets(m_VkDevice, m_VkDescriptorPool, 1, &frame.setupDescriptorSet);
+                vkFreeDescriptorSets(
+                    m_VkDevice, m_VkDescriptorPool, 1, &frame.gBufferDescriptorSet);
+                vkFreeDescriptorSets(m_VkDevice, m_VkDescriptorPool, 1, &frame.renderDescriptorSet);
+            }
         }
 
         destroySyncStructures();
         destroyImages();
-        destroySwapchain();
 
-        createSwapchain();
+        if (clientSide()) {
+            destroySwapchain();
+
+            createSwapchain();
+        }
+
         createImages();
         createSyncStructures();
-        createDescriptors();
+
+        if (serverSide()) {
+            createDescriptors();
+        }
     }
 }
 
