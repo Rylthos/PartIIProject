@@ -18,15 +18,20 @@ int main(int argc, char** argv)
     argv = cliApp.ensure_utf8(argv);
 
     InitSettings settings;
-    cliApp.add_flag("--enable-server-side", settings.enableServerSide, "Enable server side");
-    cliApp.add_flag("--enable-client-side", settings.enableClientSide, "Enable client side");
+    cliApp.add_flag(
+        "--enable-server-side", settings.netInfo.enableServerSide, "Enable server side");
+    cliApp.add_flag(
+        "--enable-client-side", settings.netInfo.enableClientSide, "Enable client side");
+    cliApp.add_flag(
+        "--server-dont-wait", settings.serverDontWait, "Dont wait for client connection on server");
 
     cliApp.add_option("-i,--ip", settings.targetIP, "The IP to target");
     cliApp.add_option("-p,--port", settings.targetPort, "The port to connect to");
 
     CLI11_PARSE(cliApp, argc, argv);
 
-    settings.networked = settings.enableClientSide | settings.enableServerSide;
+    settings.netInfo.networked
+        = settings.netInfo.enableClientSide | settings.netInfo.enableServerSide;
 
     Application app;
 

@@ -45,13 +45,12 @@ struct PerFrameData {
 };
 
 struct InitSettings {
-    bool enableServerSide = false;
-    bool enableClientSide = false;
+    Network::NetworkingInfo netInfo;
+
+    bool serverDontWait = false;
 
     std::string targetIP;
     uint16_t targetPort;
-
-    bool networked;
 };
 
 class Application : public EventDispatcher {
@@ -204,6 +203,12 @@ class Application : public EventDispatcher {
 
     void takeScreenshot(std::string filename);
 
-    bool serverSide() { return !m_Settings.networked || m_Settings.enableServerSide; }
-    bool clientSide() { return !m_Settings.networked || m_Settings.enableClientSide; }
+    bool serverSide()
+    {
+        return !m_Settings.netInfo.networked || m_Settings.netInfo.enableServerSide;
+    }
+    bool clientSide()
+    {
+        return !m_Settings.netInfo.networked || m_Settings.netInfo.enableClientSide;
+    }
 };

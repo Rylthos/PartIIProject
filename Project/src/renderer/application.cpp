@@ -59,14 +59,14 @@ void Application::init(InitSettings settings)
 
     Logger::init();
 
-    if (m_Settings.networked) {
-        if (m_Settings.enableClientSide) {
+    if (m_Settings.netInfo.networked) {
+        if (m_Settings.netInfo.enableClientSide) {
             m_Node = Network::initClient(settings.targetIP.c_str(), settings.targetPort);
 
             LOG_INFO("Connected to server: {}:{}", settings.targetIP, settings.targetPort);
-        } else if (m_Settings.enableServerSide) {
+        } else if (m_Settings.netInfo.enableServerSide) {
 
-            m_Node = Network::initServer(settings.targetPort, false);
+            m_Node = Network::initServer(settings.targetPort, !m_Settings.serverDontWait);
 
             LOG_INFO("Setup server: Listening on port {}", settings.targetPort);
         }
@@ -95,8 +95,9 @@ void Application::init(InitSettings settings)
 
     createSyncStructures();
 
-    if (clientSide())
+    if (clientSide()) {
         createImGuiStructures();
+    }
 
     createDescriptorPool();
     createDescriptorLayouts();
@@ -153,7 +154,7 @@ void Application::init(InitSettings settings)
     m_Window->subscribe(EventFamily::MOUSE, m_Camera.getMouseEvent());
     subscribe(EventFamily::FRAME, m_Camera.getFrameEvent());
 
-    if (m_Settings.enableServerSide) {
+    if (m_Settings.netInfo.enableServerSide) {
         ASManager::getManager()->setAS(ASType::BRICKMAP);
         bool validAS[] = { false, false, false, false, true };
         ASManager::getManager()->loadAS("res/structures/character", validAS);
@@ -188,11 +189,8 @@ void Application::start()
 
         render();
 
-        if (m_Settings.enableServerSide) {
+        if (m_Settings.netInfo.enableServerSide) {
             static bool takenScreenshot = false;
-            if (takenScreenshot && !m_TakeScreenshot.has_value()) {
-                m_Window->requestClose();
-            }
             if (!takenScreenshot && ASManager::getManager()->finishedGeneration()) {
                 takenScreenshot = true;
                 takeScreenshot("Temp.ppm");
@@ -247,7 +245,7 @@ void Application::cleanup()
     vkb::destroy_debug_utils_messenger(m_VkInstance, m_VkDebugMessenger);
     vkDestroyInstance(m_VkInstance, nullptr);
 
-    if (m_Settings.networked) {
+    if (m_Settings.netInfo.networked) {
         Network::cleanup(m_Node);
     }
 
@@ -267,7 +265,7 @@ void Application::initVulkan()
 #endif
                           .use_default_debug_messenger()
                           .require_api_version(1, 4, 0)
-                          .set_headless(m_Settings.enableServerSide)
+                          .set_headless(m_Settings.netInfo.enableServerSide)
                           .build();
 
     vkb::Instance vkbInst = builderRet.value();
@@ -1280,7 +1278,8 @@ void Application::render()
     VK_CHECK(vkResetFences(m_VkDevice, 1, &currentFrame.fence), "Reset fence");
 
     uint32_t swapchainImageIndex = 0;
-    if (!m_Settings.enableServerSide) {
+
+    if (clientSide()) {
         result = vkAcquireNextImageKHR(m_VkDevice, m_VkSwapchain, timeout,
             m_AcquireSemaphore[m_CurrentFrameIndex], nullptr, &swapchainImageIndex);
     }
@@ -1321,7 +1320,6 @@ void Application::render()
         }
 
         if (serverSide()) {
-
             render_RayGeneration(commandBuffer, currentFrame);
 
             render_ASRender(commandBuffer, currentFrame);
