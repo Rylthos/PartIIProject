@@ -58,16 +58,18 @@ VkSurfaceKHR GLFWWindow::createSurface(const VkInstance& instance)
     return surface;
 }
 
+bool GLFWWindow::shouldClose() { return glfwWindowShouldClose(m_Window); };
+void GLFWWindow::requestClose() { glfwSetWindowShouldClose(m_Window, true); }
+
 void GLFWWindow::pollEvents() { glfwPollEvents(); }
 void GLFWWindow::swapBuffers() { glfwSwapBuffers(m_Window); }
-bool GLFWWindow::shouldClose() { return glfwWindowShouldClose(m_Window); };
 
 void GLFWWindow::handleKeyInput(GLFWwindow* glfwWindow, int key, int scancode, int action, int mods)
 {
     GLFWWindow* window = (GLFWWindow*)glfwGetWindowUserPointer(glfwWindow);
 
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
-        glfwSetWindowShouldClose(window->m_Window, GLFW_TRUE);
+        window->requestClose();
     }
 
     if (key == GLFW_KEY_LEFT_ALT && action == GLFW_PRESS) {

@@ -13,6 +13,7 @@ class Window : public EventDispatcher {
     virtual void cleanup() = 0;
 
     virtual bool shouldClose() = 0;
+    virtual void requestClose() = 0;
 
     virtual glm::uvec2 getWindowSize() { return p_WindowSize; }
 

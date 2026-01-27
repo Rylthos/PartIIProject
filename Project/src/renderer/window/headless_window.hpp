@@ -8,4 +8,8 @@ class HeadlessWindow : public Window {
     void cleanup() override;
 
     bool shouldClose() override;
+    void requestClose() override;
+
+  private:
+    bool m_ShouldClose = false;
 };

@@ -12,6 +12,7 @@ class GLFWWindow : public Window {
     void cleanup() override;
 
     bool shouldClose() override;
+    void requestClose() override;
 
     VkSurfaceKHR createSurface(const VkInstance& instance);
     void pollEvents();
