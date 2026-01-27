@@ -3,6 +3,7 @@
 #include "header.hpp"
 #include "node.hpp"
 
+#include <functional>
 #include <stop_token>
 #include <vector>
 
@@ -13,5 +14,7 @@ void readLoop(Node node, std::stop_token stoken);
 void writeLoop(Node node, std::stop_token stoken);
 
 void sendMessage(HeaderType headerType, const std::vector<uint8_t>& data);
+
+void addCallback(HeaderType headerType, std::function<bool(const std::vector<uint8_t>&)> callback);
 
 };

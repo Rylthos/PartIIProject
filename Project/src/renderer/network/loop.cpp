@@ -12,6 +12,24 @@ namespace Network {
 std::queue<std::vector<uint8_t>> s_Messages;
 std::mutex s_MessageLock;
 
+std::unordered_map<HeaderType, std::vector<std::function<bool(const std::vector<uint8_t>&)>>>
+    s_Callbacks;
+std::mutex s_CallbackLock;
+
+void handleReceive(Header header, const std::vector<uint8_t>& data)
+{
+    if (!s_Callbacks.contains(header.type))
+        return;
+
+    const auto& callbacks = s_Callbacks[header.type];
+
+    for (const auto& callback : callbacks) {
+        if (callback(data)) {
+            break;
+        }
+    }
+}
+
 void readLoop(Node node, std::stop_token stoken)
 {
     std::vector<uint8_t> headerBuffer(sizeof(Header));
@@ -36,8 +54,17 @@ void readLoop(Node node, std::stop_token stoken)
             Header header = readHeader(headerBuffer.data(), index);
 
             std::vector<uint8_t> readBuffer(header.size);
+            size_t readCount = 0;
 
-            ssize_t read = recv(targetFD, readBuffer.data(), readBuffer.size(), 0);
+            while (readCount != header.size) {
+                ssize_t read = recv(
+                    targetFD, readBuffer.data() + readCount, readBuffer.size() - readCount, 0);
+
+                readCount += read;
+            }
+
+            handleReceive(header, readBuffer);
+
         } else if (bits > 0) {
             LOG_ERROR("[NETWORK] Unknown number of bits read: {}", bits);
         }
@@ -86,6 +113,13 @@ void sendMessage(HeaderType headerType, const std::vector<uint8_t>& data)
         std::lock_guard<std::mutex> _lock(s_MessageLock);
         s_Messages.push(message);
     }
+}
+
+void addCallback(HeaderType headerType, std::function<bool(const std::vector<uint8_t>&)> callback)
+{
+    std::unique_lock _lock(s_CallbackLock);
+
+    s_Callbacks[headerType].push_back(callback);
 }
 
 }
