@@ -42,6 +42,8 @@ struct PerFrameData {
     VkDescriptorSet setupDescriptorSet;
     VkDescriptorSet gBufferDescriptorSet;
     VkDescriptorSet renderDescriptorSet;
+
+    bool dirty = false;
 };
 
 struct InitSettings {
@@ -91,6 +93,7 @@ class Application : public EventDispatcher {
     std::vector<VkSemaphore> m_SubmitSemaphore;
 
     Image m_ScreenshotImage;
+    Image m_NetworkImage;
 
     VkCommandPool m_GeneralPool;
     std::array<PerFrameData, FRAMES_IN_FLIGHT> m_PerFrameData;
@@ -135,6 +138,7 @@ class Application : public EventDispatcher {
     void createGBuffers();
     void createDrawImages();
     void createRayDirectionImages();
+    void createNetworkImage();
     void destroyImages();
 
     void createCommandPools();
@@ -204,6 +208,8 @@ class Application : public EventDispatcher {
     void handleWindow(const Event& event);
 
     void takeScreenshot(std::string filename);
+
+    bool handleFrameReceive(const std::vector<uint8_t>& data);
 
     bool serverSide()
     {

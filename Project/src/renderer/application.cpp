@@ -12,6 +12,7 @@
 #include "animation_manager.hpp"
 #include "events/events.hpp"
 
+#include "network/header.hpp"
 #include "window/glfw_window.hpp"
 #include "window/headless_window.hpp"
 
@@ -78,6 +79,11 @@ void Application::init(InitSettings settings)
             = std::jthread([&](std::stop_token stoken) { Network::readLoop(m_Node, stoken); });
         m_NetworkWriteLoop
             = std::jthread([&](std::stop_token stoken) { Network::writeLoop(m_Node, stoken); });
+
+        if (m_Settings.netInfo.enableClientSide) {
+            Network::addCallback(Network::HeaderType::FRAME,
+                std::bind(&Application::handleFrameReceive, this, std::placeholders::_1));
+        }
     }
 
     if (clientSide()) {
@@ -197,8 +203,13 @@ void Application::start()
         float delta = difference.count() / 1000.f;
         previous = current;
 
-        if (clientSide())
+        if (m_Settings.netInfo.enableServerSide) {
+            takeScreenshot("");
+        }
+
+        if (clientSide()) {
             requestUIRender();
+        }
 
         render();
 
@@ -410,6 +421,10 @@ void Application::createImages()
     createRayDirectionImages();
     createDrawImages();
     createGBuffers();
+
+    if (m_Settings.netInfo.enableClientSide) {
+        createNetworkImage();
+    }
 }
 
 void Application::createGBuffers()
@@ -493,6 +508,17 @@ void Application::createRayDirectionImages()
     LOG_DEBUG("Created ray direction images");
 }
 
+void Application::createNetworkImage()
+{
+    VkExtent3D extent = { m_Window->getWindowSize().x, m_Window->getWindowSize().y, 1 };
+
+    m_NetworkImage.init(m_VkDevice, m_VmaAllocator, m_GraphicsQueue->getFamily(), extent,
+        VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TYPE_2D, VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+        VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_HOST,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        VK_IMAGE_TILING_LINEAR);
+}
+
 void Application::destroyImages()
 {
     for (size_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
@@ -506,6 +532,10 @@ void Application::destroyImages()
     }
 
     m_ScreenshotImage.cleanup();
+
+    if (m_Settings.netInfo.enableClientSide) {
+        m_NetworkImage.cleanup();
+    }
 
     LOG_DEBUG("Destroyed images");
 }
@@ -1350,8 +1380,17 @@ void Application::render()
             render_Screenshot(commandBuffer, currentFrame);
 
             render_UI(commandBuffer, currentFrame);
-        } else {
-            // Render image from network
+        } else if (currentFrame.dirty) {
+            currentFrame.drawImage.transition(
+                commandBuffer, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+            m_NetworkImage.transition(
+                commandBuffer, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+
+            m_NetworkImage.copyToImage(commandBuffer, currentFrame.drawImage.getImage(),
+                m_NetworkImage.getExtent(), currentFrame.drawImage.getExtent());
+
+            currentFrame.drawImage.transition(
+                commandBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
         }
 
         currentFrame.drawImage.transition(
@@ -1404,11 +1443,6 @@ void Application::render()
         GLFWWindow* glfwWindow = dynamic_cast<GLFWWindow*>(m_Window.get());
         assert(glfwWindow && "Expected window to be a glfw window");
         glfwWindow->swapBuffers();
-    }
-
-    if (m_Settings.netInfo.enableServerSide) {
-        std::vector<uint8_t> data = { 0, 1, 2 };
-        Network::sendMessage(Network::HeaderType::FRAME, data);
     }
 }
 
@@ -1634,7 +1668,8 @@ void Application::render_Present(
 void Application::render_FinaliseScreenshot()
 {
     if (m_TakeScreenshot.has_value()) {
-        std::filesystem::path filename = m_TakeScreenshot.value();
+        std::string value = m_TakeScreenshot.value();
+        std::filesystem::path filename = value;
         m_TakeScreenshot.reset();
 
         {
@@ -1654,29 +1689,62 @@ void Application::render_FinaliseScreenshot()
 
         data += subResourceLayout.offset;
 
-        if (filename.has_parent_path()) {
-            if (!std::filesystem::exists(std::filesystem::path(filename).parent_path())) {
-                std::filesystem::create_directories(std::filesystem::path(filename).parent_path());
+        VkExtent3D imageExtent = m_ScreenshotImage.getExtent();
+        glm::uvec2 size = { imageExtent.width, imageExtent.height };
+
+        if (m_Settings.netInfo.enableServerSide && value == "") {
+            size_t totalBits = size.x * size.y * 4;
+
+            std::vector<uint8_t> imageData;
+            imageData.reserve(totalBits);
+
+            imageData.push_back((size.x >> 24) & 0xFF);
+            imageData.push_back((size.x >> 16) & 0xFF);
+            imageData.push_back((size.x >> 8) & 0xFF);
+            imageData.push_back((size.x >> 0) & 0xFF);
+
+            imageData.push_back((size.y >> 24) & 0xFF);
+            imageData.push_back((size.y >> 16) & 0xFF);
+            imageData.push_back((size.y >> 8) & 0xFF);
+            imageData.push_back((size.y >> 0) & 0xFF);
+
+            for (uint32_t y = 0; y < size.y; y++) {
+                uint32_t* row = (uint32_t*)data;
+                for (uint32_t x = 0; x < size.x; x++) {
+                    imageData.push_back(((uint8_t*)row)[0]);
+                    imageData.push_back(((uint8_t*)row)[1]);
+                    imageData.push_back(((uint8_t*)row)[2]);
+                    imageData.push_back(((uint8_t*)row)[3]);
+                    row++;
+                }
+                data += subResourceLayout.rowPitch;
             }
-        }
 
-        std::ofstream file(filename, std::ios::out | std::ios::binary);
-
-        glm::uvec2 size = m_Window->getWindowSize();
-
-        file << "P6\n" << size.x << "\n" << size.y << "\n" << 255 << "\n";
-
-        for (uint32_t y = 0; y < size.y; y++) {
-            uint32_t* row = (uint32_t*)data;
-            for (uint32_t x = 0; x < size.x; x++) {
-                file.write((char*)row, 3);
-                row++;
+            Network::sendMessage(Network::HeaderType::FRAME, imageData);
+        } else {
+            if (filename.has_parent_path()) {
+                if (!std::filesystem::exists(std::filesystem::path(filename).parent_path())) {
+                    std::filesystem::create_directories(
+                        std::filesystem::path(filename).parent_path());
+                }
             }
-            data += subResourceLayout.rowPitch;
-        }
 
-        LOG_INFO("Wrote screenshot: {}", filename.string());
-        file.close();
+            std::ofstream file(filename, std::ios::out | std::ios::binary);
+
+            file << "P6\n" << size.x << "\n" << size.y << "\n" << 255 << "\n";
+
+            for (uint32_t y = 0; y < size.y; y++) {
+                uint32_t* row = (uint32_t*)data;
+                for (uint32_t x = 0; x < size.x; x++) {
+                    file.write((char*)row, 3);
+                    row++;
+                }
+                data += subResourceLayout.rowPitch;
+            }
+
+            LOG_INFO("Wrote screenshot: {}", filename.string());
+            file.close();
+        }
 
         vmaUnmapMemory(m_VmaAllocator, m_ScreenshotImage.getAllocation());
     }
@@ -1823,3 +1891,47 @@ void Application::handleWindow(const Event& event)
 }
 
 void Application::takeScreenshot(std::string filename) { m_TakeScreenshot = filename; }
+
+bool Application::handleFrameReceive(const std::vector<uint8_t>& data)
+{
+    glm::uvec2 size { 0 };
+    for (uint8_t i = 0; i < 4; i++) {
+        size.x <<= 8;
+        size.x |= data[i];
+        size.y <<= 8;
+        size.y |= data[i + 4];
+    }
+
+    VkImageSubresource subResource { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0 };
+    VkSubresourceLayout subResourceLayout;
+    vkGetImageSubresourceLayout(
+        m_VkDevice, m_ScreenshotImage.getImage(), &subResource, &subResourceLayout);
+
+    uint8_t* imageData;
+    vmaMapMemory(m_VmaAllocator, m_NetworkImage.getAllocation(), (void**)&imageData);
+
+    imageData += subResourceLayout.offset;
+
+    const uint32_t offset = 8;
+
+    for (uint32_t y = 0; y < size.y; y++) {
+        uint32_t* row = (uint32_t*)imageData;
+        for (uint32_t x = 0; x < size.x; x++) {
+            uint32_t index = (x + y * size.x) * 4 + offset;
+            ((uint8_t*)row)[0] = data[index + 0];
+            ((uint8_t*)row)[1] = data[index + 1];
+            ((uint8_t*)row)[2] = data[index + 2];
+            ((uint8_t*)row)[3] = data[index + 3];
+            row++;
+        }
+        imageData += subResourceLayout.rowPitch;
+    }
+
+    vmaUnmapMemory(m_VmaAllocator, m_NetworkImage.getAllocation());
+
+    for (size_t i = 0; i < m_PerFrameData.size(); i++) {
+        m_PerFrameData[i].dirty = true;
+    }
+
+    return true;
+}
