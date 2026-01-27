@@ -7,12 +7,15 @@
 #include <ranges>
 #include <vector>
 
+#include <thread>
+
 #include "animation_manager.hpp"
 #include "events/events.hpp"
 
 #include "window/glfw_window.hpp"
 #include "window/headless_window.hpp"
 
+#include "network/loop.hpp"
 #include "network/setup.hpp"
 
 #include "VkBootstrap.h"
@@ -70,6 +73,11 @@ void Application::init(InitSettings settings)
 
             LOG_INFO("Setup server: Listening on port {}", settings.targetPort);
         }
+
+        m_NetworkReadLoop
+            = std::jthread([&](std::stop_token stoken) { Network::readLoop(m_Node, stoken); });
+        m_NetworkWriteLoop
+            = std::jthread([&](std::stop_token stoken) { Network::writeLoop(m_Node, stoken); });
     }
 
     if (clientSide()) {
@@ -209,6 +217,11 @@ void Application::start()
 void Application::cleanup()
 {
     vkDeviceWaitIdle(m_VkDevice);
+
+    if (m_Settings.netInfo.networked) {
+        m_NetworkReadLoop.request_stop();
+        m_NetworkWriteLoop.request_stop();
+    }
 
     ASManager::getManager()->cleanup();
 
@@ -1391,6 +1404,11 @@ void Application::render()
         GLFWWindow* glfwWindow = dynamic_cast<GLFWWindow*>(m_Window.get());
         assert(glfwWindow && "Expected window to be a glfw window");
         glfwWindow->swapBuffers();
+    }
+
+    if (m_Settings.netInfo.enableServerSide) {
+        std::vector<uint8_t> data = { 0, 1, 2 };
+        Network::sendMessage(Network::HeaderType::FRAME, data);
     }
 }
 

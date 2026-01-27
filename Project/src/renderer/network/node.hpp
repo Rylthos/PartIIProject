@@ -1,11 +1,11 @@
 #pragma once
 
-#include <vector>
+#include <optional>
 
 namespace Network {
 struct Node {
     int socket;
-    int clientSocket;
+    std::optional<int> clientSocket;
 };
 
 struct NetworkingInfo {

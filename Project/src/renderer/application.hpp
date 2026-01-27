@@ -65,6 +65,8 @@ class Application : public EventDispatcher {
     InitSettings m_Settings;
 
     Network::Node m_Node;
+    std::jthread m_NetworkReadLoop;
+    std::jthread m_NetworkWriteLoop;
 
     std::unique_ptr<Window> m_Window;
 
