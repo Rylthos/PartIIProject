@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <functional>
 #include <memory>
+#include <ranges>
 #include <vector>
 
 #include "animation_manager.hpp"
@@ -65,7 +66,7 @@ void Application::init(InitSettings settings)
             LOG_INFO("Connected to server: {}:{}", settings.targetIP, settings.targetPort);
         } else if (m_Settings.enableServerSide) {
 
-            m_Node = Network::initServer(settings.targetPort);
+            m_Node = Network::initServer(settings.targetPort, false);
 
             LOG_INFO("Setup server: Listening on port {}", settings.targetPort);
         }
@@ -152,6 +153,14 @@ void Application::init(InitSettings settings)
     m_Window->subscribe(EventFamily::MOUSE, m_Camera.getMouseEvent());
     subscribe(EventFamily::FRAME, m_Camera.getFrameEvent());
 
+    if (m_Settings.enableServerSide) {
+        ASManager::getManager()->setAS(ASType::BRICKMAP);
+        bool validAS[] = { false, false, false, false, true };
+        ASManager::getManager()->loadAS("res/structures/character", validAS);
+        m_Camera.setRotation(0.01, -2);
+        m_Camera.setPosition({ 25, 59, -50 });
+    }
+
     LOG_DEBUG("Initialised application");
 }
 
@@ -178,6 +187,18 @@ void Application::start()
             requestUIRender();
 
         render();
+
+        if (m_Settings.enableServerSide) {
+            static bool takenScreenshot = false;
+            if (takenScreenshot && !m_TakeScreenshot.has_value()) {
+                m_Window->requestClose();
+            }
+            if (!takenScreenshot && ASManager::getManager()->finishedGeneration()) {
+                takenScreenshot = true;
+                takeScreenshot("Temp.ppm");
+            }
+        }
+
         update(delta);
     }
 }
@@ -210,14 +231,19 @@ void Application::cleanup()
 
     destroyCommandPools();
 
+    destroyImages();
+
     if (clientSide()) {
-        destroyImages();
         destroySwapchain();
     }
 
     vmaDestroyAllocator(m_VmaAllocator);
     vkDestroyDevice(m_VkDevice, nullptr);
-    vkDestroySurfaceKHR(m_VkInstance, m_VkSurface, nullptr);
+
+    if (clientSide()) {
+        vkDestroySurfaceKHR(m_VkInstance, m_VkSurface, nullptr);
+    }
+
     vkb::destroy_debug_utils_messenger(m_VkInstance, m_VkDebugMessenger);
     vkDestroyInstance(m_VkInstance, nullptr);
 
@@ -1584,7 +1610,7 @@ void Application::render_Present(
 void Application::render_FinaliseScreenshot()
 {
     if (m_TakeScreenshot.has_value()) {
-        std::string filename = m_TakeScreenshot.value();
+        std::filesystem::path filename = m_TakeScreenshot.value();
         m_TakeScreenshot.reset();
 
         {
@@ -1604,8 +1630,10 @@ void Application::render_FinaliseScreenshot()
 
         data += subResourceLayout.offset;
 
-        if (!std::filesystem::exists(std::filesystem::path(filename).parent_path())) {
-            std::filesystem::create_directories(std::filesystem::path(filename).parent_path());
+        if (filename.has_parent_path()) {
+            if (!std::filesystem::exists(std::filesystem::path(filename).parent_path())) {
+                std::filesystem::create_directories(std::filesystem::path(filename).parent_path());
+            }
         }
 
         std::ofstream file(filename, std::ios::out | std::ios::binary);
@@ -1623,7 +1651,7 @@ void Application::render_FinaliseScreenshot()
             data += subResourceLayout.rowPitch;
         }
 
-        LOG_INFO("Wrote screenshot: {}", filename);
+        LOG_INFO("Wrote screenshot: {}", filename.string());
         file.close();
 
         vmaUnmapMemory(m_VmaAllocator, m_ScreenshotImage.getAllocation());

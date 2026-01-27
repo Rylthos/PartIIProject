@@ -9,7 +9,7 @@
 
 namespace Network {
 
-Node initServer(uint16_t port)
+Node initServer(uint16_t port, bool waitForClient)
 {
     Node server;
 
@@ -31,15 +31,17 @@ Node initServer(uint16_t port)
 
     listen(server.socket, 10);
 
-    sockaddr_in client_addr {};
-    socklen_t client_len = sizeof(client_addr);
+    if (waitForClient) {
+        sockaddr_in client_addr {};
+        socklen_t client_len = sizeof(client_addr);
 
-    int client_fd = accept(server.socket, (sockaddr*)&client_addr, &client_len);
-    if (client_fd < 0) {
-        LOG_CRITICAL("Failed to accept client: {}", strerror(errno));
-        exit(-1);
-    } else {
-        server.clientSocket = client_fd;
+        int client_fd = accept(server.socket, (sockaddr*)&client_addr, &client_len);
+        if (client_fd < 0) {
+            LOG_CRITICAL("Failed to accept client: {}", strerror(errno));
+            exit(-1);
+        } else {
+            server.clientSocket = client_fd;
+        }
     }
 
     return server;
