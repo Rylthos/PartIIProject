@@ -10,6 +10,8 @@ class HeadlessWindow : public Window {
     bool shouldClose() override;
     void requestClose() override;
 
+    void setWindowSize(glm::uvec2 windowSize) override;
+
   private:
     bool m_ShouldClose = false;
 };

@@ -61,6 +61,11 @@ VkSurfaceKHR GLFWWindow::createSurface(const VkInstance& instance)
 bool GLFWWindow::shouldClose() { return glfwWindowShouldClose(m_Window); };
 void GLFWWindow::requestClose() { glfwSetWindowShouldClose(m_Window, true); }
 
+void GLFWWindow::setWindowSize(glm::uvec2 windowSize)
+{
+    glfwSetWindowSize(m_Window, windowSize.x, windowSize.y);
+}
+
 void GLFWWindow::pollEvents() { glfwPollEvents(); }
 void GLFWWindow::swapBuffers() { glfwSwapBuffers(m_Window); }
 

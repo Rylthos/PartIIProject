@@ -97,6 +97,14 @@ void writeLoop(Node node, std::stop_token stoken)
     }
 }
 
+void sendMessage(NetProto::Type headerType, const google::protobuf::Message& message)
+{
+    std::vector<uint8_t> data(message.ByteSizeLong());
+    message.SerializeToArray(data.data(), data.size());
+
+    sendMessage(headerType, data);
+}
+
 void sendMessage(NetProto::Type headerType, const std::vector<uint8_t>& data)
 {
     NetProto::Header header;

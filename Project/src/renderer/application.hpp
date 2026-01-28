@@ -10,6 +10,7 @@
 #include "vk_mem_alloc.h"
 #include "vulkan/vulkan.h"
 
+#include <queue>
 #include <vulkan/vulkan_core.h>
 
 #include "network/node.hpp"
@@ -128,6 +129,9 @@ class Application : public EventDispatcher {
 
     std::optional<std::string> m_TakeScreenshot;
 
+    std::queue<std::function<void()>> m_ThreadFunctions;
+    std::mutex m_ThreadFunctionsMutex;
+
   private:
     void initVulkan();
 
@@ -203,6 +207,8 @@ class Application : public EventDispatcher {
 
     void update(float delta);
 
+    void resize();
+
     void handleKeyInput(const Event& event);
     void handleMouse(const Event& event);
     void handleWindow(const Event& event);
@@ -210,6 +216,7 @@ class Application : public EventDispatcher {
     void takeScreenshot(std::string filename);
 
     bool handleFrameReceive(const std::vector<uint8_t>& data);
+    bool handleUpdateReceive(const std::vector<uint8_t>& data);
 
     bool serverSide()
     {

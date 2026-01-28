@@ -5,6 +5,7 @@
 #include "node.hpp"
 
 #include <functional>
+#include <google/protobuf/message.h>
 #include <stop_token>
 #include <vector>
 
@@ -13,6 +14,8 @@ namespace Network {
 void readLoop(Node node, std::stop_token stoken);
 
 void writeLoop(Node node, std::stop_token stoken);
+
+void sendMessage(NetProto::Type headerType, const google::protobuf::Message& message);
 
 void sendMessage(NetProto::Type headerType, const std::vector<uint8_t>& data);
 

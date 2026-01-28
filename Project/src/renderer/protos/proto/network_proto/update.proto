@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package NetProto;
+
+message UVec2 {
+  uint32 x = 1;
+  uint32 y = 2;
+}
+
+message Update {
+  UVec2 windowSize = 1;
+}

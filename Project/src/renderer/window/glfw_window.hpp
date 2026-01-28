@@ -14,6 +14,8 @@ class GLFWWindow : public Window {
     bool shouldClose() override;
     void requestClose() override;
 
+    void setWindowSize(glm::uvec2 windowSize) override;
+
     VkSurfaceKHR createSurface(const VkInstance& instance);
     void pollEvents();
     void swapBuffers();

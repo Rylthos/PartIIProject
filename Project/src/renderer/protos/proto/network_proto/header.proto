@@ -5,6 +5,7 @@ package NetProto;
 enum Type {
   HEADER_TYPE_UNKNOWN = 0;
   HEADER_TYPE_FRAME = 1;
+  HEADER_TYPE_UPDATE = 2;
 }
 
 message Header {

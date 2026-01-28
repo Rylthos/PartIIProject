@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <ranges>
 #include <vector>
 
@@ -14,6 +15,7 @@
 
 #include "network_proto/frame.pb.h"
 #include "network_proto/header.pb.h"
+#include "network_proto/update.pb.h"
 
 #include "window/glfw_window.hpp"
 #include "window/headless_window.hpp"
@@ -85,6 +87,11 @@ void Application::init(InitSettings settings)
         if (m_Settings.netInfo.enableClientSide) {
             Network::addCallback(NetProto::HEADER_TYPE_FRAME,
                 std::bind(&Application::handleFrameReceive, this, std::placeholders::_1));
+        }
+
+        if (m_Settings.netInfo.enableServerSide) {
+            Network::addCallback(NetProto::HEADER_TYPE_UPDATE,
+                std::bind(&Application::handleUpdateReceive, this, std::placeholders::_1));
         }
     }
 
@@ -181,6 +188,15 @@ void Application::init(InitSettings settings)
         ASManager::getManager()->loadAS("res/structures/character", validAS);
         m_Camera.setRotation(0.01, -2);
         m_Camera.setPosition({ 25, 59, -50 });
+    }
+
+    if (m_Settings.netInfo.enableClientSide) {
+        NetProto::Update update;
+        glm::uvec2 size = m_Window->getWindowSize();
+        update.mutable_windowsize()->set_x(size.x);
+        update.mutable_windowsize()->set_y(size.y);
+
+        Network::sendMessage(NetProto::HEADER_TYPE_UPDATE, update);
     }
 
     LOG_DEBUG("Initialised application");
@@ -1717,10 +1733,7 @@ void Application::render_FinaliseScreenshot()
             frame.set_height(size.y);
             frame.set_data(imageData.data(), imageData.size());
 
-            std::vector<uint8_t> frameData(frame.ByteSizeLong());
-            frame.SerializeToArray(frameData.data(), frameData.size());
-
-            Network::sendMessage(NetProto::HEADER_TYPE_FRAME, frameData);
+            Network::sendMessage(NetProto::HEADER_TYPE_FRAME, frame);
         } else {
             if (filename.has_parent_path()) {
                 if (!std::filesystem::exists(std::filesystem::path(filename).parent_path())) {
@@ -1829,6 +1842,55 @@ void Application::update(float delta)
     UpdateEvent event;
     event.delta = delta;
     post(event);
+
+    if (!m_ThreadFunctions.empty()) {
+        std::lock_guard _lock(m_ThreadFunctionsMutex);
+
+        while (!m_ThreadFunctions.empty()) {
+            (m_ThreadFunctions.front())();
+            m_ThreadFunctions.pop();
+        }
+    }
+}
+
+void Application::resize()
+{
+    LOG_DEBUG("Resizing window");
+    vkDeviceWaitIdle(m_VkDevice);
+
+    if (serverSide()) {
+        for (auto& frame : m_PerFrameData) {
+            vkFreeDescriptorSets(m_VkDevice, m_VkDescriptorPool, 1, &frame.setupDescriptorSet);
+            vkFreeDescriptorSets(m_VkDevice, m_VkDescriptorPool, 1, &frame.gBufferDescriptorSet);
+            vkFreeDescriptorSets(m_VkDevice, m_VkDescriptorPool, 1, &frame.renderDescriptorSet);
+        }
+    }
+
+    destroySyncStructures();
+    destroyImages();
+
+    if (clientSide()) {
+        destroySwapchain();
+
+        createSwapchain();
+    }
+
+    createImages();
+    createSyncStructures();
+
+    if (serverSide()) {
+        createDescriptors();
+    }
+
+    if (clientSide()) {
+        LOG_INFO("Window resize");
+        NetProto::Update update;
+        glm::uvec2 size = m_Window->getWindowSize();
+        update.mutable_windowsize()->set_x(size.x);
+        update.mutable_windowsize()->set_y(size.y);
+
+        Network::sendMessage(NetProto::HEADER_TYPE_UPDATE, update);
+    }
 }
 
 void Application::handleKeyInput(const Event& event)
@@ -1860,33 +1922,7 @@ void Application::handleWindow(const Event& event)
     const WindowEvent& wEvent = static_cast<const WindowEvent&>(event);
 
     if (wEvent.type() == WindowEventType::RESIZE) {
-        LOG_DEBUG("Resizing window");
-        vkDeviceWaitIdle(m_VkDevice);
-
-        if (serverSide()) {
-            for (auto& frame : m_PerFrameData) {
-                vkFreeDescriptorSets(m_VkDevice, m_VkDescriptorPool, 1, &frame.setupDescriptorSet);
-                vkFreeDescriptorSets(
-                    m_VkDevice, m_VkDescriptorPool, 1, &frame.gBufferDescriptorSet);
-                vkFreeDescriptorSets(m_VkDevice, m_VkDescriptorPool, 1, &frame.renderDescriptorSet);
-            }
-        }
-
-        destroySyncStructures();
-        destroyImages();
-
-        if (clientSide()) {
-            destroySwapchain();
-
-            createSwapchain();
-        }
-
-        createImages();
-        createSyncStructures();
-
-        if (serverSide()) {
-            createDescriptors();
-        }
+        resize();
     }
 }
 
@@ -1896,6 +1932,11 @@ bool Application::handleFrameReceive(const std::vector<uint8_t>& data)
 {
     NetProto::Frame frame;
     frame.ParseFromArray(data.data(), data.size());
+
+    glm::uvec2 windowSize = m_Window->getWindowSize();
+    if (frame.width() != windowSize.x || frame.height() != windowSize.y) {
+        return false;
+    }
 
     glm::uvec2 size { frame.width(), frame.height() };
     std::vector<uint8_t> rawData(frame.data().begin(), frame.data().end());
@@ -1929,6 +1970,27 @@ bool Application::handleFrameReceive(const std::vector<uint8_t>& data)
 
     for (size_t i = 0; i < m_PerFrameData.size(); i++) {
         m_PerFrameData[i].dirty = true;
+    }
+
+    return true;
+}
+
+bool Application::handleUpdateReceive(const std::vector<uint8_t>& data)
+{
+    NetProto::Update update;
+    update.ParseFromArray(data.data(), data.size());
+
+    LOG_INFO("UPDATE");
+
+    if (update.has_windowsize()) {
+        std::lock_guard _lock(m_ThreadFunctionsMutex);
+        m_ThreadFunctions.push([=, this]() {
+            glm::uvec2 size;
+            size.x = update.windowsize().x();
+            size.y = update.windowsize().y();
+            LOG_INFO("WINDOW: {} {}", size.x, size.y);
+            m_Window->setWindowSize(size);
+        });
     }
 
     return true;

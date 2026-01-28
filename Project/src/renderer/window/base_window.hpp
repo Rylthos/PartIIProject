@@ -15,6 +15,8 @@ class Window : public EventDispatcher {
     virtual bool shouldClose() = 0;
     virtual void requestClose() = 0;
 
+    virtual void setWindowSize(glm::uvec2 windowSize) = 0;
+
     virtual glm::uvec2 getWindowSize() { return p_WindowSize; }
 
   protected:
