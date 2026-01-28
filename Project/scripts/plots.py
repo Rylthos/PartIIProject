@@ -16,6 +16,12 @@ def barpoints(data):
     for i, id in enumerate(ids):
         datapoints = []
         offsets = []
+
+        minX = 10000
+        maxX = -10000
+
+        realtime_line = False
+
         for structure in structures:
             frame = find(data, id, structure)
 
@@ -24,16 +30,27 @@ def barpoints(data):
 
             frametime, median, q1, q3 = get_frametimes(frame)
 
+            if any(np.array(frametime) > 16):
+                realtime_line = True
+
+            minX = min(minX, min(x + offset - w))
+            maxX = max(maxX, max(x + offset + w))
+
             offsets.append(offset)
             datapoints.append((median, frametime[q1:q3]))
 
         medians = [d[0] for d in datapoints]
         frames = [d[1] for d in datapoints]
 
+        ax.set_xbound(minX, maxX)
+
         ax.bar(x + offsets, medians, w, label=f"{id}", color=name_to_colour(id, "tab20b"))
         for j in range(len(frames)):
             frame = frames[j]
             ax.scatter([x[j] + offsets[j]] * len(frame), frame, alpha=0.1, color="red")
+
+        if realtime_line:
+            ax.hlines(16, minX, maxX, linestyles="--")
 
     plt.legend()
     plt.show()
