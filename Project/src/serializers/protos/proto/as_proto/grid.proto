@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+import "as_proto/general.proto";
+
+package ASProto;
+
+message Grid {
+  Header header = 1;
+  repeated fixed32 voxels = 2;
+  Animation animation = 3;
+}
