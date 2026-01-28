@@ -12,6 +12,7 @@
 #include "animation_manager.hpp"
 #include "events/events.hpp"
 
+#include "network_proto/frame.pb.h"
 #include "network_proto/header.pb.h"
 
 #include "window/glfw_window.hpp"
@@ -1699,16 +1700,6 @@ void Application::render_FinaliseScreenshot()
             std::vector<uint8_t> imageData;
             imageData.reserve(totalBits);
 
-            imageData.push_back((size.x >> 24) & 0xFF);
-            imageData.push_back((size.x >> 16) & 0xFF);
-            imageData.push_back((size.x >> 8) & 0xFF);
-            imageData.push_back((size.x >> 0) & 0xFF);
-
-            imageData.push_back((size.y >> 24) & 0xFF);
-            imageData.push_back((size.y >> 16) & 0xFF);
-            imageData.push_back((size.y >> 8) & 0xFF);
-            imageData.push_back((size.y >> 0) & 0xFF);
-
             for (uint32_t y = 0; y < size.y; y++) {
                 uint32_t* row = (uint32_t*)data;
                 for (uint32_t x = 0; x < size.x; x++) {
@@ -1721,7 +1712,15 @@ void Application::render_FinaliseScreenshot()
                 data += subResourceLayout.rowPitch;
             }
 
-            Network::sendMessage(NetProto::HEADER_TYPE_FRAME, imageData);
+            NetProto::Frame frame;
+            frame.set_width(size.x);
+            frame.set_height(size.y);
+            frame.set_data(imageData.data(), imageData.size());
+
+            std::vector<uint8_t> frameData(frame.ByteSizeLong());
+            frame.SerializeToArray(frameData.data(), frameData.size());
+
+            Network::sendMessage(NetProto::HEADER_TYPE_FRAME, frameData);
         } else {
             if (filename.has_parent_path()) {
                 if (!std::filesystem::exists(std::filesystem::path(filename).parent_path())) {
@@ -1895,13 +1894,11 @@ void Application::takeScreenshot(std::string filename) { m_TakeScreenshot = file
 
 bool Application::handleFrameReceive(const std::vector<uint8_t>& data)
 {
-    glm::uvec2 size { 0 };
-    for (uint8_t i = 0; i < 4; i++) {
-        size.x <<= 8;
-        size.x |= data[i];
-        size.y <<= 8;
-        size.y |= data[i + 4];
-    }
+    NetProto::Frame frame;
+    frame.ParseFromArray(data.data(), data.size());
+
+    glm::uvec2 size { frame.width(), frame.height() };
+    std::vector<uint8_t> rawData(frame.data().begin(), frame.data().end());
 
     VkImageSubresource subResource { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0 };
     VkSubresourceLayout subResourceLayout;
@@ -1919,10 +1916,10 @@ bool Application::handleFrameReceive(const std::vector<uint8_t>& data)
         uint32_t* row = (uint32_t*)imageData;
         for (uint32_t x = 0; x < size.x; x++) {
             uint32_t index = (x + y * size.x) * 4 + offset;
-            ((uint8_t*)row)[0] = data[index + 0];
-            ((uint8_t*)row)[1] = data[index + 1];
-            ((uint8_t*)row)[2] = data[index + 2];
-            ((uint8_t*)row)[3] = data[index + 3];
+            ((uint8_t*)row)[0] = rawData[index + 0];
+            ((uint8_t*)row)[1] = rawData[index + 1];
+            ((uint8_t*)row)[2] = rawData[index + 2];
+            ((uint8_t*)row)[3] = rawData[index + 3];
             row++;
         }
         imageData += subResourceLayout.rowPitch;

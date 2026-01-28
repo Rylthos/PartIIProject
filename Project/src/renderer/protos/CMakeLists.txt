@@ -1,5 +1,6 @@
 add_library(Renderer-proto OBJECT
   "proto/network_proto/header.proto"
+  "proto/network_proto/frame.proto"
 )
 
 target_link_libraries(Renderer-proto PUBLIC protobuf::libprotobuf)
