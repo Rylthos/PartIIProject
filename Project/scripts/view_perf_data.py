@@ -23,7 +23,7 @@ if __name__=="__main__":
     data = parse_file(args.perf_file)
 
     if args.bar:
-        barpoints(data)
+        barpoints(data, args.perf_file)
     if args.violin:
         violin(data)
     if args.ratio:

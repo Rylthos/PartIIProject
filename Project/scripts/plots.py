@@ -3,7 +3,9 @@ from helper import *
 import numpy as np
 import matplotlib.pyplot as plt
 
-def barpoints(data):
+from pathlib import Path
+
+def barpoints(data, path):
     ax = plt.subplot()
 
     ax.set_title("Frame times")
@@ -53,6 +55,12 @@ def barpoints(data):
             ax.hlines(16, minX, maxX, linestyles="--")
 
     plt.legend()
+
+    parent_path = Path(path).parent
+    file_name = Path(path).stem
+
+    plt.savefig(f"{parent_path}/{file_name}.png")
+
     plt.show()
 
 def violin(data):
