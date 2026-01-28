@@ -29,6 +29,7 @@ add_executable(Renderer ${SOURCE_LIST})
 add_subdirectory(accelerationStructures)
 add_subdirectory(window)
 add_subdirectory(network)
+add_subdirectory(protos)
 
 target_compile_options(Renderer
   PUBLIC
@@ -42,6 +43,8 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
   )
 endif()
 
+target_include_directories(Renderer PUBLIC "$<BUILD_INTERFACE:${PROTO_BINARY_DIR}>")
+
 target_link_libraries(Renderer PRIVATE
   loaders
   logger
@@ -49,6 +52,8 @@ target_link_libraries(Renderer PRIVATE
   generators
   events
   serializers
+
+  Renderer-proto
 
   glm::glm
   Vulkan::UtilityHeaders
@@ -62,4 +67,5 @@ target_link_libraries(Renderer PRIVATE
   GPUOpen::VulkanMemoryAllocator
   nlohmann_json::nlohmann_json
   CLI11::CLI11
+  protobuf::libprotobuf
 )

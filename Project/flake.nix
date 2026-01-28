@@ -26,6 +26,9 @@
           cmake
           gnumake
           ninja
+
+          protobuf_33
+
           zlib
         ];
 

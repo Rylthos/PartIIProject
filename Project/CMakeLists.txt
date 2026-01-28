@@ -7,6 +7,9 @@ project(VoxelRaymarcher
 
 find_package(Vulkan REQUIRED)
 find_package(glfw3 REQUIRED)
+find_package(Protobuf CONFIG REQUIRED)
+
+find_package(ZLIB CONFIG)
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
   message("Enabled Debug features")

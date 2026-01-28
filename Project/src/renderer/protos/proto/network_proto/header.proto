@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package NetProto;
+
+enum Type {
+  HEADER_TYPE_UNKNOWN = 0;
+  HEADER_TYPE_FRAME = 1;
+}
+
+message Header {
+  Type type = 1;
+  uint32 header_size = 2;
+}

@@ -76,4 +76,5 @@ add_subdirectory(json)
 
 # assimp
 set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_ZLIB ON)
 add_subdirectory(assimp)

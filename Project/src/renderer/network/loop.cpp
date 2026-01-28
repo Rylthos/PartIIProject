@@ -1,8 +1,7 @@
 #include "loop.hpp"
 
-#include "header.hpp"
-
 #include "logger/logger.hpp"
+#include "network_proto/header.pb.h"
 
 #include <queue>
 #include <sys/socket.h>
@@ -12,16 +11,16 @@ namespace Network {
 std::queue<std::vector<uint8_t>> s_Messages;
 std::mutex s_MessageLock;
 
-std::unordered_map<HeaderType, std::vector<std::function<bool(const std::vector<uint8_t>&)>>>
+std::unordered_map<NetProto::Type, std::vector<std::function<bool(const std::vector<uint8_t>&)>>>
     s_Callbacks;
 std::mutex s_CallbackLock;
 
-void handleReceive(Header header, const std::vector<uint8_t>& data)
+void handleReceive(NetProto::Header& header, const std::vector<uint8_t>& data)
 {
-    if (!s_Callbacks.contains(header.type))
+    if (!s_Callbacks.contains(header.type()))
         return;
 
-    const auto& callbacks = s_Callbacks[header.type];
+    const auto& callbacks = s_Callbacks[header.type()];
 
     for (const auto& callback : callbacks) {
         if (callback(data)) {
@@ -32,15 +31,14 @@ void handleReceive(Header header, const std::vector<uint8_t>& data)
 
 void readLoop(Node node, std::stop_token stoken)
 {
-    std::vector<uint8_t> headerBuffer(sizeof(Header));
+    std::vector<uint8_t> headerSizeBuffer(sizeof(uint8_t));
 
     int targetFD = node.clientSocket.value_or(node.socket);
 
     while (!stoken.stop_requested()) {
-        ssize_t bits = -1;
-        bits = recv(targetFD, headerBuffer.data(), headerBuffer.size(), 0);
+        ssize_t headerSize = recv(targetFD, headerSizeBuffer.data(), headerSizeBuffer.size(), 0);
 
-        if (bits == -1) {
+        if (headerSize == -1) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
                 continue;
             } else {
@@ -49,14 +47,18 @@ void readLoop(Node node, std::stop_token stoken)
             continue;
         }
 
-        if (bits == headerBuffer.size()) {
-            uint32_t index = 0;
-            Header header = readHeader(headerBuffer.data(), index);
+        std::vector<uint8_t> headerBuffer(headerSizeBuffer[0]);
+        size_t headerBits = recv(targetFD, headerBuffer.data(), headerBuffer.size(), 0);
 
-            std::vector<uint8_t> readBuffer(header.size);
+        if (headerBits == headerBuffer.size()) {
+            NetProto::Header header;
+
+            header.ParseFromArray(headerBuffer.data(), headerBits);
+
+            std::vector<uint8_t> readBuffer(header.header_size());
             size_t readCount = 0;
 
-            while (readCount != header.size) {
+            while (readCount != header.header_size()) {
                 ssize_t read = recv(
                     targetFD, readBuffer.data() + readCount, readBuffer.size() - readCount, 0);
 
@@ -65,15 +67,15 @@ void readLoop(Node node, std::stop_token stoken)
 
             handleReceive(header, readBuffer);
 
-        } else if (bits > 0) {
-            LOG_ERROR("[NETWORK] Unknown number of bits read: {}", bits);
+        } else if (headerBits > 0) {
+            LOG_ERROR("[NETWORK] Unknown number of bits read: {}", headerBits);
         }
     }
 }
 
 void writeLoop(Node node, std::stop_token stoken)
 {
-    std::vector<uint8_t> headerBuffer(sizeof(Header));
+    std::vector<uint8_t> headerBuffer(sizeof(NetProto::Header));
 
     while (!stoken.stop_requested()) {
 
@@ -95,17 +97,18 @@ void writeLoop(Node node, std::stop_token stoken)
     }
 }
 
-void sendMessage(HeaderType headerType, const std::vector<uint8_t>& data)
+void sendMessage(NetProto::Type headerType, const std::vector<uint8_t>& data)
 {
-    Header header;
-    header.size = data.size();
-    header.type = headerType;
+    NetProto::Header header;
+    header.set_type(headerType);
+    header.set_header_size(data.size());
 
-    std::vector<uint8_t> message(sizeof(Header));
-    message.reserve(sizeof(Header) + data.size());
+    size_t headerSize = header.ByteSizeLong();
 
-    uint32_t offset = 0;
-    writeHeader(header, message.data(), offset);
+    std::vector<uint8_t> message(headerSize + 1);
+
+    message[0] = (uint8_t)headerSize;
+    header.SerializeToArray(message.data() + 1, headerSize);
 
     message.insert(message.end(), data.begin(), data.end());
 
@@ -115,11 +118,11 @@ void sendMessage(HeaderType headerType, const std::vector<uint8_t>& data)
     }
 }
 
-void addCallback(HeaderType headerType, std::function<bool(const std::vector<uint8_t>&)> callback)
+void addCallback(NetProto::Type type, std::function<bool(const std::vector<uint8_t>&)> callback)
 {
     std::unique_lock _lock(s_CallbackLock);
 
-    s_Callbacks[headerType].push_back(callback);
+    s_Callbacks[type].push_back(callback);
 }
 
 }

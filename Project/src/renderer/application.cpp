@@ -12,7 +12,8 @@
 #include "animation_manager.hpp"
 #include "events/events.hpp"
 
-#include "network/header.hpp"
+#include "network_proto/header.pb.h"
+
 #include "window/glfw_window.hpp"
 #include "window/headless_window.hpp"
 
@@ -81,7 +82,7 @@ void Application::init(InitSettings settings)
             = std::jthread([&](std::stop_token stoken) { Network::writeLoop(m_Node, stoken); });
 
         if (m_Settings.netInfo.enableClientSide) {
-            Network::addCallback(Network::HeaderType::FRAME,
+            Network::addCallback(NetProto::HEADER_TYPE_FRAME,
                 std::bind(&Application::handleFrameReceive, this, std::placeholders::_1));
         }
     }
@@ -1720,7 +1721,7 @@ void Application::render_FinaliseScreenshot()
                 data += subResourceLayout.rowPitch;
             }
 
-            Network::sendMessage(Network::HeaderType::FRAME, imageData);
+            Network::sendMessage(NetProto::HEADER_TYPE_FRAME, imageData);
         } else {
             if (filename.has_parent_path()) {
                 if (!std::filesystem::exists(std::filesystem::path(filename).parent_path())) {
