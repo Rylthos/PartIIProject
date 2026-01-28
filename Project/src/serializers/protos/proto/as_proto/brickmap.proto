@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+import "as_proto/general.proto";
+
+package ASProto;
+
+message Brickgrid {
+  repeated fixed32 pointers = 1;
+}
+
+message Brick {
+  fixed64 colour_ptr = 1;
+  repeated fixed64 occupancy = 2;
+}
+
+message BrickColour {
+  fixed32 data = 1;
+}
+
+message Brickmap {
+  Header header = 1;
+  Brickgrid grid = 2;
+  repeated Brick bricks = 3;
+  repeated BrickColour colours = 4;
+  Animation animation = 5;
+}

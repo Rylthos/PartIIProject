@@ -6,6 +6,7 @@
 #include "generators/texture.hpp"
 
 #include <filesystem>
+#include <fstream>
 
 namespace Serializers {
 

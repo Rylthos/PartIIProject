@@ -4,7 +4,9 @@
 #include "generators/brickmap.hpp"
 #include "modification/diff.hpp"
 
-#include <iostream>
+#include "as_proto/brickmap.pb.h"
+
+#include <fstream>
 #include <tuple>
 
 namespace Serializers {
@@ -23,6 +25,61 @@ std::ifstream loadBrickmapFile(std::filesystem::path directory)
 
     return inputStream;
 }
+std::optional<
+    std::tuple<SerialInfo, std::vector<Generators::BrickgridPtr>, std::vector<Generators::Brickmap>,
+        std::vector<Generators::BrickmapColour>, Modification::AnimationFrames>>
+loadBrickmap(ASProto::Brickmap& brickmap)
+{
+    SerialInfo serialInfo = readHeader(brickmap.header());
+
+    size_t brickgridSize = brickmap.grid().pointers_size();
+    std::vector<Generators::BrickgridPtr> brickgrid;
+    brickgrid.reserve(brickgridSize);
+
+    size_t brickmapSize = brickmap.bricks_size();
+    std::vector<Generators::Brickmap> brickmaps;
+    brickmaps.reserve(brickmapSize);
+
+    size_t coloursSize = brickmap.colours_size();
+    std::vector<Generators::BrickmapColour> colours;
+    brickmaps.reserve(coloursSize);
+
+    for (size_t i = 0; i < brickgridSize; i++) {
+        brickgrid.push_back(brickmap.grid().pointers().at(i));
+    }
+
+    for (size_t i = 0; i < brickmapSize; i++) {
+        ASProto::Brick protoBrick = brickmap.bricks().at(i);
+
+        Generators::Brickmap brickmap;
+        brickmap.colourPtr = protoBrick.colour_ptr();
+
+        for (int j = 0; j < 8; j++) {
+            brickmap.occupancy[j] = protoBrick.occupancy().at(j);
+        }
+        brickmaps.push_back(brickmap);
+    }
+
+    for (size_t i = 0; i < coloursSize; i++) {
+        ASProto::BrickColour protoColour = brickmap.colours().at(i);
+
+        Generators::BrickmapColour colour;
+
+        colour.data = (protoColour.data() >> 24) & 0xFF;
+        colour.r = (protoColour.data() >> 16) & 0xFF;
+        colour.g = (protoColour.data() >> 8) & 0xFF;
+        colour.b = (protoColour.data() >> 0) & 0xFF;
+
+        colours.push_back(colour);
+    }
+
+    Modification::AnimationFrames animation;
+    if (brickmap.has_animation()) {
+        animation = readAnimation(brickmap.animation());
+    }
+
+    return std::make_tuple(serialInfo, brickgrid, brickmaps, colours, animation);
+}
 
 std::optional<
     std::tuple<SerialInfo, std::vector<Generators::BrickgridPtr>, std::vector<Generators::Brickmap>,
@@ -30,9 +87,11 @@ std::optional<
 loadBrickmap(std::filesystem::path directory)
 {
     std::ifstream inputStream = loadBrickmapFile(directory);
-    std::vector<uint8_t> data = vectorFromStream(inputStream);
 
-    return loadBrickmap(data);
+    ASProto::Brickmap brickmap;
+    brickmap.ParseFromIstream(&inputStream);
+
+    return loadBrickmap(brickmap);
 }
 
 std::optional<
@@ -40,54 +99,10 @@ std::optional<
         std::vector<Generators::BrickmapColour>, Modification::AnimationFrames>>
 loadBrickmap(const std::vector<uint8_t>& data)
 {
-    std::istringstream inputStream(std::string(data.begin(), data.end()));
+    ASProto::Brickmap brickmap;
+    brickmap.ParseFromArray(data.data(), data.size());
 
-    SerialInfo serialInfo;
-    serialInfo.dimensions = Serializers::readUvec3(inputStream);
-    serialInfo.voxels = Serializers::readUint64(inputStream);
-    serialInfo.nodes = Serializers::readUint64(inputStream);
-
-    size_t numBrickmaps = Serializers::readUint64(inputStream);
-    size_t numColours = Serializers::readUint64(inputStream);
-
-    glm::uvec3 brickgridSize = serialInfo.dimensions;
-
-    std::vector<Generators::BrickgridPtr> brickgrid;
-    size_t totalNodes = brickgridSize.x * brickgridSize.y * brickgridSize.z;
-    brickgrid.reserve(totalNodes);
-
-    std::vector<Generators::Brickmap> brickmaps;
-    brickmaps.reserve(numBrickmaps);
-
-    std::vector<Generators::BrickmapColour> colours;
-    brickmaps.reserve(numColours);
-
-    for (size_t i = 0; i < totalNodes; i++) {
-        brickgrid.push_back(Serializers::readUint32(inputStream));
-    }
-
-    for (size_t j = 0; j < numBrickmaps; j++) {
-        Generators::Brickmap brickmap;
-        brickmap.colourPtr = Serializers::readUint64(inputStream);
-        for (int i = 0; i < 8; i++) {
-            brickmap.occupancy[i] = Serializers::readUint64(inputStream);
-        }
-        brickmaps.push_back(brickmap);
-    }
-
-    for (size_t j = 0; j < numColours; j++) {
-        Generators::BrickmapColour colour;
-        colour.data = Serializers::readByte(inputStream);
-        colour.r = Serializers::readByte(inputStream);
-        colour.g = Serializers::readByte(inputStream);
-        colour.b = Serializers::readByte(inputStream);
-
-        colours.push_back(colour);
-    }
-
-    Modification::AnimationFrames animation = readAnimationFrames(inputStream);
-
-    return std::make_tuple(serialInfo, brickgrid, brickmaps, colours, animation);
+    return loadBrickmap(brickmap);
 }
 
 void storeBrickmap(std::filesystem::path output, const std::string& name, glm::uvec3 dimensions,
@@ -103,32 +118,37 @@ void storeBrickmap(std::filesystem::path output, const std::string& name, glm::u
         exit(-1);
     }
 
-    writeUvec3(dimensions, outputStream);
-    writeUint64(generationInfo.voxelCount, outputStream);
-    writeUint64(generationInfo.nodes, outputStream);
+    ASProto::Brickmap brickmap;
 
-    writeUint64(brickmaps.size(), outputStream);
-    writeUint64(colours.size(), outputStream);
+    writeHeader(
+        brickmap.mutable_header(), dimensions, generationInfo.voxelCount, generationInfo.nodes);
 
     for (const uint32_t& ptr : brickgrid) {
-        Serializers::writeUint32(ptr, outputStream);
+        brickmap.mutable_grid()->mutable_pointers()->Add(ptr);
     }
 
-    for (const Generators::Brickmap& brickmap : brickmaps) {
-        Serializers::writeUint64(brickmap.colourPtr, outputStream);
+    for (const Generators::Brickmap& brick : brickmaps) {
+        ASProto::Brick* protoBrick = brickmap.mutable_bricks()->Add();
+
+        protoBrick->set_colour_ptr(brick.colourPtr);
+
         for (uint8_t i = 0; i < 8; i++) {
-            Serializers::writeUint64(brickmap.occupancy[i], outputStream);
+            protoBrick->mutable_occupancy()->Add(brick.occupancy[i]);
         }
     }
 
     for (const Generators::BrickmapColour& colour : colours) {
-        Serializers::writeByte(colour.data, outputStream);
-        Serializers::writeByte(colour.r, outputStream);
-        Serializers::writeByte(colour.g, outputStream);
-        Serializers::writeByte(colour.b, outputStream);
+        ASProto::BrickColour* protoColour = brickmap.mutable_colours()->Add();
+
+        protoColour->set_data((((uint32_t)colour.data) << 24) | (((uint32_t)colour.r) << 16)
+            | (((uint32_t)colour.g) << 8) | (((uint32_t)colour.b) << 0));
     }
 
-    writeAnimationFrames(animation, outputStream);
+    if (animation.size() != 0) {
+        writeAnimation(brickmap.mutable_animation(), animation);
+    }
+
+    brickmap.SerializeToOstream(&outputStream);
 
     outputStream.close();
 }

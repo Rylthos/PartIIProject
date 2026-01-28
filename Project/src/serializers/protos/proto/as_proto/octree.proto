@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+import "as_proto/general.proto";
+
+package ASProto;
+
+message OctreeNode {
+  fixed32 data = 1;
+}
+
+message Octree {
+  Header header = 1;
+  repeated OctreeNode nodes = 2;
+}

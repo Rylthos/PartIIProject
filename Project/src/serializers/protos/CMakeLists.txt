@@ -1,6 +1,10 @@
 add_library(serializer-proto OBJECT
   "proto/as_proto/general.proto"
   "proto/as_proto/grid.proto"
+  "proto/as_proto/texture.proto"
+  "proto/as_proto/octree.proto"
+  "proto/as_proto/contree.proto"
+  "proto/as_proto/brickmap.proto"
 )
 
 target_link_libraries(serializer-proto PUBLIC protobuf::libprotobuf)

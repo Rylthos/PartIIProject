@@ -2,10 +2,10 @@
 
 #include "common.hpp"
 
+#include "as_proto/octree.pb.h"
+
 #include "generators/common.hpp"
 #include "generators/octree.hpp"
-
-#include <iostream>
 
 namespace Serializers {
 
@@ -25,33 +25,40 @@ std::ifstream loadOctreeFile(std::filesystem::path directory)
 }
 
 std::optional<std::tuple<SerialInfo, std::vector<Generators::OctreeNode>>> loadOctree(
+    ASProto::Octree& octree)
+{
+    SerialInfo serialInfo = readHeader(octree.header());
+
+    size_t nodeCount = octree.nodes_size();
+    std::vector<Generators::OctreeNode> nodes;
+    nodes.reserve(serialInfo.nodes);
+
+    for (size_t i = 0; i < nodeCount; i++) {
+        uint32_t value = octree.nodes().at(i).data();
+
+        nodes.push_back(value);
+    }
+
+    return std::make_pair(serialInfo, nodes);
+}
+
+std::optional<std::tuple<SerialInfo, std::vector<Generators::OctreeNode>>> loadOctree(
     std::filesystem::path directory)
 {
     std::ifstream inputStream = loadOctreeFile(directory);
-    std::vector<uint8_t> data = vectorFromStream(inputStream);
+    ASProto::Octree octree;
+    octree.ParseFromIstream(&inputStream);
 
-    return loadOctree(data);
+    return loadOctree(octree);
 }
 
 std::optional<std::tuple<SerialInfo, std::vector<Generators::OctreeNode>>> loadOctree(
     const std::vector<uint8_t>& data)
 {
-    std::istringstream inputStream(std::string(data.begin(), data.end()));
+    ASProto::Octree octree;
+    octree.ParseFromArray(data.data(), data.size());
 
-    SerialInfo serialInfo;
-    serialInfo.dimensions = Serializers::readUvec3(inputStream);
-    serialInfo.voxels = Serializers::readUint64(inputStream);
-    serialInfo.nodes = Serializers::readUint64(inputStream);
-
-    std::vector<Generators::OctreeNode> nodes;
-    nodes.reserve(serialInfo.nodes);
-
-    while (!inputStream.eof()) {
-        uint32_t data = Serializers::readUint32(inputStream);
-
-        nodes.push_back(Generators::OctreeNode(data));
-    }
-    return std::make_pair(serialInfo, nodes);
+    return loadOctree(octree);
 }
 
 void storeOctree(std::filesystem::path output, const std::string& name, glm::uvec3 dimensions,
@@ -65,14 +72,19 @@ void storeOctree(std::filesystem::path output, const std::string& name, glm::uve
         exit(-1);
     }
 
-    writeUvec3(dimensions, outputStream);
-    writeUint64(generationInfo.voxelCount, outputStream);
-    writeUint64(generationInfo.nodes, outputStream);
+    ASProto::Octree octree;
+
+    writeHeader(
+        octree.mutable_header(), dimensions, generationInfo.voxelCount, generationInfo.nodes);
 
     for (const auto& node : nodes) {
         uint32_t data = node.getData();
-        Serializers::writeUint32(data, outputStream);
+
+        ASProto::OctreeNode* protoNode = octree.mutable_nodes()->Add();
+        protoNode->set_data(data);
     }
+
+    octree.SerializeToOstream(&outputStream);
 
     outputStream.close();
 }

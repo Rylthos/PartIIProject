@@ -6,6 +6,7 @@
 #include "generators/contree.hpp"
 
 #include <filesystem>
+#include <fstream>
 
 namespace Serializers {
 

@@ -2,176 +2,108 @@
 #include "modification/diff.hpp"
 #include "modification/mod_type.hpp"
 
-namespace Serializers {
-std::vector<uint8_t> vectorFromStream(std::ifstream& inputStream)
-{
-    inputStream.seekg(0, std::ios::end);
+#include "as_proto/general.pb.h"
 
-    size_t fileSize = inputStream.tellg();
-    inputStream.seekg(0, std::ios::beg);
+namespace Serializers {
+
+std::vector<uint8_t> vectorFromStream(std::istream& stream)
+{
+    stream.seekg(0, std::ios::end);
+
+    size_t fileSize = stream.tellg();
+    stream.seekg(0, std::ios::beg);
 
     std::vector<uint8_t> data(fileSize);
-    inputStream.read((char*)data.data(), fileSize);
+    stream.read((char*)data.data(), fileSize);
 
     return data;
 }
 
-void writeByte(uint8_t byte, std::ofstream& stream) { stream.put(byte); }
-
-uint8_t readByte(std::istream& stream) { return stream.get(); }
-
-void writeUint32(uint32_t value, std::ofstream& stream)
+void writeHeader(
+    ASProto::Header* header, glm::uvec3 dimensions, size_t voxelCount, size_t nodeCount)
 {
-    for (size_t i = 0; i < 4; i++) {
-        uint8_t byte = (value >> (8 * i)) & 0xFF;
-        stream.put(byte);
-    }
+    header->mutable_dimensions()->set_x(dimensions.x);
+    header->mutable_dimensions()->set_y(dimensions.y);
+    header->mutable_dimensions()->set_z(dimensions.z);
+
+    header->set_voxelcount(voxelCount);
+    header->set_nodecount(nodeCount);
 }
 
-uint32_t readUint32(std::istream& stream)
+SerialInfo readHeader(const ASProto::Header& header)
 {
-    uint32_t output = 0;
-    for (size_t i = 0; i < 4; i++) {
-        uint8_t byte = readByte(stream);
-        output |= ((uint32_t)byte) << (8 * i);
-    }
-    return output;
+    return SerialInfo {
+        .dimensions = glm::uvec3 { header.dimensions().x(), header.dimensions().y(),
+                                  header.dimensions().z(), },
+        .voxels = header.voxelcount(),
+        .nodes = header.nodecount(),
+    };
 }
 
-void writeFloat(float value, std::ofstream& stream)
+void writeDiff(ASProto::AnimationDiff* diff, glm::ivec3 position, Modification::DiffType diffType)
 {
-    uint32_t converted = std::bit_cast<uint32_t>(value);
+    diff->set_type(static_cast<uint32_t>(diffType.first));
 
-    writeUint32(converted, stream);
+    diff->mutable_position()->set_x(position.x);
+    diff->mutable_position()->set_y(position.y);
+    diff->mutable_position()->set_z(position.z);
+
+    diff->mutable_colour()->set_r(diffType.second.r);
+    diff->mutable_colour()->set_g(diffType.second.g);
+    diff->mutable_colour()->set_b(diffType.second.b);
 }
 
-float readFloat(std::istream& stream)
+std::pair<glm::ivec3, Modification::DiffType> readDiff(const ASProto::AnimationDiff& diff)
 {
-    uint32_t converted = readUint32(stream);
-    return std::bit_cast<float>(converted);
+    glm::ivec3 index = {
+        diff.position().x(),
+        diff.position().y(),
+        diff.position().z(),
+    };
+
+    Modification::Type type = static_cast<Modification::Type>(diff.type());
+    glm::vec3 colour = {
+        diff.colour().r(),
+        diff.colour().g(),
+        diff.colour().b(),
+    };
+
+    return std::make_pair(index, Modification::DiffType(type, colour));
 }
 
-void writeUint64(uint64_t value, std::ofstream& stream)
+void writeAnimation(ASProto::Animation* animation, const Modification::AnimationFrames& frames)
 {
-    for (size_t i = 0; i < 8; i++) {
-        uint8_t byte = (value >> (8 * i)) & 0xFF;
-        stream.put(byte);
-    }
-}
-
-uint64_t readUint64(std::istream& stream)
-{
-
-    uint64_t output = 0;
-    for (size_t i = 0; i < 8; i++) {
-        uint8_t byte = readByte(stream);
-        output |= ((uint64_t)byte) << (8 * i);
-    }
-    return output;
-}
-
-void writeUvec3(glm::uvec3 vec, std::ofstream& stream)
-{
-    writeUint32(vec.x, stream);
-    writeUint32(vec.y, stream);
-    writeUint32(vec.z, stream);
-}
-
-glm::uvec3 readUvec3(std::istream& stream)
-{
-    glm::uvec3 vec;
-    vec.x = readUint32(stream);
-    vec.y = readUint32(stream);
-    vec.z = readUint32(stream);
-    return vec;
-}
-
-void writeVec3(glm::vec3 vec, std::ofstream& stream)
-{
-    writeFloat(vec.x, stream);
-    writeFloat(vec.y, stream);
-    writeFloat(vec.z, stream);
-}
-
-glm::vec3 readVec3(std::istream& stream)
-{
-    glm::vec3 vec;
-
-    vec.x = readFloat(stream);
-    vec.y = readFloat(stream);
-    vec.z = readFloat(stream);
-
-    return vec;
-}
-
-void writeU8Vec4(glm::u8vec4 vec, std::ofstream& stream)
-{
-    writeByte(vec.x, stream);
-    writeByte(vec.y, stream);
-    writeByte(vec.z, stream);
-    writeByte(vec.w, stream);
-}
-
-glm::u8vec4 readU8Vec4(std::istream& stream)
-{
-    glm::u8vec4 vec;
-    vec.x = readByte(stream);
-    vec.y = readByte(stream);
-    vec.z = readByte(stream);
-    vec.w = readByte(stream);
-    return vec;
-}
-
-void writeDiff(Modification::DiffType diff, std::ofstream& stream)
-{
-    writeUint32(static_cast<uint32_t>(diff.first), stream);
-    writeVec3(diff.second, stream);
-}
-
-Modification::DiffType readDiff(std::istream& stream)
-{
-    Modification::Type type = static_cast<Modification::Type>(readUint32(stream));
-    glm::vec3 colour = readVec3(stream);
-
-    return { type, colour };
-}
-
-void writeAnimationFrames(const Modification::AnimationFrames& animation, std::ofstream& stream)
-{
-    writeUint64(animation.size(), stream);
-
-    for (const auto& frame : animation) {
-        writeUint64(frame.size(), stream);
-
-        for (const auto& change : frame) {
-            writeUvec3(change.first, stream);
-
-            writeDiff(change.second, stream);
+    for (const auto& frame : frames) {
+        ASProto::AnimationFrames* frames = animation->mutable_frames()->Add();
+        for (const auto& diff : frame) {
+            ASProto::AnimationDiff* protoDiff = frames->mutable_diffs()->Add();
+            writeDiff(protoDiff, diff.first, diff.second);
         }
     }
 }
 
-Modification::AnimationFrames readAnimationFrames(std::istream& stream)
+Modification::AnimationFrames readAnimation(const ASProto::Animation& animation)
 {
-    Modification::AnimationFrames animation;
+    Modification::AnimationFrames frames;
 
-    size_t animationFrames = readUint64(stream);
+    uint32_t frameCount = animation.frames_size();
+    frames.resize(frameCount);
 
-    animation.resize(animationFrames);
+    for (uint32_t frame = 0; frame < frameCount; frame++) {
 
-    for (size_t frame = 0; frame < animationFrames; frame++) {
-        size_t changes = readUint64(stream);
+        uint32_t diffs = animation.frames().at(frame).diffs_size();
+        for (uint32_t diff = 0; diff < diffs; diff++) {
+            ASProto::AnimationDiff animDiff = animation.frames().at(frame).diffs().at(diff);
 
-        for (size_t change = 0; change < changes; change++) {
-            glm::ivec3 index = readUvec3(stream);
+            glm::ivec3 index;
+            Modification::DiffType diffType;
+            std::tie(index, diffType) = readDiff(animDiff);
 
-            Modification::DiffType diff = readDiff(stream);
-
-            animation[frame].insert({ index, diff });
+            frames[frame].insert({ index, diffType });
         }
     }
 
-    return animation;
+    return frames;
 }
 
 }

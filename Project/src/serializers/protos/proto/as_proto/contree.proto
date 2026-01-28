@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+import "as_proto/general.proto";
+
+package ASProto;
+
+message ContreeNode {
+  fixed64 high = 1;
+  fixed64 low = 2;
+}
+
+message Contree {
+  Header header = 1;
+  repeated ContreeNode nodes = 2;
+}

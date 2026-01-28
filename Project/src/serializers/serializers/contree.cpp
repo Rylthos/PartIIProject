@@ -3,7 +3,7 @@
 #include "common.hpp"
 #include "generators/contree.hpp"
 
-#include <iostream>
+#include "as_proto/contree.pb.h"
 
 namespace Serializers {
 
@@ -23,33 +23,41 @@ std::ifstream loadContreeFile(std::filesystem::path directory)
 }
 
 std::optional<std::tuple<SerialInfo, std::vector<Generators::ContreeNode>>> loadContree(
+    ASProto::Contree& contree)
+{
+    SerialInfo serialInfo = readHeader(contree.header());
+
+    size_t contreeNodes = contree.nodes_size();
+    std::vector<Generators::ContreeNode> nodes;
+    nodes.reserve(contreeNodes);
+
+    for (size_t i = 0; i < contreeNodes; i++) {
+        ASProto::ContreeNode node = contree.nodes().at(i);
+
+        nodes.push_back(Generators::ContreeNode(node.high(), node.low()));
+    }
+
+    return std::make_pair(serialInfo, nodes);
+}
+
+std::optional<std::tuple<SerialInfo, std::vector<Generators::ContreeNode>>> loadContree(
     std::filesystem::path directory)
 {
     std::ifstream inputStream = loadContreeFile(directory);
-    std::vector<uint8_t> data = vectorFromStream(inputStream);
+    ASProto::Contree contree;
+    contree.ParseFromIstream(&inputStream);
 
-    return loadContree(data);
+    return loadContree(contree);
 }
 std::optional<std::tuple<SerialInfo, std::vector<Generators::ContreeNode>>> loadContree(
     const std::vector<uint8_t>& data)
 {
     std::istringstream inputStream(std::string(data.begin(), data.end()));
 
-    SerialInfo serialInfo;
-    serialInfo.dimensions = Serializers::readUvec3(inputStream);
-    serialInfo.voxels = Serializers::readUint64(inputStream);
-    serialInfo.nodes = Serializers::readUint64(inputStream);
+    ASProto::Contree contree;
+    contree.ParseFromArray(data.data(), data.size());
 
-    std::vector<Generators::ContreeNode> nodes;
-    nodes.reserve(serialInfo.nodes);
-
-    while (!inputStream.eof()) {
-        uint64_t high = Serializers::readUint64(inputStream);
-        uint64_t low = Serializers::readUint64(inputStream);
-
-        nodes.push_back(Generators::ContreeNode(high, low));
-    }
-    return std::make_pair(serialInfo, nodes);
+    return loadContree(contree);
 }
 
 void storeContree(std::filesystem::path output, const std::string& name, glm::uvec3 dimensions,
@@ -63,15 +71,18 @@ void storeContree(std::filesystem::path output, const std::string& name, glm::uv
         exit(-1);
     }
 
-    writeUvec3(dimensions, outputStream);
-    writeUint64(generationInfo.voxelCount, outputStream);
-    writeUint64(generationInfo.nodes, outputStream);
+    ASProto::Contree contree;
+    writeHeader(
+        contree.mutable_header(), dimensions, generationInfo.voxelCount, generationInfo.nodes);
 
     for (const auto& node : nodes) {
+        ASProto::ContreeNode* protoNode = contree.mutable_nodes()->Add();
         std::array<uint64_t, 2> data = node.getData();
-        Serializers::writeUint64(data[0], outputStream);
-        Serializers::writeUint64(data[1], outputStream);
+        protoNode->set_high(data[0]);
+        protoNode->set_low(data[1]);
     }
+
+    contree.SerializeToOstream(&outputStream);
 
     outputStream.close();
 }

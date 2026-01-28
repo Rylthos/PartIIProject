@@ -9,6 +9,7 @@
 #include <glm/glm.hpp>
 
 #include <filesystem>
+#include <fstream>
 
 namespace Serializers {
 

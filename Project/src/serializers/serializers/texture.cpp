@@ -4,7 +4,7 @@
 #include "generators/texture.hpp"
 #include "modification/diff.hpp"
 
-#include <iostream>
+#include "as_proto/texture.pb.h"
 
 namespace Serializers {
 
@@ -26,38 +26,54 @@ std::ifstream loadTextureFile(std::filesystem::path directory)
 
 std::optional<
     std::tuple<SerialInfo, std::vector<Generators::TextureVoxel>, Modification::AnimationFrames>>
+loadTexture(ASProto::Texture& texture)
+{
+    SerialInfo serialInfo = readHeader(texture.header());
+
+    size_t voxelCount = texture.voxels_size();
+    std::vector<Generators::TextureVoxel> voxels;
+    voxels.reserve(voxelCount);
+
+    for (size_t i = 0; i < voxelCount; i++) {
+        uint32_t rawVoxel = texture.voxels().at(i);
+
+        glm::u8vec4 voxel = glm::u8vec4 {
+            (rawVoxel >> 24) & 0xFF,
+            (rawVoxel >> 16) & 0xFF,
+            (rawVoxel >> 8) & 0xFF,
+            (rawVoxel >> 0) & 0xFF,
+        };
+
+        voxels.push_back(voxel);
+    }
+    Modification::AnimationFrames animation;
+    if (texture.has_animation()) {
+        animation = readAnimation(texture.animation());
+    }
+
+    return std::make_tuple(serialInfo, voxels, animation);
+}
+
+std::optional<
+    std::tuple<SerialInfo, std::vector<Generators::TextureVoxel>, Modification::AnimationFrames>>
 loadTexture(std::filesystem::path directory)
 {
     std::ifstream inputStream = loadTextureFile(directory);
-    std::vector<uint8_t> data = vectorFromStream(inputStream);
 
-    return loadTexture(data);
+    ASProto::Texture texture;
+    texture.ParseFromIstream(&inputStream);
+
+    return loadTexture(texture);
 }
 
 std::optional<
     std::tuple<SerialInfo, std::vector<Generators::TextureVoxel>, Modification::AnimationFrames>>
 loadTexture(const std::vector<uint8_t>& data)
 {
-    std::istringstream inputStream(std::string(data.begin(), data.end()));
+    ASProto::Texture texture;
+    texture.ParseFromArray(data.data(), data.size());
 
-    SerialInfo serialInfo;
-    serialInfo.dimensions = Serializers::readUvec3(inputStream);
-    serialInfo.voxels = Serializers::readUint64(inputStream);
-    serialInfo.nodes = Serializers::readUint64(inputStream);
-    size_t voxelCount = Serializers::readUint64(inputStream);
-
-    std::vector<Generators::TextureVoxel> nodes;
-    nodes.reserve(serialInfo.nodes);
-
-    for (size_t i = 0; i < voxelCount; i++) {
-        glm::u8vec4 data = Serializers::readU8Vec4(inputStream);
-
-        nodes.push_back(data);
-    }
-
-    Modification::AnimationFrames animation = readAnimationFrames(inputStream);
-
-    return std::make_tuple(serialInfo, nodes, animation);
+    return loadTexture(texture);
 }
 
 void storeTexture(std::filesystem::path output, const std::string& name, glm::uvec3 dimensions,
@@ -72,16 +88,23 @@ void storeTexture(std::filesystem::path output, const std::string& name, glm::uv
         exit(-1);
     }
 
-    writeUvec3(dimensions, outputStream);
-    writeUint64(generationInfo.voxelCount, outputStream);
-    writeUint64(generationInfo.nodes, outputStream);
-    writeUint64(voxels.size(), outputStream);
+    ASProto::Texture textureProto;
 
-    for (const auto& node : voxels) {
-        writeU8Vec4(node, outputStream);
+    writeHeader(
+        textureProto.mutable_header(), dimensions, generationInfo.voxelCount, generationInfo.nodes);
+
+    for (const auto& voxel : voxels) {
+        uint32_t v = (((uint32_t)(voxel.r)) << 24) | (((uint32_t)(voxel.g)) << 16)
+            | (((uint32_t)(voxel.b)) << 8) | (((uint32_t)(voxel.a)) << 0);
+
+        textureProto.add_voxels(v);
     }
 
-    writeAnimationFrames(animation, outputStream);
+    if (animation.size() != 0) {
+        writeAnimation(textureProto.mutable_animation(), animation);
+    }
+
+    textureProto.SerializeToOstream(&outputStream);
 
     outputStream.close();
 }

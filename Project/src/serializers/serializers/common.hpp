@@ -1,9 +1,8 @@
 #pragma once
 
 #include "modification/diff.hpp"
-#include <fstream>
 
-#include <cstdint>
+#include "as_proto/general.pb.h"
 
 #include <glm/glm.hpp>
 
@@ -14,41 +13,18 @@ struct SerialInfo {
     uint64_t nodes;
 };
 
-std::vector<uint8_t> vectorFromStream(std::ifstream& file);
+std::vector<uint8_t> vectorFromStream(std::istream& stream);
 
-void writeByte(uint8_t byte, std::ofstream& stream);
+void writeHeader(
+    ASProto::Header* header, glm::uvec3 dimensions, size_t voxelCount, size_t nodeCount);
 
-uint8_t readByte(std::istream& stream);
+SerialInfo readHeader(const ASProto::Header& header);
 
-void writeUint32(uint32_t value, std::ofstream& stream);
+void writeDiff(ASProto::AnimationDiff* diff, glm::ivec3 position, Modification::DiffType diffType);
 
-uint32_t readUint32(std::istream& stream);
+std::pair<glm::ivec3, Modification::DiffType> readDiff(const ASProto::AnimationDiff& diff);
 
-void writeFloat(float value, std::ofstream& stream);
+void writeAnimation(ASProto::Animation* animation, const Modification::AnimationFrames& frames);
 
-float readFloat(std::istream& stream);
-
-void writeUint64(uint64_t value, std::ofstream& stream);
-
-uint64_t readUint64(std::istream& stream);
-
-void writeUvec3(glm::uvec3 vec, std::ofstream& stream);
-
-glm::uvec3 readUvec3(std::istream& stream);
-
-void writeVec3(glm::vec3 vec, std::ofstream& stream);
-
-glm::vec3 readVec3(std::istream& stream);
-
-void writeU8Vec4(glm::u8vec4 vec, std::ofstream& stream);
-
-glm::u8vec4 readU8Vec4(std::istream& stream);
-
-void writeDiff(Modification::DiffType diff, std::ofstream& stream);
-
-Modification::DiffType readDiff(std::istream& stream);
-
-void writeAnimationFrames(const Modification::AnimationFrames& animation, std::ofstream& stream);
-
-Modification::AnimationFrames readAnimationFrames(std::istream& stream);
+Modification::AnimationFrames readAnimation(const ASProto::Animation& animation);
 };

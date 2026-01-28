@@ -10,7 +10,6 @@
 #include <unordered_map>
 #include <vector>
 
-#include "serializers/common.hpp"
 #include "spdlog/fmt/bundled/format.h"
 
 static std::array<uint32_t, 256> DefaultPallete = { 0x00000000, 0xffffffff, 0xffccffff, 0xff99ffff,
@@ -60,11 +59,23 @@ struct Chunk {
     std::vector<Chunk> children;
 };
 
+uint8_t readByte(std::ifstream& stream) { return stream.get(); }
+
+uint32_t readUint32(std::ifstream& stream)
+{
+    uint32_t data = 0;
+    for (uint8_t i = 0; i < 4; i++) {
+        data |= ((uint32_t)(readByte(stream)) << (8 * i));
+    }
+
+    return data;
+}
+
 namespace ParserImpl {
 
 bool parseHeader(std::ifstream& inputstream)
 {
-    uint32_t id = Serializers::readUint32(inputstream);
+    uint32_t id = readUint32(inputstream);
 
     const uint32_t TARGET_ID = 'V' | ('O' << 8) | ('X' << 16) | (' ' << 24);
 
@@ -73,7 +84,7 @@ bool parseHeader(std::ifstream& inputstream)
         return false;
     }
 
-    uint32_t version = Serializers::readUint32(inputstream);
+    uint32_t version = readUint32(inputstream);
     if (version != 150 && version != 200) {
         fprintf(stderr, "Expected version 150 or 200 got %d\n", version);
         return false;
@@ -87,7 +98,7 @@ std::array<char, 4> readTag(std::ifstream& stream)
     std::array<char, 4> tag;
 
     for (uint8_t i = 0; i < 4; i++) {
-        tag[i] = Serializers::readByte(stream);
+        tag[i] = readByte(stream);
     }
 
     return tag;
@@ -100,14 +111,14 @@ Chunk parseChunk(std::ifstream& file, uint32_t& i)
     chunk.tag = readTag(file);
     i += 4;
 
-    chunk.chunkSize = Serializers::readUint32(file);
+    chunk.chunkSize = readUint32(file);
     i += 4;
-    chunk.childrenSize = Serializers::readUint32(file);
+    chunk.childrenSize = readUint32(file);
     i += 4;
 
     chunk.chunkContent.reserve(chunk.chunkSize);
     for (uint32_t j = 0; j < chunk.chunkSize; j++) {
-        chunk.chunkContent.push_back(Serializers::readByte(file));
+        chunk.chunkContent.push_back(readByte(file));
     }
     i += chunk.chunkSize;
 

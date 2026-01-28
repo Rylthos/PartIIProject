@@ -6,6 +6,7 @@
 #include "generators/common.hpp"
 
 #include <filesystem>
+#include <fstream>
 
 namespace Serializers {
 

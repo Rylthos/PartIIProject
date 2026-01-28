@@ -6,6 +6,7 @@
 #include "generators/octree.hpp"
 
 #include <filesystem>
+#include <fstream>
 
 namespace Serializers {
 

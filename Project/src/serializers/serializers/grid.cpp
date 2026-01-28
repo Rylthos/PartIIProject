@@ -27,33 +27,9 @@ std::ifstream loadGridFile(std::filesystem::path directory)
 
 std::optional<
     std::tuple<SerialInfo, std::vector<Generators::GridVoxel>, Modification::AnimationFrames>>
-loadGrid(std::filesystem::path directory)
+loadGrid(ASProto::Grid& grid)
 {
-    std::ifstream inputStream = loadGridFile(directory);
-    std::vector<uint8_t> data = vectorFromStream(inputStream);
-
-    return loadGrid(data);
-}
-
-std::optional<
-    std::tuple<SerialInfo, std::vector<Generators::GridVoxel>, Modification::AnimationFrames>>
-loadGrid(const std::vector<uint8_t>& data)
-{
-    ASProto::Grid grid;
-    grid.ParseFromArray(data.data(), data.size());
-
-    ASProto::Header gridHeader = grid.header();
-
-    SerialInfo info {
-        .dimensions = glm::uvec3 { gridHeader.dimensions().x(), gridHeader.dimensions().y(),
-                                  gridHeader.dimensions().z(), },
-        .voxels = gridHeader.voxelcount(),
-        .nodes = gridHeader.nodecount(),
-    };
-
-    printf("GRID: %d %d %d\n", info.dimensions.x, info.dimensions.y, info.dimensions.z);
-    printf("Voxels: %ld\n", info.voxels);
-    printf("Nodes: %ld\n", info.nodes);
+    SerialInfo info = readHeader(grid.header());
 
     size_t voxelCount = grid.voxels_size();
     std::vector<Generators::GridVoxel> voxels;
@@ -81,35 +57,32 @@ loadGrid(const std::vector<uint8_t>& data)
     Modification::AnimationFrames animation;
 
     if (grid.has_animation()) {
-        uint32_t frames = grid.animation().frames_size();
-        animation.resize(frames);
-        for (uint32_t frame = 0; frame < frames; frame++) {
-            uint32_t diffs = grid.animation().frames().at(frame).diffs_size();
-            for (uint32_t diff = 0; diff < diffs; diff++) {
-                ASProto::AnimationDiff animDiff
-                    = grid.animation().frames().at(frame).diffs().at(diff);
-
-                glm::ivec3 index = {
-                    animDiff.position().x(),
-                    animDiff.position().y(),
-                    animDiff.position().z(),
-                };
-
-                Modification::Type type = static_cast<Modification::Type>(animDiff.type());
-                glm::vec3 colour = {
-                    animDiff.colour().r(),
-                    animDiff.colour().g(),
-                    animDiff.colour().b(),
-                };
-
-                animation[frame].insert({
-                    index, Modification::DiffType { type, colour }
-                });
-            }
-        }
+        animation = readAnimation(grid.animation());
     }
 
     return std::make_tuple(info, voxels, animation);
+}
+
+std::optional<
+    std::tuple<SerialInfo, std::vector<Generators::GridVoxel>, Modification::AnimationFrames>>
+loadGrid(std::filesystem::path directory)
+{
+    std::ifstream inputStream = loadGridFile(directory);
+
+    ASProto::Grid grid;
+    grid.ParseFromIstream(&inputStream);
+
+    return loadGrid(grid);
+}
+
+std::optional<
+    std::tuple<SerialInfo, std::vector<Generators::GridVoxel>, Modification::AnimationFrames>>
+loadGrid(const std::vector<uint8_t>& data)
+{
+    ASProto::Grid grid;
+    grid.ParseFromArray(data.data(), data.size());
+
+    return loadGrid(grid);
 }
 
 void storeGrid(std::filesystem::path output, const std::string& name, glm::uvec3 dimensions,
@@ -126,12 +99,8 @@ void storeGrid(std::filesystem::path output, const std::string& name, glm::uvec3
 
     ASProto::Grid gridProto;
 
-    gridProto.mutable_header()->mutable_dimensions()->set_x(dimensions.x);
-    gridProto.mutable_header()->mutable_dimensions()->set_y(dimensions.y);
-    gridProto.mutable_header()->mutable_dimensions()->set_z(dimensions.z);
-
-    gridProto.mutable_header()->set_voxelcount(generationInfo.voxelCount);
-    gridProto.mutable_header()->set_nodecount(generationInfo.nodes);
+    writeHeader(
+        gridProto.mutable_header(), dimensions, generationInfo.voxelCount, generationInfo.nodes);
 
     for (const auto& voxel : grid) {
         uint32_t v = ((((uint32_t)(voxel.colour.r * 255.f)) & 0xFF) << 24)
@@ -142,20 +111,8 @@ void storeGrid(std::filesystem::path output, const std::string& name, glm::uvec3
         gridProto.mutable_voxels()->Add(v);
     }
 
-    for (const auto& frame : animation) {
-        ASProto::AnimationFrames* frames = gridProto.mutable_animation()->mutable_frames()->Add();
-        for (const auto& diff : frame) {
-            ASProto::AnimationDiff* protoDiff = frames->mutable_diffs()->Add();
-            protoDiff->set_type(static_cast<uint32_t>(diff.second.first));
-
-            protoDiff->mutable_position()->set_x(diff.first.x);
-            protoDiff->mutable_position()->set_y(diff.first.y);
-            protoDiff->mutable_position()->set_z(diff.first.z);
-
-            protoDiff->mutable_colour()->set_r(diff.second.second.r);
-            protoDiff->mutable_colour()->set_g(diff.second.second.g);
-            protoDiff->mutable_colour()->set_b(diff.second.second.b);
-        }
+    if (animation.size() != 0) {
+        writeAnimation(gridProto.mutable_animation(), animation);
     }
 
     gridProto.SerializeToOstream(&outputStream);
