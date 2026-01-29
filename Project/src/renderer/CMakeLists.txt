@@ -68,4 +68,5 @@ target_link_libraries(Renderer PRIVATE
   nlohmann_json::nlohmann_json
   CLI11::CLI11
   protobuf::libprotobuf
+  msquic
 )

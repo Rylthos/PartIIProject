@@ -78,3 +78,6 @@ add_subdirectory(json)
 set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(ASSIMP_BUILD_ZLIB ON)
 add_subdirectory(assimp)
+
+# msquic
+find_package(msquic REQUIRED)

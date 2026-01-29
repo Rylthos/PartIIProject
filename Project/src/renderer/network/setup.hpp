@@ -8,10 +8,10 @@
 
 namespace Network {
 
-Node initServer(uint16_t port, bool waitForClient = true);
+void initServer(uint16_t port, bool waitForClient = true);
 
-Node initClient(const char* target, uint16_t port);
+void initClient(const char* target, uint16_t port);
 
-void cleanup(Node& node);
+void cleanup();
 
 }

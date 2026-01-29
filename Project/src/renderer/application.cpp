@@ -69,20 +69,18 @@ void Application::init(InitSettings settings)
 
     if (m_Settings.netInfo.networked) {
         if (m_Settings.netInfo.enableClientSide) {
-            m_Node = Network::initClient(settings.targetIP.c_str(), settings.targetPort);
+            Network::initClient(settings.targetIP.c_str(), settings.targetPort);
 
             LOG_INFO("Connected to server: {}:{}", settings.targetIP, settings.targetPort);
         } else if (m_Settings.netInfo.enableServerSide) {
 
-            m_Node = Network::initServer(settings.targetPort, !m_Settings.serverDontWait);
+            Network::initServer(settings.targetPort, !m_Settings.serverDontWait);
 
             LOG_INFO("Setup server: Listening on port {}", settings.targetPort);
         }
 
-        m_NetworkReadLoop
-            = std::jthread([&](std::stop_token stoken) { Network::readLoop(m_Node, stoken); });
         m_NetworkWriteLoop
-            = std::jthread([&](std::stop_token stoken) { Network::writeLoop(m_Node, stoken); });
+            = std::jthread([&](std::stop_token stoken) { Network::writeLoop(stoken); });
 
         if (m_Settings.netInfo.enableClientSide) {
             Network::addCallback(NetProto::HEADER_TYPE_FRAME,
@@ -248,7 +246,6 @@ void Application::cleanup()
     vkDeviceWaitIdle(m_VkDevice);
 
     if (m_Settings.netInfo.networked) {
-        m_NetworkReadLoop.request_stop();
         m_NetworkWriteLoop.request_stop();
     }
 
@@ -296,7 +293,7 @@ void Application::cleanup()
     vkDestroyInstance(m_VkInstance, nullptr);
 
     if (m_Settings.netInfo.networked) {
-        Network::cleanup(m_Node);
+        Network::cleanup();
     }
 
     m_Window->cleanup();
@@ -528,6 +525,8 @@ void Application::createRayDirectionImages()
 
 void Application::createNetworkImage()
 {
+    std::lock_guard _lock(m_NetworkImageMutex);
+
     VkExtent3D extent = { m_Window->getWindowSize().x, m_Window->getWindowSize().y, 1 };
 
     m_NetworkImage.init(m_VkDevice, m_VmaAllocator, m_GraphicsQueue->getFamily(), extent,
@@ -552,6 +551,7 @@ void Application::destroyImages()
     m_ScreenshotImage.cleanup();
 
     if (m_Settings.netInfo.enableClientSide) {
+        std::lock_guard _lock(m_NetworkImageMutex);
         m_NetworkImage.cleanup();
     }
 
@@ -1695,7 +1695,9 @@ void Application::render_FinaliseScreenshot()
             vkQueueWaitIdle(m_GraphicsQueue->getQueue());
         }
 
-        LOG_INFO("Take Screenshot");
+        if (!m_Settings.netInfo.enableServerSide) {
+            LOG_INFO("Take Screenshot");
+        }
 
         VkImageSubresource subResource { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0 };
         VkSubresourceLayout subResourceLayout;
@@ -1946,27 +1948,30 @@ bool Application::handleFrameReceive(const std::vector<uint8_t>& data)
     vkGetImageSubresourceLayout(
         m_VkDevice, m_ScreenshotImage.getImage(), &subResource, &subResourceLayout);
 
-    uint8_t* imageData;
-    vmaMapMemory(m_VmaAllocator, m_NetworkImage.getAllocation(), (void**)&imageData);
+    std::lock_guard _lock(m_NetworkImageMutex);
+    {
+        uint8_t* imageData;
+        vmaMapMemory(m_VmaAllocator, m_NetworkImage.getAllocation(), (void**)&imageData);
 
-    imageData += subResourceLayout.offset;
+        imageData += subResourceLayout.offset;
 
-    const uint32_t offset = 8;
+        const uint32_t offset = 8;
 
-    for (uint32_t y = 0; y < size.y; y++) {
-        uint32_t* row = (uint32_t*)imageData;
-        for (uint32_t x = 0; x < size.x; x++) {
-            uint32_t index = (x + y * size.x) * 4 + offset;
-            ((uint8_t*)row)[0] = rawData[index + 0];
-            ((uint8_t*)row)[1] = rawData[index + 1];
-            ((uint8_t*)row)[2] = rawData[index + 2];
-            ((uint8_t*)row)[3] = rawData[index + 3];
-            row++;
+        for (uint32_t y = 0; y < size.y; y++) {
+            uint32_t* row = (uint32_t*)imageData;
+            for (uint32_t x = 0; x < size.x; x++) {
+                uint32_t index = (x + y * size.x) * 4 + offset;
+                ((uint8_t*)row)[0] = rawData[index + 0];
+                ((uint8_t*)row)[1] = rawData[index + 1];
+                ((uint8_t*)row)[2] = rawData[index + 2];
+                ((uint8_t*)row)[3] = rawData[index + 3];
+                row++;
+            }
+            imageData += subResourceLayout.rowPitch;
         }
-        imageData += subResourceLayout.rowPitch;
-    }
 
-    vmaUnmapMemory(m_VmaAllocator, m_NetworkImage.getAllocation());
+        vmaUnmapMemory(m_VmaAllocator, m_NetworkImage.getAllocation());
+    }
 
     for (size_t i = 0; i < m_PerFrameData.size(); i++) {
         m_PerFrameData[i].dirty = true;

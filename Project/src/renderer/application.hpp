@@ -67,8 +67,6 @@ class Application : public EventDispatcher {
   private:
     InitSettings m_Settings;
 
-    Network::Node m_Node;
-    std::jthread m_NetworkReadLoop;
     std::jthread m_NetworkWriteLoop;
 
     std::unique_ptr<Window> m_Window;
@@ -94,7 +92,9 @@ class Application : public EventDispatcher {
     std::vector<VkSemaphore> m_SubmitSemaphore;
 
     Image m_ScreenshotImage;
+
     Image m_NetworkImage;
+    std::mutex m_NetworkImageMutex;
 
     VkCommandPool m_GeneralPool;
     std::array<PerFrameData, FRAMES_IN_FLIGHT> m_PerFrameData;

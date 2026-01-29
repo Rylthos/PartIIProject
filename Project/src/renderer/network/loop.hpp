@@ -11,9 +11,9 @@
 
 namespace Network {
 
-void readLoop(Node node, std::stop_token stoken);
+void handleReceive(NetProto::Header& header, const std::vector<uint8_t>& data, uint32_t offset = 0);
 
-void writeLoop(Node node, std::stop_token stoken);
+void writeLoop(std::stop_token stoken);
 
 void sendMessage(NetProto::Type headerType, const google::protobuf::Message& message);
 

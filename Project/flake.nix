@@ -30,6 +30,9 @@
           protobuf_33
 
           zlib
+
+          libmsquic
+          openssl
         ];
 
         packages = with pkgs; [
