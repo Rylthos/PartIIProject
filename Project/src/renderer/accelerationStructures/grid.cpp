@@ -294,7 +294,7 @@ void GridAS::createBuffer()
 {
     VkDeviceSize occupancyBufferSize
         = std::ceil(m_Voxels.size() / 32.) * sizeof(uint32_t); // Convert to bytes
-    VkDeviceSize colourBufferSize = sizeof(glm::vec3) * m_Voxels.size();
+    VkDeviceSize colourBufferSize = sizeof(uint32_t) * m_Voxels.size();
 
     m_OccupancyBuffer.init(p_Info.device, p_Info.allocator, occupancyBufferSize,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
@@ -337,11 +337,13 @@ void GridAS::createBuffer()
 
     auto colourIndex
         = FrameCommands::getInstance()->createStaging(colourBufferSize, [=, this](void* ptr) {
-              float* data = (float*)ptr;
+              uint32_t* data = (uint32_t*)ptr;
               for (size_t i = 0; i < m_Voxels.size(); i++) {
-                  data[i * 3 + 0] = m_Voxels.at(i).colour.r;
-                  data[i * 3 + 1] = m_Voxels.at(i).colour.g;
-                  data[i * 3 + 2] = m_Voxels.at(i).colour.b;
+                  uint32_t colour = 0;
+                  colour |= m_Voxels.at(i).colour.r << 16;
+                  colour |= m_Voxels.at(i).colour.g << 8;
+                  colour |= m_Voxels.at(i).colour.b << 0;
+                  data[i] = colour;
               }
           });
 

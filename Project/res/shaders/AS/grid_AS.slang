@@ -20,7 +20,7 @@ PushConstants push_constants;
 StructuredBuffer<uint32_t> i_Occupancy;
 
 [[vk::binding(1, 1)]]
-StructuredBuffer<float> i_Colour;
+StructuredBuffer<uint32_t> i_Colour;
 
 struct GridRayMarch : IRayMarch
 {
@@ -72,10 +72,10 @@ struct GridRayMarch : IRayMarch
         hit.hit_position = ray.calculate(t);
         hit.t = t;
 
-        uint64_t colour_index = index * 3;
-        hit.colour.r          = i_Colour[colour_index + 0];
-        hit.colour.g          = i_Colour[colour_index + 1];
-        hit.colour.b          = i_Colour[colour_index + 2];
+        uint32_t colour = i_Colour[index];
+        hit.colour.r          = ((colour >> 16) & 0xFF) / 255.f;
+        hit.colour.g          = ((colour >> 8) & 0xFF) / 255.f;
+        hit.colour.b          = ((colour >> 0) & 0xFF) / 255.f;
 
         hit.voxel_index = voxel_pos;
 

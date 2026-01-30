@@ -32,10 +32,22 @@ std::vector<GridVoxel> generateGrid(std::stop_token stoken, std::unique_ptr<Load
 
                 auto v = loader->getVoxel({ x, y, z });
 
-                voxels[index] = GridVoxel {
-                    .visible = v.has_value(),
-                    .colour = v.value_or(glm::vec3(0, 0, 0)),
-                };
+                if (v.has_value()) {
+                    glm::vec3 colour = v.value();
+                    voxels[index] = GridVoxel {
+                        .visible = true,
+                        .colour = glm::u8vec3 {
+                            (uint8_t)(colour.r * 255.f),
+                            (uint8_t)(colour.g * 255.f),
+                            (uint8_t)(colour.b * 255.f),
+                        }
+                    };
+                } else {
+                    voxels[index] = GridVoxel {
+                        .visible = false,
+                        .colour = glm::u8vec3(0),
+                    };
+                }
             }
         }
     }

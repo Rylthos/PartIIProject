@@ -47,9 +47,9 @@ loadGrid(ASProto::Grid& grid)
         voxels.push_back(Generators::GridVoxel {
             .visible = voxel.a > 0,
             .colour = {
-                voxel.r / 255.f,
-                voxel.g / 255.f,
-                voxel.b / 255.f,
+                voxel.r,
+                voxel.g,
+                voxel.b,
             },
             });
     }
@@ -103,10 +103,8 @@ void storeGrid(std::filesystem::path output, const std::string& name, glm::uvec3
         gridProto.mutable_header(), dimensions, generationInfo.voxelCount, generationInfo.nodes);
 
     for (const auto& voxel : grid) {
-        uint32_t v = ((((uint32_t)(voxel.colour.r * 255.f)) & 0xFF) << 24)
-            | ((((uint32_t)(voxel.colour.g * 255.f)) & 0xFF) << 16)
-            | ((((uint32_t)(voxel.colour.b * 255.f)) & 0xFF) << 8)
-            | ((((uint32_t)(voxel.visible)) & 0xFF) << 0);
+        uint32_t v = (((uint32_t)voxel.colour.r) << 24) | (((uint32_t)voxel.colour.g) << 16)
+            | (((uint32_t)voxel.colour.b) << 8) | (((uint32_t)voxel.visible) << 0);
 
         gridProto.mutable_voxels()->Add(v);
     }

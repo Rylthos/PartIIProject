@@ -39,18 +39,18 @@ struct GridModification : IModification
      case Type::PLACE: {
           i_Occupancy[array_index] |= 1 << bit_index;
 
-          float3 colour = push_constants.mod.colour;
-          i_Colour[index * 3 + 0] = colour.r;
-          i_Colour[index * 3 + 1] = colour.g;
-          i_Colour[index * 3 + 2] = colour.b;
+          uint32_t colour = (uint32_t(uint8_t(colour.r * 255.f)) << 16)
+                          | (uint32_t(uint8_t(colour.g * 255.f)) << 8)
+                          | (uint32_t(uint8_t(colour.b * 255.f)) << 0);
+          i_Colour[index] = colour;
           break;
         }
       case Type::REPLACE: {
           if ((i_Occupancy[array_index] & (1 << bit_index)) != 0) {
-            float3 colour = push_constants.mod.colour;
-            i_Colour[index * 3 + 0] = colour.r;
-            i_Colour[index * 3 + 1] = colour.g;
-            i_Colour[index * 3 + 2] = colour.b;
+            uint32_t colour = (uint32_t(uint8_t(colour.r * 255.f)) << 16)
+                            | (uint32_t(uint8_t(colour.g * 255.f)) << 8)
+                            | (uint32_t(uint8_t(colour.b * 255.f)) << 0);
+            i_Colour[index] = colour;
           }
           break;
         }

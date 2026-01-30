@@ -12,7 +12,7 @@
 namespace Generators {
 struct GridVoxel {
     bool visible;
-    glm::vec3 colour;
+    glm::u8vec3 colour;
 };
 
 std::vector<GridVoxel> generateGrid(std::stop_token stoken, std::unique_ptr<Loader>&& loader,
