@@ -159,7 +159,8 @@ void Parser::generateStructures(
             auto nodes = Generators::generateContree(
                 stoken, std::move(loader), info[CONTREE], dimensions, finished[CONTREE]);
 
-            Serializers::storeContree(outputDirectory, outputName, dimensions, nodes, info[OCTREE]);
+            Serializers::storeContree(
+                outputDirectory, outputName, dimensions, nodes, info[CONTREE]);
         });
     }
 
