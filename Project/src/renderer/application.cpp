@@ -23,6 +23,8 @@
 #include "network/loop.hpp"
 #include "network/setup.hpp"
 
+#include "stb/stb_image_write.h"
+
 #include "VkBootstrap.h"
 #include "acceleration_structure_manager.hpp"
 #include "compute_pipeline.hpp"
@@ -1712,24 +1714,24 @@ void Application::render_FinaliseScreenshot()
         VkExtent3D imageExtent = m_ScreenshotImage.getExtent();
         glm::uvec2 size = { imageExtent.width, imageExtent.height };
 
-        if (m_Settings.netInfo.enableServerSide && value == "") {
-            size_t totalBits = size.x * size.y * 4;
+        size_t totalBits = size.x * size.y * 4;
 
-            std::vector<uint8_t> imageData;
-            imageData.reserve(totalBits);
+        std::vector<uint8_t> imageData;
+        imageData.reserve(totalBits);
 
-            for (uint32_t y = 0; y < size.y; y++) {
-                uint32_t* row = (uint32_t*)data;
-                for (uint32_t x = 0; x < size.x; x++) {
-                    imageData.push_back(((uint8_t*)row)[0]);
-                    imageData.push_back(((uint8_t*)row)[1]);
-                    imageData.push_back(((uint8_t*)row)[2]);
-                    imageData.push_back(((uint8_t*)row)[3]);
-                    row++;
-                }
-                data += subResourceLayout.rowPitch;
+        for (uint32_t y = 0; y < size.y; y++) {
+            uint32_t* row = (uint32_t*)data;
+            for (uint32_t x = 0; x < size.x; x++) {
+                imageData.push_back(((uint8_t*)row)[0]);
+                imageData.push_back(((uint8_t*)row)[1]);
+                imageData.push_back(((uint8_t*)row)[2]);
+                imageData.push_back(((uint8_t*)row)[3]);
+                row++;
             }
+            data += subResourceLayout.rowPitch;
+        }
 
+        if (m_Settings.netInfo.enableServerSide && value == "") {
             NetProto::Frame frame;
             frame.set_width(size.x);
             frame.set_height(size.y);
@@ -1744,21 +1746,9 @@ void Application::render_FinaliseScreenshot()
                 }
             }
 
-            std::ofstream file(filename, std::ios::out | std::ios::binary);
-
-            file << "P6\n" << size.x << "\n" << size.y << "\n" << 255 << "\n";
-
-            for (uint32_t y = 0; y < size.y; y++) {
-                uint32_t* row = (uint32_t*)data;
-                for (uint32_t x = 0; x < size.x; x++) {
-                    file.write((char*)row, 3);
-                    row++;
-                }
-                data += subResourceLayout.rowPitch;
-            }
+            stbi_write_jpg(filename.string().c_str(), size.x, size.y, 4, imageData.data(), 95);
 
             LOG_INFO("Wrote screenshot: {}", filename.string());
-            file.close();
         }
 
         vmaUnmapMemory(m_VmaAllocator, m_ScreenshotImage.getAllocation());
@@ -1907,7 +1897,7 @@ void Application::handleKeyInput(const Event& event)
         }
 
         if (keyEvent.keycode == GLFW_KEY_K) {
-            takeScreenshot("screenshot.ppm");
+            takeScreenshot("screenshot.jpg");
         }
     }
 }

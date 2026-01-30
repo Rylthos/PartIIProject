@@ -55,6 +55,7 @@ target_link_libraries(Renderer PRIVATE
 
   Renderer-proto
 
+  stb_lib
   glm::glm
   Vulkan::UtilityHeaders
   spdlog

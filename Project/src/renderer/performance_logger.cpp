@@ -145,7 +145,7 @@ void PerformanceLogger::update(float delta)
     }
     if (!screenshotTaken) {
         takeScreenshot(std::format(
-            "res/perf_output/{}/{}.ppm", m_PerfName, m_PerfEntries[m_CurrentEntry].name));
+            "res/perf_output/{}/{}.jpg", m_PerfName, m_PerfEntries[m_CurrentEntry].name));
         screenshotTaken = true;
     }
 
