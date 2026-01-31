@@ -25,14 +25,12 @@ struct TextureModification : IModification
       case Type::PLACE:
         i_VoxelData[voxel_index].a = 1;
 
-        float3 colour = push_constants.mod.colour;
         i_VoxelData[voxel_index].rgb = colour;
         break;
       case Type::REPLACE:
         i_VoxelData[voxel_index].a = 1;
 
         if (i_VoxelData[voxel_index].a != 0) {
-          float3 colour = push_constants.mod.colour;
           i_VoxelData[voxel_index].rgb = colour;
         }
         break;
@@ -48,7 +46,7 @@ struct TextureModification : IModification
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-  uint3 voxel_index = push_constants.mod.voxel_index;
+  uint3 voxel_index = push_constants.mod.voxel_index.rgb;
 
   run_shape<TextureModification>(voxel_index, push_constants.camera_forward, push_constants.mod);
 }

@@ -65,6 +65,8 @@ class GridAS : public IAccelerationStructure {
     Buffer m_OccupancyBuffer;
     Buffer m_ColourBuffer;
 
+    Buffer m_ModBuffer;
+
     VkDescriptorSetLayout m_BufferSetLayout;
     VkDescriptorSet m_BufferSet = VK_NULL_HANDLE;
 

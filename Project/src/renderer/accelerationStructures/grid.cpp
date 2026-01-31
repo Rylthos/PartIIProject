@@ -3,6 +3,7 @@
 #include <stop_token>
 #include <vector>
 
+#include "acceleration_structure.hpp"
 #include "imgui.h"
 #include "logger/logger.hpp"
 
@@ -28,9 +29,10 @@ struct PushConstants {
 };
 
 struct ModPushConstants {
-    alignas(16) glm::uvec3 dimensions;
+    glm::uvec3 dimensions;
+    uint32_t modCount;
     alignas(16) glm::vec3 cameraFacing;
-    alignas(16) ModInfo mod;
+    alignas(16) VkDeviceAddress mods;
 };
 
 GridAS::GridAS() { }
@@ -181,6 +183,15 @@ void GridAS::render(
     if (p_Mods.size() != 0 && p_FinishedGeneration) {
         Debug::beginCmdDebugLabel(cmd, "Grid mod AS render", { 0.0f, 0.0f, 1.0f, 1.0f });
 
+        size_t required = sizeof(ModInfo) * p_Mods.size();
+        if (m_ModBuffer.getSize() < required) {
+            m_ModBuffer.cleanup();
+
+            m_ModBuffer.init(p_Info.device, p_Info.allocator, sizeof(ModInfo) * p_Mods.size(),
+                VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO);
+        }
+
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_ModPipeline);
         std::vector<VkDescriptorSet> descriptorSets = {
             m_BufferSet,
@@ -189,54 +200,58 @@ void GridAS::render(
         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_ModPipelineLayout, 0,
             descriptorSets.size(), descriptorSets.data(), 0, nullptr);
 
-        for (const auto& mod : p_Mods) {
-            ModPushConstants pushConstant {
-                .dimensions = m_Dimensions,
-                .cameraFacing = camera.getForwardVector(),
-                .mod = mod,
-            };
-            vkCmdPushConstants(cmd, m_ModPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
-                sizeof(ModPushConstants), &pushConstant);
+        size_t totalCalls = std::ceil(p_Mods.size() / 32.f);
+        ModPushConstants pushConstant {
+            .dimensions = m_Dimensions,
+            .modCount = (uint32_t)p_Mods.size(),
+            .cameraFacing = camera.getForwardVector(),
+            .mods = m_ModBuffer.getBufferAddress(),
+        };
 
-            vkCmdDispatch(cmd, 1, 1, 1);
+        ModInfo* data = (ModInfo*)m_ModBuffer.mapMemory();
+        memcpy(data, p_Mods.data(), p_Mods.size() * sizeof(ModInfo));
 
-            {
-                VkBufferMemoryBarrier occupancyMB {
-                    .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-                    .pNext = nullptr,
-                    .srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-                    .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-                    .srcQueueFamilyIndex = p_Info.graphicsQueue->getFamily(),
-                    .dstQueueFamilyIndex = p_Info.graphicsQueue->getFamily(),
-                    .buffer = m_OccupancyBuffer.getBuffer(),
-                    .offset = 0,
-                    .size = VK_WHOLE_SIZE,
-                };
+        vkCmdPushConstants(cmd, m_ModPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
+            sizeof(ModPushConstants), &pushConstant);
 
-                VkBufferMemoryBarrier colourMB {
-                    .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-                    .pNext = nullptr,
-                    .srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-                    .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-                    .srcQueueFamilyIndex = p_Info.graphicsQueue->getFamily(),
-                    .dstQueueFamilyIndex = p_Info.graphicsQueue->getFamily(),
-                    .buffer = m_ColourBuffer.getBuffer(),
-                    .offset = 0,
-                    .size = VK_WHOLE_SIZE,
-                };
+        vkCmdDispatch(cmd, totalCalls, 1, 1);
 
-                std::vector<VkBufferMemoryBarrier> barriers = { occupancyMB, colourMB };
+        VkBufferMemoryBarrier occupancyMB {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+            .pNext = nullptr,
+            .srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+            .srcQueueFamilyIndex = p_Info.graphicsQueue->getFamily(),
+            .dstQueueFamilyIndex = p_Info.graphicsQueue->getFamily(),
+            .buffer = m_OccupancyBuffer.getBuffer(),
+            .offset = 0,
+            .size = VK_WHOLE_SIZE,
+        };
 
-                vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, barriers.size(),
-                    barriers.data(), 0, nullptr);
-            }
-        }
+        VkBufferMemoryBarrier colourMB {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+            .pNext = nullptr,
+            .srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+            .srcQueueFamilyIndex = p_Info.graphicsQueue->getFamily(),
+            .dstQueueFamilyIndex = p_Info.graphicsQueue->getFamily(),
+            .buffer = m_ColourBuffer.getBuffer(),
+            .offset = 0,
+            .size = VK_WHOLE_SIZE,
+        };
+
+        std::vector<VkBufferMemoryBarrier> barriers = { occupancyMB, colourMB };
+
+        vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, barriers.size(), barriers.data(),
+            0, nullptr);
+
+        m_ModBuffer.unmapMemory();
 
         p_Mods.clear();
-
-        Debug::endCmdDebugLabel(cmd);
     }
+
+    Debug::endCmdDebugLabel(cmd);
 }
 
 void GridAS::update(float dt)
@@ -340,9 +355,9 @@ void GridAS::createBuffer()
               uint32_t* data = (uint32_t*)ptr;
               for (size_t i = 0; i < m_Voxels.size(); i++) {
                   uint32_t colour = 0;
-                  colour |= m_Voxels.at(i).colour.r << 16;
-                  colour |= m_Voxels.at(i).colour.g << 8;
-                  colour |= m_Voxels.at(i).colour.b << 0;
+                  colour |= (uint32_t)(m_Voxels.at(i).colour.r) << 16;
+                  colour |= (uint32_t)(m_Voxels.at(i).colour.g) << 8;
+                  colour |= (uint32_t)(m_Voxels.at(i).colour.b) << 0;
                   data[i] = colour;
               }
           });
@@ -357,10 +372,16 @@ void GridAS::createBuffer()
 
             vkCmdCopyBuffer(cmd, buffer.buffer, m_ColourBuffer.getBuffer(), 1, &region);
         });
+
+    m_ModBuffer.init(p_Info.device, p_Info.allocator, sizeof(ModInfo) * 1,
+        VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+        VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO);
 }
 
 void GridAS::freeBuffers()
 {
+    m_ModBuffer.cleanup();
+
     m_ColourBuffer.cleanup();
     m_OccupancyBuffer.cleanup();
 }

@@ -343,7 +343,7 @@ struct BrickmapModification : IModification
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-  uint3 voxel_index = push_constants.mod.voxel_index;
+  uint3 voxel_index = push_constants.mod.voxel_index.rgb;
 
   run_shape<BrickmapModification>(voxel_index, push_constants.camera_facing, push_constants.mod);
 }

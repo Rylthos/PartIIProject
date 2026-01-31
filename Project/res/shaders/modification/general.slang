@@ -17,10 +17,9 @@ enum Type
 
 struct ModStruct
 {
-  int shape;
-  Type type;
-  uint3 voxel_index;
-  float3 colour;
+  uint4 generic; // Shape Type
+  uint4 voxel_index;
+  float4 colour;
   float4 additional;
 }
 
@@ -88,24 +87,24 @@ func run_shape<T>(in voxel_index: uint3, in forward: float3, in mod: ModStruct) 
     return;
 
   Type type = Type::ERASE;
-  if (mod.type == 1) {
+  if (mod.generic.y == 1) {
     type = Type::PLACE;
-  } else if (mod.type == 2) {
+  } else if (mod.generic.y == 2) {
     type = Type::REPLACE;
   }
 
-  switch (mod.shape) {
+  switch ((Shape)mod.generic.x) {
     case Shape::VOXEL:
-      T::setVoxel(voxel_index, mod.colour, type);
+      T::setVoxel(voxel_index, mod.colour.rgb, type);
       break;
     case Shape::SPHERE:
-      sphere<T>(voxel_index, int(mod.additional.x), mod.colour, type);
+      sphere<T>(voxel_index, int(mod.additional.x), mod.colour.rgb, type);
       break;
     case Shape::CUBE:
-      cuboid<T>(voxel_index, int3(mod.additional.x), mod.colour, type, forward);
+      cuboid<T>(voxel_index, int3(mod.additional.x), mod.colour.rgb, type, forward);
       break;
     case Shape::CUBOID:
-      cuboid<T>(voxel_index, int3(mod.additional.xyz), mod.colour, type, forward);
+      cuboid<T>(voxel_index, int3(mod.additional.xyz), mod.colour.rgb, type, forward);
       break;
   }
 }

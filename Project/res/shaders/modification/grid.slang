@@ -2,9 +2,10 @@
 
 struct PushConstants {
   uint3 dimensions;
+  uint modCount;
   float3 camera_forward;
 
-  ModStruct mod;
+  uint64_t modBuffer;
 }
 
 [[vk_push_constant]]
@@ -14,7 +15,7 @@ PushConstants push_constants;
 RWStructuredBuffer<uint32_t> i_Occupancy;
 
 [[vk::binding(1, 0)]]
-RWStructuredBuffer<float> i_Colour;
+RWStructuredBuffer<uint32_t> i_Colour;
 
 func getIndex(in voxel_index : int3) -> uint {
   return voxel_index.x + voxel_index.z * push_constants.dimensions.x +
@@ -37,7 +38,8 @@ struct GridModification : IModification
 
     switch (type) {
      case Type::PLACE: {
-          i_Occupancy[array_index] |= 1 << bit_index;
+        uint32_t mask = 1 << bit_index;
+          InterlockedOr(i_Occupancy[array_index], mask);
 
           uint32_t colour = (uint32_t(uint8_t(colour.r * 255.f)) << 16)
                           | (uint32_t(uint8_t(colour.g * 255.f)) << 8)
@@ -55,17 +57,25 @@ struct GridModification : IModification
           break;
         }
       case Type::ERASE:
-        i_Occupancy[array_index] &= ~(1 << bit_index);
+          uint32_t mask = ~(1 << bit_index);
+          InterlockedAnd(i_Occupancy[array_index], mask);
         break;
     }
   }
 }
 
 [shader("compute")]
-[numthreads(1, 1, 1)]
+[numthreads(32, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-  uint3 voxel_index = push_constants.mod.voxel_index;
+  ModStruct* mods = (ModStruct*)push_constants.modBuffer;
 
-  run_shape<GridModification>(voxel_index, push_constants.camera_forward, push_constants.mod);
+  if (dispatchThreadID.x >= push_constants.modCount)
+    return;
+
+  ModStruct mod = mods[dispatchThreadID.x];
+
+  uint3 voxel_index = mod.voxel_index.xyz;
+
+  run_shape<GridModification>(voxel_index, push_constants.camera_forward, mod);
 }
