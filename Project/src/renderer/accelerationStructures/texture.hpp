@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../buffer.hpp"
 #include "../image.hpp"
 #include "acceleration_structure.hpp"
 #include <vulkan/vulkan_core.h>
@@ -39,6 +40,9 @@ class TextureAS : public IAccelerationStructure {
     void createImages();
     void destroyImages();
 
+    void createBuffers();
+    void destroyBuffers();
+
     void createDescriptorSets();
     void freeDescriptorSets();
 
@@ -68,6 +72,8 @@ class TextureAS : public IAccelerationStructure {
     VkPipelineLayout m_ModPipelineLayout;
 
     Image m_DataImage;
+
+    Buffer m_ModBuffer;
 
     bool m_UpdateBuffers = false;
 };

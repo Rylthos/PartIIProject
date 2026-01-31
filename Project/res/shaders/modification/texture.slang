@@ -2,8 +2,9 @@
 
 struct PushConstants {
   uint3 dimensions;
+  uint modCount;
   float3 camera_forward;
-  ModStruct mod;
+  uint64_t modBuffer;
 }
 
 [[vk_push_constant]]
@@ -43,10 +44,17 @@ struct TextureModification : IModification
 }
 
 [shader("compute")]
-[numthreads(1, 1, 1)]
+[numthreads(32, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-  uint3 voxel_index = push_constants.mod.voxel_index.rgb;
+  ModStruct* mods = (ModStruct*)push_constants.modBuffer;
 
-  run_shape<TextureModification>(voxel_index, push_constants.camera_forward, push_constants.mod);
+  if (dispatchThreadID.x >= push_constants.modCount)
+    return;
+
+  ModStruct mod = mods[dispatchThreadID.x];
+
+  uint3 voxel_index = mod.voxel_index.rgb;
+
+  run_shape<TextureModification>(voxel_index, push_constants.camera_forward, mod);
 }

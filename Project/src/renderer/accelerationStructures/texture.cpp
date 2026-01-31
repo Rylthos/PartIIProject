@@ -23,14 +23,16 @@ struct PushConstants {
 };
 
 struct ModPushConstants {
-    alignas(16) glm::uvec3 dimensions;
+    glm::uvec3 dimensions;
+    uint32_t modCount;
     alignas(16) glm::vec3 cameraFacing;
-    alignas(16) ModInfo mod;
+    alignas(16) VkDeviceAddress mods;
 };
 
 TextureAS::TextureAS() { }
 TextureAS::~TextureAS()
 {
+    destroyBuffers();
     destroyImages();
     freeDescriptorSets();
     destroyDescriptorLayouts();
@@ -45,6 +47,8 @@ TextureAS::~TextureAS()
 void TextureAS::init(ASStructInfo info)
 {
     IAccelerationStructure::init(info);
+
+    createBuffers();
 
     createDescriptorLayouts();
     createRenderPipelineLayout();
@@ -168,6 +172,15 @@ void TextureAS::render(
     if (p_Mods.size() != 0 && p_FinishedGeneration) {
         Debug::beginCmdDebugLabel(cmd, "Texture mod AS render", { 0.0f, 0.0f, 1.0f, 1.0f });
 
+        size_t required = sizeof(ModInfo) * p_Mods.size();
+        if (m_ModBuffer.getSize() < required) {
+            m_ModBuffer.cleanup();
+
+            m_ModBuffer.init(p_Info.device, p_Info.allocator, sizeof(ModInfo) * p_Mods.size(),
+                VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO);
+        }
+
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_ModPipeline);
         std::vector<VkDescriptorSet> descriptorSets = {
             m_ImageSet,
@@ -176,42 +189,48 @@ void TextureAS::render(
         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_ModPipelineLayout, 0,
             descriptorSets.size(), descriptorSets.data(), 0, nullptr);
 
-        for (const auto& mod : p_Mods) {
-            ModPushConstants pushConstant {
-                .dimensions = m_Dimensions,
-                .cameraFacing = camera.getForwardVector(),
-                .mod = mod,
+        size_t totalCalls = std::ceil(p_Mods.size() / 32.f);
+        ModPushConstants pushConstant {
+            .dimensions = m_Dimensions,
+            .modCount = (uint32_t)p_Mods.size(),
+            .cameraFacing = camera.getForwardVector(),
+            .mods = m_ModBuffer.getBufferAddress(),
+        };
+
+        ModInfo* data = (ModInfo*)m_ModBuffer.mapMemory();
+        memcpy(data, p_Mods.data(), p_Mods.size() * sizeof(ModInfo));
+
+        vkCmdPushConstants(cmd, m_ModPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
+            sizeof(ModPushConstants), &pushConstant);
+
+        vkCmdDispatch(cmd, totalCalls, 1, 1);
+
+        {
+            VkImageMemoryBarrier imageMB {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                .pNext = nullptr,
+                .srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+                .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+                .oldLayout = VK_IMAGE_LAYOUT_GENERAL,
+                .newLayout = VK_IMAGE_LAYOUT_GENERAL,
+                .srcQueueFamilyIndex = p_Info.graphicsQueue->getFamily(),
+                .dstQueueFamilyIndex = p_Info.graphicsQueue->getFamily(),
+                .image = m_DataImage.getImage(),
+                .subresourceRange = { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                                     .baseMipLevel = 0,
+                                     .levelCount = VK_REMAINING_MIP_LEVELS,
+                                     .baseArrayLayer = 0,
+                                     .layerCount = VK_REMAINING_ARRAY_LAYERS },
             };
-            vkCmdPushConstants(cmd, m_ModPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
-                sizeof(ModPushConstants), &pushConstant);
 
-            vkCmdDispatch(cmd, 1, 1, 1);
+            std::vector<VkImageMemoryBarrier> barriers = { imageMB };
 
-            {
-                VkImageMemoryBarrier imageMB {
-                    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-                    .pNext = nullptr,
-                    .srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-                    .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-                    .oldLayout = VK_IMAGE_LAYOUT_GENERAL,
-                    .newLayout = VK_IMAGE_LAYOUT_GENERAL,
-                    .srcQueueFamilyIndex = p_Info.graphicsQueue->getFamily(),
-                    .dstQueueFamilyIndex = p_Info.graphicsQueue->getFamily(),
-                    .image = m_DataImage.getImage(),
-                    .subresourceRange = { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                                         .baseMipLevel = 0,
-                                         .levelCount = VK_REMAINING_MIP_LEVELS,
-                                         .baseArrayLayer = 0,
-                                         .layerCount = VK_REMAINING_ARRAY_LAYERS },
-                };
-
-                std::vector<VkImageMemoryBarrier> barriers = { imageMB };
-
-                vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr,
-                    barriers.size(), barriers.data());
-            }
+            vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr, barriers.size(),
+                barriers.data());
         }
+
+        m_ModBuffer.unmapMemory();
 
         p_Mods.clear();
 
@@ -320,6 +339,15 @@ void TextureAS::createImages()
 }
 
 void TextureAS::destroyImages() { m_DataImage.cleanup(); }
+
+void TextureAS::createBuffers()
+{
+    m_ModBuffer.init(p_Info.device, p_Info.allocator, sizeof(ModInfo) * 1,
+        VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+        VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO);
+}
+
+void TextureAS::destroyBuffers() { m_ModBuffer.cleanup(); }
 
 void TextureAS::createDescriptorSets()
 {
