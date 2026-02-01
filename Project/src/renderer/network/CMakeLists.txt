@@ -3,4 +3,5 @@ target_sources(Renderer PRIVATE
   "node.hpp" "node.cpp"
   "loop.hpp" "loop.cpp"
   "callbacks.hpp" "callbacks.cpp"
+  "messages.hpp" "messages.cpp"
 )

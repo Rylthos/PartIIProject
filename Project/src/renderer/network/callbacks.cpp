@@ -1,20 +1,64 @@
 #include "callbacks.hpp"
 
 #include "logger/logger.hpp"
+#include "network_proto/stream_header.pb.h"
 #include "node.hpp"
 #include <msquic.h>
+#include <unordered_map>
 
 #include "network_proto/header.pb.h"
 
 #include "loop.hpp"
 
+struct StreamMessage {
+    uint32_t messageLength;
+    uint32_t receivedLength;
+
+    std::vector<uint8_t> stream;
+};
+
+static std::unordered_map<uint32_t, StreamMessage> s_StreamData;
+static std::unordered_map<HQUIC, uint32_t> s_StreamToMessage;
+
 namespace Network {
 
-static std::unordered_map<HQUIC, std::vector<uint8_t>> s_ReceivedData;
-
-void handleData(const std::vector<uint8_t>& data)
+void getHeader(const std::vector<uint8_t>& data, NetProto::Header& header)
 {
-    if (data.size() == 0)
+    uint32_t header_size = data[0];
+    LOG_INFO("Header Size: {}", header_size);
+    header.ParseFromArray(data.data() + 1, header_size);
+}
+
+void handleStreamData(uint32_t messageID)
+{
+    const StreamMessage& message = s_StreamData[messageID];
+    if (message.messageLength == 0) {
+        LOG_INFO("Received no data");
+        s_StreamData.erase(messageID);
+        return;
+    }
+
+    if (message.receivedLength != message.messageLength) {
+        LOG_INFO("Received and expected mismatch : {}/{}", message.receivedLength,
+            message.messageLength);
+        s_StreamData.erase(messageID);
+        return;
+    }
+
+    NetProto::Header header;
+    getHeader(message.stream, header);
+
+    if (header.message_size() + header.ByteSizeLong() + 1 != message.stream.size()) {
+        LOG_ERROR("Data size does not agree with header: {}/{}({}+{}+1)", message.stream.size(),
+            header.message_size() + header.ByteSizeLong() + 1, header.message_size(),
+            header.ByteSizeLong());
+        return;
+    }
+
+    handleReceive(header, message.stream, header.ByteSizeLong() + 1);
+
+    s_StreamData.erase(messageID);
+}
         return;
 
     NetProto::Header header;
@@ -41,15 +85,44 @@ QUIC_STATUS streamCallback(HQUIC stream, void* context, QUIC_STREAM_EVENT* event
         LOG_DEBUG("[strm][{}] Data Recevied: {} | {}", fmt::ptr(stream),
             event->RECEIVE.TotalBufferLength, event->RECEIVE.BufferCount);
 
-        std::vector<uint8_t> newBuf(event->RECEIVE.TotalBufferLength);
-        size_t offset = 0;
-        for (uint32_t i = 0; i < event->RECEIVE.BufferCount; i++) {
-            memcpy(newBuf.data() + offset, event->RECEIVE.Buffers[i].Buffer,
-                event->RECEIVE.Buffers[i].Length);
-            offset += event->RECEIVE.Buffers[i].Length;
+        bool handleHeader = false;
+        if (!s_StreamToMessage.contains(stream)) {
+            handleHeader = true;
         }
 
-        s_ReceivedData[stream].insert(s_ReceivedData[stream].end(), newBuf.begin(), newBuf.end());
+        for (uint32_t i = 0; i < event->RECEIVE.BufferCount; i++) {
+            const QUIC_BUFFER buf = event->RECEIVE.Buffers[i];
+            if (handleHeader) {
+                uint32_t streamHeaderSize = buf.Buffer[0];
+
+                NetProto::StreamHeader streamHeader;
+                streamHeader.ParseFromArray(buf.Buffer + 1, streamHeaderSize);
+
+                uint32_t messageID = streamHeader.message_id();
+                s_StreamToMessage[stream] = messageID;
+
+                s_StreamData[messageID] = {};
+                StreamMessage& message = s_StreamData[messageID];
+                message.messageLength = streamHeader.message_length();
+                message.receivedLength = 0;
+                message.stream.resize(message.messageLength);
+
+                memcpy(message.stream.data(), buf.Buffer + streamHeaderSize + 1,
+                    buf.Length - streamHeaderSize - 1);
+
+                message.receivedLength += buf.Length - streamHeaderSize - 1;
+
+                handleHeader = false;
+            } else {
+                uint32_t messageID = s_StreamToMessage[stream];
+
+                StreamMessage& message = s_StreamData[messageID];
+
+                memcpy(message.stream.data() + message.receivedLength, buf.Buffer, buf.Length);
+
+                message.receivedLength += buf.Length;
+            }
+        }
 
         break;
     }
@@ -135,8 +208,6 @@ QUIC_STATUS connectionCallback(HQUIC connection, void* context, QUIC_CONNECTION_
         break;
     case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
         LOG_DEBUG("[strm][{}] Peer started", fmt::ptr(event->PEER_STREAM_STARTED.Stream));
-
-        s_ReceivedData[event->PEER_STREAM_STARTED.Stream].clear();
 
         s_QuicAPI->SetCallbackHandler(
             event->PEER_STREAM_STARTED.Stream, (void*)streamCallback, NULL);

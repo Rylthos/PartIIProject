@@ -10,5 +10,5 @@ enum Type {
 
 message Header {
   Type type = 1;
-  uint32 header_size = 2;
+  uint32 message_size = 2;
 }

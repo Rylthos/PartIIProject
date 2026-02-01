@@ -3,6 +3,8 @@
 #include "logger/logger.hpp"
 #include "network_proto/header.pb.h"
 
+#include "messages.hpp"
+
 #include "callbacks.hpp"
 #include "node.hpp"
 
@@ -19,7 +21,7 @@ std::unordered_map<NetProto::Type, std::vector<std::function<bool(const std::vec
     s_Callbacks;
 std::mutex s_CallbackLock;
 
-void quicMessage(
+void quicStreamMessage(
     HQUIC connection, const std::vector<uint8_t>& header, const std::vector<uint8_t>& data)
 {
     if (connection == nullptr)
@@ -46,64 +48,36 @@ void quicMessage(
         return;
     }
 
-    // Transmit header
-    uint8_t* rawHeaderBuf = (uint8_t*)malloc(sizeof(QUIC_BUFFER) + header.size());
-    QUIC_BUFFER* headerBuf = (QUIC_BUFFER*)rawHeaderBuf;
-    headerBuf->Length = header.size();
-    headerBuf->Buffer = rawHeaderBuf + sizeof(QUIC_BUFFER);
-    memcpy(headerBuf->Buffer, header.data(), header.size());
+    size_t bufferCount;
+    QUIC_BUFFER* quicBuffers;
+    std::tie(bufferCount, quicBuffers) = formStreamBuffers(header, data);
 
-    const size_t bufferSize = 64 * 1024;
-    size_t bufferCount = std::ceil(data.size() / (float)bufferSize);
-
-    uint8_t* rawBuffers = (uint8_t*)malloc(sizeof(QUIC_BUFFER) * bufferCount + data.size());
-    QUIC_BUFFER* buffers = (QUIC_BUFFER*)rawBuffers;
-    uint8_t* dataStart = rawBuffers + sizeof(QUIC_BUFFER) * bufferCount;
-    size_t total = 0;
-    for (size_t i = 0; i < bufferCount; i++) {
-        size_t length = std::min(bufferSize, data.size() - total);
-        buffers[i].Length = length;
-        buffers[i].Buffer = dataStart + total;
-        memcpy(buffers[i].Buffer, data.data() + total, length);
-
-        total += length;
-    }
-
-    if (QUIC_FAILED(status
-            = s_QuicAPI->StreamSend(stream, headerBuf, 1, QUIC_SEND_FLAG_START, headerBuf))) {
-        LOG_ERROR("Stream send failed: 0x{:x}", status);
-        free(headerBuf);
-        free(rawBuffers);
-
-        s_QuicAPI->ConnectionShutdown(connection, QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0);
-        return;
-    }
-
-    if (QUIC_FAILED(status
-            = s_QuicAPI->StreamSend(stream, buffers, bufferCount, QUIC_SEND_FLAG_NONE, buffers))) {
-        LOG_ERROR("Stream send failed: 0x{:x}", status);
-        free(headerBuf);
-        free(rawBuffers);
-
-        s_QuicAPI->ConnectionShutdown(connection, QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0);
-        return;
+    if (QUIC_FAILED(status = s_QuicAPI->StreamSend(
+                        stream, quicBuffers, bufferCount, QUIC_SEND_FLAG_NONE, quicBuffers))) {
+        goto Error;
     }
 
     if (QUIC_FAILED(
             status = s_QuicAPI->StreamSend(stream, nullptr, 0, QUIC_SEND_FLAG_FIN, nullptr))) {
-        LOG_ERROR("Stream send failed: 0x{:x}", status);
-        free(headerBuf);
-        free(rawBuffers);
-
-        s_QuicAPI->ConnectionShutdown(connection, QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0);
-        return;
+        goto Error;
     }
+
+    return;
+
+Error:
+    LOG_ERROR("Stream send failed: 0x{:x}", status);
+    free(quicBuffers);
+
+    s_QuicAPI->ConnectionShutdown(connection, QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0);
+    return;
 }
 
 void handleReceive(NetProto::Header& header, const std::vector<uint8_t>& data, uint32_t offset)
 {
-    if (!s_Callbacks.contains(header.type()))
+    if (!s_Callbacks.contains(header.type())) {
+        LOG_ERROR("No callback set for {}", (uint8_t)header.type());
         return;
+    }
 
     std::vector<uint8_t> trimmed(data.size() - offset);
     memcpy(trimmed.data(), data.data() + offset, data.size() - offset);
@@ -128,7 +102,7 @@ void writeLoop(std::stop_token stoken)
 
             LOG_DEBUG("[NETWORK] sending: {}", msg.second.size());
 
-            quicMessage(s_Node.connection, msg.first, msg.second);
+            quicStreamMessage(s_Node.connection, msg.first, msg.second);
 
             {
                 std::lock_guard<std::mutex> _lock(s_MessageLock);
@@ -150,20 +124,17 @@ void sendMessage(NetProto::Type headerType, const std::vector<uint8_t>& data)
 {
     NetProto::Header header;
     header.set_type(headerType);
-    header.set_header_size(data.size());
+    header.set_message_size(data.size());
 
     size_t headerSize = header.ByteSizeLong();
 
     std::vector<uint8_t> headerBuf(headerSize + 1);
-    headerBuf[0] = header.ByteSizeLong();
+    headerBuf[0] = headerSize;
     header.SerializeToArray(headerBuf.data() + 1, headerSize);
-
-    std::vector<uint8_t> buf(data.size());
-    memcpy(buf.data(), data.data(), data.size());
 
     {
         std::lock_guard<std::mutex> _lock(s_MessageLock);
-        s_Messages.push(std::make_pair(headerBuf, buf));
+        s_Messages.push(std::make_pair(headerBuf, data));
     }
 }
 
