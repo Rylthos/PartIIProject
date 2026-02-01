@@ -5,15 +5,19 @@ import matplotlib.pyplot as plt
 
 from pathlib import Path
 
-def barpoints(data, path):
+def frame_times(data, path):
+    parent_path = Path(path).parent
+    file_name = Path(path).stem
+
     ax = plt.subplot()
 
-    ax.set_title("Frame times")
+    ax.set_title(f"{get_title(file_name)} Frame Times")
     ax.set_ylabel("Frame time (ms)")
 
     ids, structures, w, x = calculate_bar_sizes(data)
 
     plt.xticks(x, [s for s in structures])
+
 
     for i, id in enumerate(ids):
         datapoints = []
@@ -46,7 +50,7 @@ def barpoints(data, path):
 
         ax.set_xbound(minX, maxX)
 
-        ax.bar(x + offsets, medians, w, label=f"{id}", color=name_to_colour(id, "tab20b"))
+        ax.bar(x + offsets, medians, w, label=f"{id}", color=name_to_colour(ids, id, "tab10"))
         for j in range(len(frames)):
             frame = frames[j]
             ax.scatter([x[j] + offsets[j]] * len(frame), frame, alpha=0.1, color="red")
@@ -56,10 +60,8 @@ def barpoints(data, path):
 
     plt.legend()
 
-    parent_path = Path(path).parent
-    file_name = Path(path).stem
 
-    plt.savefig(f"{parent_path}/{file_name}.png")
+    plt.savefig(f"{parent_path}/{file_name}_frame_times.png")
 
     plt.show()
 
@@ -98,7 +100,12 @@ def violin(data):
     plt.legend()
     plt.show()
 
-def size_ratio(data):
+def voxel_ratio(data, path):
+    parent_path = Path(path).parent
+    file_name = Path(path).stem
+
+    ax = plt.subplot()
+
     ids = list(set([f["id"] for f in data]))
     structures = list(set([f["structure"] for f in data]))
 
@@ -106,6 +113,9 @@ def size_ratio(data):
     structures.sort()
 
     labels = [s for s in structures]
+
+    ax.set_title(f"{get_title(file_name)} Voxel Ratio")
+    ax.set_ylabel("Voxel Ratio")
 
     for id in ids:
         datapoints = []
@@ -115,11 +125,93 @@ def size_ratio(data):
             total = total_voxels(frame)
             actual = frame["stats"]["voxels"]
 
+            # ratio = np.log10(total / actual)
             ratio = actual / total
 
             datapoints.append(ratio)
 
         plt.bar(labels, datapoints, label=f"{id}")
         break
+
+    plt.savefig(f"{parent_path}/{file_name}_voxel_ratio.png")
+
+    plt.show()
+
+def total_memory(data, path):
+    parent_path = Path(path).parent
+    file_name = Path(path).stem
+
+    ax = plt.subplot()
+
+    ids = list(set([f["id"] for f in data]))
+    structures = list(set([f["structure"] for f in data]))
+
+    ids.sort()
+    structures.sort()
+
+    labels = [s for s in structures]
+
+    ax.set_title(f"{get_title(file_name)} Memory Use")
+    ax.set_ylabel("Memory use (MiB)")
+
+    for id in ids:
+        datapoints = []
+        for structure in structures:
+            frame = find(data, id, structure)
+
+            memory = frame["stats"]["memory"] / (1024 ** 2)
+
+            datapoints.append(memory)
+
+        plt.bar(labels, datapoints, label=f"{id}")
+        break
+
+    plt.savefig(f"{parent_path}/{file_name}_total_memory.png")
+
+    plt.show()
+
+def per_voxel(data, path):
+    parent_path = Path(path).parent
+    file_name = Path(path).stem
+
+    ax = plt.subplot()
+
+    ids = list(set([f["id"] for f in data]))
+    structures = list(set([f["structure"] for f in data]))
+
+    ids.sort()
+    structures.sort()
+
+    labels = [s for s in structures]
+
+    w = 0.4
+    x = np.arange(len(labels))
+
+    ax.set_title(f"{get_title(file_name)} Per Voxel Memory Use")
+    ax.set_ylabel("Memory Per Voxel (Bytes)")
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels)
+
+    for id in ids:
+        datapoints = []
+        for structure in structures:
+            frame = find(data, id, structure)
+
+            memory = frame["stats"]["memory"]
+
+            total = total_voxels(frame)
+            actual = frame["stats"]["voxels"]
+
+            datapoints.append((memory / total, memory / actual))
+
+
+        plt.bar(x - w/4, [x[0] for x in datapoints], label=f"Per Total Voxels", alpha=0.7, width=w)
+        plt.bar(x + w/4, [x[1] for x in datapoints], label=f"Per Visible Voxels", alpha=0.7, width=w)
+
+        break
+
+    plt.legend()
+    plt.savefig(f"{parent_path}/{file_name}_per_voxel.png")
 
     plt.show()

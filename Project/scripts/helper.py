@@ -1,8 +1,12 @@
 import json
 import hashlib
+from itertools import cycle
 
 import matplotlib.pyplot as plt
 import numpy as np
+
+def get_title(filename):
+    return " ".join([x.capitalize() for x in filename.split("_")])
 
 def parse_file(filename):
     lines = ""
@@ -11,13 +15,15 @@ def parse_file(filename):
 
     return json.loads(lines)["values"]
 
-def name_to_colour(name, cmap):
-    h = hashlib.md5(name.encode("utf-8")).hexdigest()
-
-    idx = int(h, 16)
-
+def name_to_colour(all_ids, id, cmap):
     plt_cmap = plt.get_cmap(cmap)
-    return plt_cmap(idx % plt_cmap.N)
+    colourcyle = cycle(plt_cmap.colors)
+
+    colours = {}
+    for i in all_ids:
+        colours[i] = next(colourcyle)
+
+    return colours[id]
 
 def parse_frames(data):
     frames = data["frametimes"]

@@ -11,9 +11,11 @@ def parse_args():
 
     parser.add_argument("perf_file")
 
-    parser.add_argument("-b", "--bar", action="store_true")
+    parser.add_argument("-f", "--frame-times", action="store_true")
     parser.add_argument("-v", "--violin", action="store_true")
     parser.add_argument("-r", "--ratio", action="store_true")
+    parser.add_argument("-m", "--memory", action="store_true")
+    parser.add_argument("-p", "--per-voxel", action="store_true")
 
     return parser.parse_args()
 
@@ -22,9 +24,13 @@ if __name__=="__main__":
 
     data = parse_file(args.perf_file)
 
-    if args.bar:
-        barpoints(data, args.perf_file)
+    if args.frame_times:
+        frame_times(data, args.perf_file)
     if args.violin:
         violin(data)
     if args.ratio:
-        size_ratio(data)
+        voxel_ratio(data, args.perf_file)
+    if args.memory:
+        total_memory(data, args.perf_file)
+    if args.per_voxel:
+        per_voxel(data, args.perf_file)
