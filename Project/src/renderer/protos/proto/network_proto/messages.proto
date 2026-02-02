@@ -2,16 +2,8 @@ syntax = "proto3";
 
 package NetProto;
 
-enum ASType {
-  AS_TYPE_GRID = 0;
-  AS_TYPE_TEXTURE = 1;
-  AS_TYPE_OCTREE = 2;
-  AS_TYPE_CONTREE = 3;
-  AS_TYPE_BRICKMAP = 4;
-}
-
 message SetAS {
-  ASType type = 1;
+  uint32 type = 1;
 }
 
 message RequestFileEntries {

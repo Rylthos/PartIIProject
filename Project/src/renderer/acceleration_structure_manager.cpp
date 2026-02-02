@@ -5,6 +5,9 @@
 #include <format>
 #include <memory>
 
+#include "network/loop.hpp"
+#include "network_proto/messages.pb.h"
+
 #include "accelerationStructures/acceleration_structure.hpp"
 #include "accelerationStructures/brickmap.hpp"
 #include "accelerationStructures/contree.hpp"
@@ -77,6 +80,10 @@ void ASManager::render(
 
 void ASManager::update(float dt)
 {
+    while (!m_Functions.empty()) {
+        m_Functions.front()();
+        m_Functions.pop();
+    }
     if (m_InitInfo.netInfo.enableClientSide)
         return;
 
@@ -105,38 +112,42 @@ void ASManager::update(float dt)
 
 void ASManager::setAS(ASType type)
 {
-    if (m_InitInfo.netInfo.enableClientSide)
-        return;
-
     m_CurrentType = type;
-    vkDeviceWaitIdle(m_InitInfo.device);
+    if (m_InitInfo.netInfo.enableClientSide) {
+        NetProto::SetAS setAS;
+        setAS.set_type(static_cast<uint8_t>(m_CurrentType));
 
-    if (m_CurrentAS)
-        delete m_CurrentAS.release();
+        Network::sendMessage(NetProto::HEADER_TYPE_SET_AS, setAS);
+    } else {
+        vkDeviceWaitIdle(m_InitInfo.device);
 
-    switch (m_CurrentType) {
-    case ASType::GRID:
-        m_CurrentAS = std::make_unique<GridAS>();
-        break;
-    case ASType::TEXTURE:
-        m_CurrentAS = std::make_unique<TextureAS>();
-        break;
-    case ASType::OCTREE:
-        m_CurrentAS = std::make_unique<OctreeAS>();
-        break;
-    case ASType::CONTREE:
-        m_CurrentAS = std::make_unique<ContreeAS>();
-        break;
-    case ASType::BRICKMAP:
-        m_CurrentAS = std::make_unique<BrickmapAS>();
-        break;
-    default:
-        assert(false && "Invalid Type provided");
+        if (m_CurrentAS)
+            delete m_CurrentAS.release();
+
+        switch (m_CurrentType) {
+        case ASType::GRID:
+            m_CurrentAS = std::make_unique<GridAS>();
+            break;
+        case ASType::TEXTURE:
+            m_CurrentAS = std::make_unique<TextureAS>();
+            break;
+        case ASType::OCTREE:
+            m_CurrentAS = std::make_unique<OctreeAS>();
+            break;
+        case ASType::CONTREE:
+            m_CurrentAS = std::make_unique<ContreeAS>();
+            break;
+        case ASType::BRICKMAP:
+            m_CurrentAS = std::make_unique<BrickmapAS>();
+            break;
+        default:
+            assert(false && "Invalid Type provided");
+        }
+
+        AnimationManager::getManager()->reset();
+
+        m_CurrentAS->init(m_InitInfo);
     }
-
-    AnimationManager::getManager()->reset();
-
-    m_CurrentAS->init(m_InitInfo);
     LOG_INFO("Changed to {}", structTypeToStringMap[m_CurrentType]);
 }
 
@@ -527,4 +538,17 @@ void ASManager::mouse(const Event& event)
             m_ShouldEdit = false;
         }
     }
+}
+
+bool ASManager::handleASChange(const std::vector<uint8_t>& data, uint32_t messageID)
+{
+    NetProto::SetAS asEvent;
+    asEvent.ParseFromArray(data.data(), data.size());
+
+    uint32_t as = asEvent.type();
+    ASType type = static_cast<ASType>(as);
+
+    m_Functions.push([this, type]() { setAS(type); });
+
+    return true;
 }

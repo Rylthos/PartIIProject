@@ -109,6 +109,9 @@ void Application::init(InitSettings settings)
 
             Network::addCallback(NetProto::HEADER_TYPE_REQUEST_FILE_ENTRIES,
                 SceneManager::getManager()->getHandleRequestFileEntries());
+
+            Network::addCallback(
+                NetProto::HEADER_TYPE_SET_AS, ASManager::getManager()->getHandleASChange());
         }
     }
 
@@ -180,12 +183,6 @@ void Application::init(InitSettings settings)
     createQueryPool();
 
     addCallbacks();
-
-    if (m_Settings.netInfo.enableServerSide) {
-        ASManager::getManager()->setAS(ASType::BRICKMAP);
-        bool validAS[] = { false, false, false, false, true };
-        ASManager::getManager()->loadAS("res/structures/character", validAS);
-    }
 
     if (m_Settings.netInfo.enableClientSide) {
         NetProto::Update update;

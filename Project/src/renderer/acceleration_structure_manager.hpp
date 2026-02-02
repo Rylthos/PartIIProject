@@ -2,11 +2,14 @@
 
 #include <memory>
 
+#include "network/node.hpp"
+
 #include "accelerationStructures/acceleration_structure.hpp"
 
 #include "events/events.hpp"
 
 #include "buffer.hpp"
+#include <queue>
 
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
@@ -73,6 +76,12 @@ class ASManager {
         return std::bind(&ASManager::mouse, this, std::placeholders::_1);
     }
 
+    std::function<bool(const std::vector<uint8_t>&, uint32_t)> getHandleASChange()
+    {
+        using namespace std::placeholders;
+        return std::bind(&ASManager::handleASChange, this, _1, _2);
+    }
+
     uint64_t getMemoryUsage();
     uint64_t getVoxels();
     uint64_t getNodes();
@@ -92,6 +101,8 @@ class ASManager {
     void UI(const Event& event);
     void mouse(const Event& event);
 
+    bool handleASChange(const std::vector<uint8_t>& data, uint32_t messageID);
+
   private:
     ASStructInfo m_InitInfo;
 
@@ -109,6 +120,5 @@ class ASManager {
 
     float m_PreviousPlacement = 0.f;
 
-    // Networking
-    bool m_RequestedScene = false;
+    std::queue<std::function<void()>> m_Functions;
 };
