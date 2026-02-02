@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <optional>
 
 #include "msquic.h"
@@ -14,6 +15,8 @@ extern HQUIC s_QuicConfiguration;
 struct Node {
     HQUIC listener = nullptr;
     HQUIC connection = nullptr;
+
+    std::chrono::steady_clock clock;
 };
 
 extern Node s_Node;

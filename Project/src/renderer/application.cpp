@@ -1,5 +1,6 @@
 #include "application.hpp"
 
+#include <chrono>
 #include <cstdint>
 #include <filesystem>
 #include <functional>
@@ -1969,9 +1970,10 @@ void Application::takeScreenshot(std::string filename) { m_TakeScreenshot = file
 
 bool Application::handleFrameReceive(const std::vector<uint8_t>& data, uint32_t messageID)
 {
-    static uint32_t previousID = 0;
+    static std::chrono::steady_clock clock;
+    static auto previousTime = clock.now();
 
-    LOG_INFO("FRAME: {}:{}", previousID, messageID);
+    static uint32_t previousID = 0;
 
     if (messageID < previousID) {
         return false;
@@ -2024,7 +2026,14 @@ bool Application::handleFrameReceive(const std::vector<uint8_t>& data, uint32_t 
         m_PerFrameData[i].dirty = true;
     }
 
-    previousID = messageID;
+    {
+        previousID = messageID;
+        auto time = clock.now();
+
+        std::chrono::duration<float, std::milli> diff = time - previousTime;
+        m_PreviousGPUTime = diff.count();
+        previousTime = time;
+    }
 
     return true;
 }
@@ -2033,8 +2042,6 @@ bool Application::handleUpdateReceive(const std::vector<uint8_t>& data, uint32_t
 {
     NetProto::Update update;
     update.ParseFromArray(data.data(), data.size());
-
-    LOG_INFO("UPDATE");
 
     if (update.has_window_size()) {
         std::lock_guard _lock(m_ThreadFunctionsMutex);
