@@ -34,7 +34,6 @@ namespace Network {
 void getHeader(const std::vector<uint8_t>& data, NetProto::Header& header)
 {
     uint32_t header_size = data[0];
-    LOG_INFO("Header Size: {}", header_size);
     header.ParseFromArray(data.data() + 1, header_size);
 }
 
@@ -61,6 +60,9 @@ void handleStreamData(uint32_t messageID)
         LOG_ERROR("Data size does not agree with header: {}/{}({}+{}+1)", message.stream.size(),
             header.message_size() + header.ByteSizeLong() + 1, header.message_size(),
             header.ByteSizeLong());
+
+        s_StreamData.erase(messageID);
+
         return;
     }
 
@@ -131,6 +133,9 @@ QUIC_STATUS streamCallback(HQUIC stream, void* context, QUIC_STREAM_EVENT* event
                 NetProto::StreamHeader streamHeader;
                 streamHeader.ParseFromArray(buf.Buffer + 1, streamHeaderSize);
 
+                if (streamHeader.message_length() == 0)
+                    break;
+
                 uint32_t messageID = streamHeader.message_id();
                 s_StreamToMessage[stream] = messageID;
 
@@ -170,7 +175,10 @@ QUIC_STATUS streamCallback(HQUIC stream, void* context, QUIC_STREAM_EVENT* event
     case QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE:
         LOG_DEBUG("[strm][{}] Done", fmt::ptr(stream));
 
-        handleData(s_ReceivedData[stream]);
+        if (s_StreamToMessage.contains(stream))
+            handleStreamData(s_StreamToMessage[stream]);
+
+        s_StreamToMessage.erase(stream);
 
         if (!event->SHUTDOWN_COMPLETE.AppCloseInProgress) {
             s_QuicAPI->StreamClose(stream);
