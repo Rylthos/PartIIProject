@@ -4,20 +4,56 @@
 
 #include "logger/logger.hpp"
 
+#include "network/loop.hpp"
+#include "network/node.hpp"
+#include "network_proto/header.pb.h"
+#include "network_proto/messages.pb.h"
+
 #include "acceleration_structure_manager.hpp"
 
 #include <imgui.h>
 
 #include <functional>
 
-SceneManager::SceneManager()
+SceneManager::SceneManager() { }
+
+void SceneManager::init(Network::NetworkingInfo info)
 {
+    m_NetInfo = info;
+
     m_CurrentPath = std::filesystem::current_path();
     if (std::filesystem::exists(m_CurrentPath / "res" / "structures")) {
         m_CurrentPath /= "res";
         m_CurrentPath /= "structures";
     }
     getDirectories();
+}
+
+std::function<bool(const std::vector<uint8_t>&, uint32_t)>
+SceneManager::getHandleRequestFileEntries()
+{
+    using namespace std::placeholders;
+    return std::bind(&SceneManager::handleRequestFileEntries, this, _1, _2);
+}
+
+std::function<bool(const std::vector<uint8_t>&, uint32_t)>
+SceneManager::getHandleRequestDirEntries()
+{
+    using namespace std::placeholders;
+    return std::bind(&SceneManager::handleRequestDirEntries, this, _1, _2);
+}
+
+std::function<bool(const std::vector<uint8_t>&, uint32_t)>
+SceneManager::getHandleReturnFileEntries()
+{
+    using namespace std::placeholders;
+    return std::bind(&SceneManager::handleReturnFileEntries, this, _1, _2);
+}
+
+std::function<bool(const std::vector<uint8_t>&, uint32_t)> SceneManager::getHandleReturnDirEntries()
+{
+    using namespace std::placeholders;
+    return std::bind(&SceneManager::handleReturnDirEntries, this, _1, _2);
 }
 
 void SceneManager::UI(const Event& event)
@@ -85,29 +121,103 @@ void SceneManager::UI(const Event& event)
     }
 }
 
-void SceneManager::getDirectories()
+bool SceneManager::handleRequestFileEntries(const std::vector<uint8_t>& data, uint32_t messageID)
 {
-    m_Directories.clear();
+    NetProto::RequestFileEntries entries;
+    entries.ParseFromArray(data.data(), data.size());
 
-    for (auto const& entry : std::filesystem::directory_iterator { m_CurrentPath }) {
-        if (entry.is_directory()) {
-            m_Directories.push_back(entry.path());
-        }
+    m_SelectedPath = entries.file();
+
+    getFileEntries();
+
+    LOG_INFO("Returning File entries");
+    NetProto::ReturnFileEntries files;
+    for (const auto& fileExt : m_FileEntries) {
+        files.mutable_file_extensions()->Add(std::string(fileExt));
+    }
+    Network::sendMessage(NetProto::HEADER_TYPE_RETURN_FILE_ENTRIES, files);
+
+    return true;
+}
+
+bool SceneManager::handleRequestDirEntries(const std::vector<uint8_t>& data, uint32_t messageID)
+{
+    LOG_INFO("Returning Dir entries");
+    NetProto::ReturnDirEntries dirs;
+    for (uint32_t i = 0; i < m_Directories.size(); i++) {
+        dirs.mutable_dir_files()->Add(m_Directories[i]);
+    }
+    Network::sendMessage(NetProto::HEADER_TYPE_RETURN_DIR_ENTRIES, dirs);
+
+    return true;
+}
+
+bool SceneManager::handleReturnFileEntries(const std::vector<uint8_t>& data, uint32_t messageID)
+{
+    LOG_INFO("Received File Entries");
+    NetProto::ReturnFileEntries fileEntries;
+    fileEntries.ParseFromArray(data.data(), data.size());
+
+    m_FileEntries.clear();
+    for (uint32_t i = 0; i < fileEntries.file_extensions_size(); i++) {
+        m_FileEntries.insert(fileEntries.file_extensions().at(i));
     }
 
+    return true;
+}
+
+bool SceneManager::handleReturnDirEntries(const std::vector<uint8_t>& data, uint32_t messageID)
+{
+    LOG_INFO("Received Dir Entries");
+    NetProto::ReturnDirEntries dirEntries;
+    dirEntries.ParseFromArray(data.data(), data.size());
+
+    m_Directories.clear();
+    for (uint32_t i = 0; i < dirEntries.dir_files_size(); i++) {
+        m_Directories.push_back(dirEntries.dir_files().at(i));
+    }
     std::sort(m_Directories.begin(), m_Directories.end());
+
+    return true;
+}
+
+void SceneManager::getDirectories()
+{
+    if (m_NetInfo.enableClientSide) {
+        LOG_INFO("REQUEST DIRECTORIES");
+        std::vector<uint8_t> data;
+        Network::sendMessage(NetProto::HEADER_TYPE_REQUEST_DIR_ENTRIES, data);
+    } else {
+        m_Directories.clear();
+
+        for (auto const& entry : std::filesystem::directory_iterator { m_CurrentPath }) {
+            if (entry.is_directory()) {
+                m_Directories.push_back(entry.path());
+            }
+        }
+
+        std::sort(m_Directories.begin(), m_Directories.end());
+    }
 }
 
 void SceneManager::getFileEntries()
 {
-    std::filesystem::path folderName = m_SelectedPath.filename();
+    if (m_NetInfo.enableClientSide) {
+        LOG_INFO("REQUEST FILES");
 
-    m_FileEntries.clear();
+        NetProto::RequestFileEntries fileEntries;
+        fileEntries.set_file(m_SelectedPath);
+        Network::sendMessage(NetProto::HEADER_TYPE_REQUEST_FILE_ENTRIES, fileEntries);
+    } else {
+        std::filesystem::path folderName = m_SelectedPath.filename();
 
-    for (auto const& entry : std::filesystem::directory_iterator { m_SelectedPath }) {
-        if (entry.is_regular_file()) {
-            if (entry.path().stem() == folderName) {
-                m_FileEntries.insert(entry.path().extension());
+        m_FileEntries.clear();
+
+        for (auto const& entry : std::filesystem::directory_iterator { m_SelectedPath }) {
+            if (entry.is_regular_file()) {
+                if (entry.path().stem() == folderName) {
+                    m_FileEntries.insert(entry.path().extension());
+                }
             }
         }
     }

@@ -72,6 +72,8 @@ void Application::init(InitSettings settings)
 
     Logger::init();
 
+    SceneManager::getManager()->init(m_Settings.netInfo);
+
     if (m_Settings.netInfo.networked) {
         if (m_Settings.netInfo.enableClientSide) {
             Network::initClient(settings.targetIP.c_str(), settings.targetPort);
@@ -90,11 +92,23 @@ void Application::init(InitSettings settings)
         if (m_Settings.netInfo.enableClientSide) {
             Network::addCallback(NetProto::HEADER_TYPE_FRAME,
                 std::bind(&Application::handleFrameReceive, this, _1, _2));
+
+            Network::addCallback(NetProto::HEADER_TYPE_RETURN_DIR_ENTRIES,
+                SceneManager::getManager()->getHandleReturnDirEntries());
+
+            Network::addCallback(NetProto::HEADER_TYPE_RETURN_FILE_ENTRIES,
+                SceneManager::getManager()->getHandleReturnFileEntries());
         }
 
         if (m_Settings.netInfo.enableServerSide) {
             Network::addCallback(NetProto::HEADER_TYPE_UPDATE,
                 std::bind(&Application::handleUpdateReceive, this, _1, _2));
+
+            Network::addCallback(NetProto::HEADER_TYPE_REQUEST_DIR_ENTRIES,
+                SceneManager::getManager()->getHandleRequestDirEntries());
+
+            Network::addCallback(NetProto::HEADER_TYPE_REQUEST_FILE_ENTRIES,
+                SceneManager::getManager()->getHandleRequestFileEntries());
         }
     }
 
