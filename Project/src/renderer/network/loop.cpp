@@ -17,7 +17,8 @@ namespace Network {
 std::queue<std::tuple<NetProto::Type, std::vector<uint8_t>, std::vector<uint8_t>>> s_Messages;
 std::mutex s_MessageLock;
 
-std::unordered_map<NetProto::Type, std::vector<std::function<bool(const std::vector<uint8_t>&)>>>
+std::unordered_map<NetProto::Type,
+    std::vector<std::function<bool(const std::vector<uint8_t>&, uint32_t)>>>
     s_Callbacks;
 std::mutex s_CallbackLock;
 
@@ -104,7 +105,8 @@ Error:
     return;
 }
 
-void handleReceive(NetProto::Header& header, const std::vector<uint8_t>& data, uint32_t offset)
+void handleReceive(
+    NetProto::Header& header, const std::vector<uint8_t>& data, uint32_t messageID, uint32_t offset)
 {
     if (!s_Callbacks.contains(header.type())) {
         LOG_ERROR("No callback set for {}", (uint8_t)header.type());
@@ -117,7 +119,7 @@ void handleReceive(NetProto::Header& header, const std::vector<uint8_t>& data, u
     const auto& callbacks = s_Callbacks[header.type()];
 
     for (const auto& callback : callbacks) {
-        if (callback(trimmed)) {
+        if (callback(trimmed, messageID)) {
             break;
         }
     }
@@ -185,7 +187,8 @@ void sendMessage(NetProto::Type headerType, const std::vector<uint8_t>& data)
     }
 }
 
-void addCallback(NetProto::Type type, std::function<bool(const std::vector<uint8_t>&)> callback)
+void addCallback(
+    NetProto::Type type, std::function<bool(const std::vector<uint8_t>&, uint32_t)> callback)
 {
     std::unique_lock _lock(s_CallbackLock);
 

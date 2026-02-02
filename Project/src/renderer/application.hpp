@@ -215,8 +215,8 @@ class Application : public EventDispatcher {
 
     void takeScreenshot(std::string filename);
 
-    bool handleFrameReceive(const std::vector<uint8_t>& data);
-    bool handleUpdateReceive(const std::vector<uint8_t>& data);
+    bool handleFrameReceive(const std::vector<uint8_t>& data, uint32_t messageID);
+    bool handleUpdateReceive(const std::vector<uint8_t>& data, uint32_t messageID);
 
     bool serverSide()
     {

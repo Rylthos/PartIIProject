@@ -86,12 +86,12 @@ void Application::init(InitSettings settings)
 
         if (m_Settings.netInfo.enableClientSide) {
             Network::addCallback(NetProto::HEADER_TYPE_FRAME,
-                std::bind(&Application::handleFrameReceive, this, std::placeholders::_1));
+                std::bind(&Application::handleFrameReceive, this, _1, _2));
         }
 
         if (m_Settings.netInfo.enableServerSide) {
             Network::addCallback(NetProto::HEADER_TYPE_UPDATE,
-                std::bind(&Application::handleUpdateReceive, this, std::placeholders::_1));
+                std::bind(&Application::handleUpdateReceive, this, _1, _2));
         }
     }
 
@@ -1920,8 +1920,16 @@ void Application::handleWindow(const Event& event)
 
 void Application::takeScreenshot(std::string filename) { m_TakeScreenshot = filename; }
 
-bool Application::handleFrameReceive(const std::vector<uint8_t>& data)
+bool Application::handleFrameReceive(const std::vector<uint8_t>& data, uint32_t messageID)
 {
+    static uint32_t previousID = 0;
+
+    LOG_INFO("FRAME: {}:{}", previousID, messageID);
+
+    if (messageID < previousID) {
+        return false;
+    }
+
     NetProto::Frame frame;
     frame.ParseFromArray(data.data(), data.size());
 
@@ -1967,10 +1975,12 @@ bool Application::handleFrameReceive(const std::vector<uint8_t>& data)
         m_PerFrameData[i].dirty = true;
     }
 
+    previousID = messageID;
+
     return true;
 }
 
-bool Application::handleUpdateReceive(const std::vector<uint8_t>& data)
+bool Application::handleUpdateReceive(const std::vector<uint8_t>& data, uint32_t messageID)
 {
     NetProto::Update update;
     update.ParseFromArray(data.data(), data.size());

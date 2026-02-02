@@ -11,7 +11,8 @@
 
 namespace Network {
 
-void handleReceive(NetProto::Header& header, const std::vector<uint8_t>& data, uint32_t offset = 0);
+void handleReceive(NetProto::Header& header, const std::vector<uint8_t>& data, uint32_t messageID,
+    uint32_t offset = 0);
 
 void writeLoop(std::stop_token stoken);
 
@@ -20,6 +21,6 @@ void sendMessage(NetProto::Type headerType, const google::protobuf::Message& mes
 void sendMessage(NetProto::Type headerType, const std::vector<uint8_t>& data);
 
 void addCallback(
-    NetProto::Type headerType, std::function<bool(const std::vector<uint8_t>&)> callback);
+    NetProto::Type headerType, std::function<bool(const std::vector<uint8_t>&, uint32_t)> callback);
 
 };

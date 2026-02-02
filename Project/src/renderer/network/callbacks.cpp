@@ -66,7 +66,7 @@ void handleStreamData(uint32_t messageID)
         return;
     }
 
-    handleReceive(header, message.stream, header.ByteSizeLong() + 1);
+    handleReceive(header, message.stream, messageID, header.ByteSizeLong() + 1);
 
     s_StreamData.erase(messageID);
 }
@@ -104,7 +104,7 @@ void handleDatagramData(uint32_t messageID)
         return;
     }
 
-    handleReceive(header, data, header.ByteSizeLong() + 1);
+    handleReceive(header, data, messageID, header.ByteSizeLong() + 1);
 
     s_DatagramData.erase(messageID);
 }
