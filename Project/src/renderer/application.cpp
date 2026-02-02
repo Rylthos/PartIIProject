@@ -11,6 +11,7 @@
 #include <thread>
 
 #include "animation_manager.hpp"
+#include "compression.hpp"
 #include "events/events.hpp"
 
 #include "network_proto/frame.pb.h"
@@ -1732,10 +1733,11 @@ void Application::render_FinaliseScreenshot()
         }
 
         if (m_Settings.netInfo.enableServerSide && value == "") {
+            std::vector<uint8_t> compressed = Compression::compress(imageData);
             NetProto::Frame frame;
             frame.set_width(size.x);
             frame.set_height(size.y);
-            frame.set_data(imageData.data(), imageData.size());
+            frame.set_data(compressed.data(), compressed.size());
 
             Network::sendMessage(NetProto::HEADER_TYPE_FRAME, frame);
         } else {
@@ -1939,7 +1941,9 @@ bool Application::handleFrameReceive(const std::vector<uint8_t>& data, uint32_t 
     }
 
     glm::uvec2 size { frame.width(), frame.height() };
+
     std::vector<uint8_t> rawData(frame.data().begin(), frame.data().end());
+    std::vector<uint8_t> uncompressed = Compression::uncompress(rawData);
 
     VkImageSubresource subResource { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0 };
     VkSubresourceLayout subResourceLayout;
@@ -1959,10 +1963,10 @@ bool Application::handleFrameReceive(const std::vector<uint8_t>& data, uint32_t 
             uint32_t* row = (uint32_t*)imageData;
             for (uint32_t x = 0; x < size.x; x++) {
                 uint32_t index = (x + y * size.x) * 4 + offset;
-                ((uint8_t*)row)[0] = rawData[index + 0];
-                ((uint8_t*)row)[1] = rawData[index + 1];
-                ((uint8_t*)row)[2] = rawData[index + 2];
-                ((uint8_t*)row)[3] = rawData[index + 3];
+                ((uint8_t*)row)[0] = uncompressed[index + 0];
+                ((uint8_t*)row)[1] = uncompressed[index + 1];
+                ((uint8_t*)row)[2] = uncompressed[index + 2];
+                ((uint8_t*)row)[3] = uncompressed[index + 3];
                 row++;
             }
             imageData += subResourceLayout.rowPitch;

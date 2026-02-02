@@ -74,6 +74,8 @@ std::vector<uint8_t*> formDatagramBuffers(
     datagramHeader.set_fragment_count(bufferCount);
     datagramHeader.set_fragment_index(0);
 
+    LOG_INFO("Datagram message: {}", datagramHeader.message_id());
+
     size_t datagramHeaderSize = datagramHeader.ByteSizeLong();
 
     std::vector<uint8_t*> buffers;

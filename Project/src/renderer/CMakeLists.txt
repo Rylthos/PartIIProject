@@ -20,6 +20,7 @@ set (SOURCE_LIST
   "modification_manager.cpp" "modification_manager.hpp"
   "animation_manager.cpp" "animation_manager.hpp"
   "queue.cpp" "queue.hpp"
+  "compression.cpp" "compression.hpp"
 )
 
 add_compile_definitions(GLM_ENABLE_EXPERIMENTAL)
@@ -70,4 +71,5 @@ target_link_libraries(Renderer PRIVATE
   CLI11::CLI11
   protobuf::libprotobuf
   msquic
+  ZLIB::ZLIB
 )

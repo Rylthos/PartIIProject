@@ -9,7 +9,17 @@ find_package(Vulkan REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(Protobuf CONFIG REQUIRED)
 
-find_package(ZLIB CONFIG)
+find_package(ZLIB REQUIRED)
+
+if (NOT TARGET zlib)
+  add_library(zlib INTERFACE)
+  target_link_libraries(zlib INTERFACE ZLIB::ZIB)
+endif()
+
+if (NOT TARGET zlibstatic)
+  add_library(zlibstatic INTERFACE)
+  target_link_libraries(zlibstatic INTERFACE ZLIB::ZIB)
+endif()
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
   message("Enabled Debug features")
