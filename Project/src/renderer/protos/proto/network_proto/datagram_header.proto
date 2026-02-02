@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package NetProto;
+
+message DatagramHeader {
+  fixed32 message_id = 1;
+  fixed32 fragment_index = 2;
+  fixed32 fragment_count = 3;
+}

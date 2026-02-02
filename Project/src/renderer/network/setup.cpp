@@ -70,6 +70,9 @@ bool loadServerConfiguration()
     settings.PeerUnidiStreamCount = 1;
     settings.IsSet.PeerUnidiStreamCount = TRUE;
 
+    settings.DatagramReceiveEnabled = TRUE;
+    settings.IsSet.DatagramReceiveEnabled = TRUE;
+
     QUIC_CREDENTIAL_CONFIG config;
     memset(&config, 0, sizeof(config));
     config.Flags = QUIC_CREDENTIAL_FLAG_NONE;
@@ -107,6 +110,9 @@ bool loadClientConfiguration()
 
     settings.PeerUnidiStreamCount = 1;
     settings.IsSet.PeerUnidiStreamCount = TRUE;
+
+    settings.DatagramReceiveEnabled = TRUE;
+    settings.IsSet.DatagramReceiveEnabled = TRUE;
 
     QUIC_CREDENTIAL_CONFIG credConfig;
     memset(&credConfig, 0, sizeof(credConfig));
@@ -181,6 +187,10 @@ void initClient(const char* target, uint16_t port)
         cleanup();
         exit(-1);
     }
+
+    BOOLEAN enableDatagram = TRUE;
+    s_QuicAPI->SetParam(s_Node.connection, QUIC_PARAM_CONN_DATAGRAM_RECEIVE_ENABLED,
+        sizeof(enableDatagram), &enableDatagram);
 
     if (QUIC_FAILED(status = s_QuicAPI->ConnectionStart(s_Node.connection, s_QuicConfiguration,
                         QUIC_ADDRESS_FAMILY_UNSPEC, target, port))) {

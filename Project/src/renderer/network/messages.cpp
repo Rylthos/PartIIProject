@@ -1,8 +1,10 @@
 #include "messages.hpp"
 
+#include "network_proto/datagram_header.pb.h"
 #include "network_proto/stream_header.pb.h"
 
 #include "logger/logger.hpp"
+#include <msquic.h>
 
 namespace Network {
 uint32_t getNextID()
@@ -59,6 +61,62 @@ std::pair<size_t, QUIC_BUFFER*> formStreamBuffers(
     }
 
     return std::make_pair(bufferCount, quicHeaders);
+}
+
+std::vector<uint8_t*> formDatagramBuffers(
+    const std::vector<uint8_t>& headerData, const std::vector<uint8_t>& messageData)
+{
+    const size_t bufferSize = 1 * 1000;
+    const size_t bufferCount = std::ceil(messageData.size() / (float)bufferSize) + 1;
+
+    NetProto::DatagramHeader datagramHeader;
+    datagramHeader.set_message_id(getNextID());
+    datagramHeader.set_fragment_count(bufferCount);
+    datagramHeader.set_fragment_index(0);
+
+    size_t datagramHeaderSize = datagramHeader.ByteSizeLong();
+
+    std::vector<uint8_t*> buffers;
+    buffers.push_back(
+        (uint8_t*)malloc(datagramHeaderSize + 1 + sizeof(QUIC_BUFFER) + headerData.size()));
+
+    uint8_t* rawBuffer = buffers[0];
+    QUIC_BUFFER* quicHeaders = (QUIC_BUFFER*)rawBuffer;
+
+    QUIC_BUFFER& header = quicHeaders[0];
+    header.Length = headerData.size() + datagramHeaderSize + 1;
+    header.Buffer = rawBuffer + sizeof(QUIC_BUFFER);
+    header.Buffer[0] = datagramHeaderSize;
+
+    datagramHeader.SerializeToArray(header.Buffer + 1, datagramHeaderSize);
+    memcpy(header.Buffer + datagramHeaderSize + 1, headerData.data(), headerData.size());
+
+    uint32_t total = 0;
+    for (uint32_t i = 1; i < bufferCount; i++) {
+        datagramHeader.set_fragment_index(i);
+        datagramHeaderSize = datagramHeader.ByteSizeLong();
+
+        size_t bufLength = std::min(bufferSize, messageData.size() - total);
+
+        uint8_t* bufPtr
+            = (uint8_t*)malloc(datagramHeaderSize + 1 + sizeof(QUIC_BUFFER) + bufLength);
+
+        QUIC_BUFFER* buf = (QUIC_BUFFER*)bufPtr;
+
+        buf->Length = bufLength + datagramHeaderSize + 1;
+        buf->Buffer = bufPtr + sizeof(QUIC_BUFFER);
+
+        buf->Buffer[0] = datagramHeaderSize;
+
+        datagramHeader.SerializeToArray(buf->Buffer + 1, datagramHeaderSize);
+        memcpy(buf->Buffer + 1 + datagramHeaderSize, messageData.data() + total, bufLength);
+
+        total += bufLength;
+
+        buffers.push_back(bufPtr);
+    }
+
+    return buffers;
 }
 
 }

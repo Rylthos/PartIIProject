@@ -14,7 +14,7 @@
 
 namespace Network {
 
-std::queue<std::pair<std::vector<uint8_t>, std::vector<uint8_t>>> s_Messages;
+std::queue<std::tuple<NetProto::Type, std::vector<uint8_t>, std::vector<uint8_t>>> s_Messages;
 std::mutex s_MessageLock;
 
 std::unordered_map<NetProto::Type, std::vector<std::function<bool(const std::vector<uint8_t>&)>>>
@@ -72,6 +72,38 @@ Error:
     return;
 }
 
+void quicDatagramMessage(
+    HQUIC connection, const std::vector<uint8_t>& header, const std::vector<uint8_t>& data)
+{
+    if (connection == nullptr)
+        return;
+
+    QUIC_STATUS status;
+
+    std::vector<uint8_t*> buffers = formDatagramBuffers(header, data);
+
+    LOG_DEBUG("[conn][{}] Sending datagram : {}", fmt::ptr(connection), buffers.size());
+
+    for (uint32_t i = 0; i < buffers.size(); i++) {
+        if (QUIC_FAILED(status = s_QuicAPI->DatagramSend(connection, (QUIC_BUFFER*)buffers[i], 1,
+                            QUIC_SEND_FLAG_NONE, buffers[i]))) {
+            goto Error;
+        }
+    }
+
+    return;
+
+Error:
+    LOG_ERROR("Datagram send failed: 0x{:x}", status);
+
+    for (size_t i = 0; i < buffers.size(); i++) {
+        free(buffers[i]);
+    }
+
+    s_QuicAPI->ConnectionShutdown(connection, QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0);
+    return;
+}
+
 void handleReceive(NetProto::Header& header, const std::vector<uint8_t>& data, uint32_t offset)
 {
     if (!s_Callbacks.contains(header.type())) {
@@ -100,9 +132,24 @@ void writeLoop(std::stop_token stoken)
         while (!s_Messages.empty()) {
             const auto& msg = s_Messages.front();
 
-            LOG_DEBUG("[NETWORK] sending: {}", msg.second.size());
+            NetProto::Type type = std::get<0>(msg);
 
-            quicStreamMessage(s_Node.connection, msg.first, msg.second);
+            bool sendStream = true;
+            switch (type) {
+            case NetProto::HEADER_TYPE_FRAME:
+                sendStream = false;
+                break;
+            default:
+                break;
+            }
+
+            LOG_DEBUG("[NETWORK] sending: {} | {}", (uint8_t)type, std::get<2>(msg).size());
+
+            if (sendStream) {
+                quicStreamMessage(s_Node.connection, std::get<1>(msg), std::get<2>(msg));
+            } else {
+                quicDatagramMessage(s_Node.connection, std::get<1>(msg), std::get<2>(msg));
+            }
 
             {
                 std::lock_guard<std::mutex> _lock(s_MessageLock);
@@ -134,7 +181,7 @@ void sendMessage(NetProto::Type headerType, const std::vector<uint8_t>& data)
 
     {
         std::lock_guard<std::mutex> _lock(s_MessageLock);
-        s_Messages.push(std::make_pair(headerBuf, data));
+        s_Messages.push(std::make_tuple(headerType, headerBuf, data));
     }
 }
 

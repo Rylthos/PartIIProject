@@ -3,6 +3,7 @@ add_library(Renderer-proto OBJECT
   "proto/network_proto/frame.proto"
   "proto/network_proto/update.proto"
   "proto/network_proto/stream_header.proto"
+  "proto/network_proto/datagram_header.proto"
 )
 
 target_link_libraries(Renderer-proto PUBLIC protobuf::libprotobuf)
