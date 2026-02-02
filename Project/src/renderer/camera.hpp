@@ -2,11 +2,12 @@
 
 #include <set>
 
+#include "events/event_dispatcher.hpp"
 #include "events/events.hpp"
 
 #include "glm/glm.hpp"
 
-class Camera {
+class Camera : public EventDispatcher {
   public:
     Camera(glm::vec3 origin = glm::vec3(0.0f, 0.0f, 0.0f), float pitch = 0.0f, float yaw = 0.0f);
     ~Camera();
@@ -30,14 +31,15 @@ class Camera {
     {
         m_Position = pos;
         updateVectors();
+        positionUpdated();
     }
 
     void setRotation(float yaw, float pitch)
     {
         m_Yaw = yaw;
         m_Pitch = pitch;
-
         updateVectors();
+        rotationUpdated();
     }
 
     glm::vec3 getPosition() { return m_Position; }
@@ -65,6 +67,9 @@ class Camera {
     void keyboardEvent(const Event& event);
     void mouseEvent(const Event& event);
     void frameEvent(const Event& event);
+
+    void positionUpdated();
+    void rotationUpdated();
 
     void updateVectors();
 };

@@ -190,6 +190,8 @@ class Application : public EventDispatcher {
     void createQueryPool();
     void destroyQueryPool();
 
+    void addCallbacks();
+
     void requestUIRender();
     void UI(const Event& event);
 
@@ -212,6 +214,8 @@ class Application : public EventDispatcher {
     void handleKeyInput(const Event& event);
     void handleMouse(const Event& event);
     void handleWindow(const Event& event);
+
+    void handleCameraEvent(const Event& event);
 
     void takeScreenshot(std::string filename);
 

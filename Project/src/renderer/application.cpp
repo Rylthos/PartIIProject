@@ -163,39 +163,19 @@ void Application::init(InitSettings settings)
 
     createQueryPool();
 
-    m_Window->subscribe(EventFamily::KEYBOARD, std::bind(&Application::handleKeyInput, this, _1));
-    m_Window->subscribe(EventFamily::MOUSE, std::bind(&Application::handleMouse, this, _1));
-    m_Window->subscribe(EventFamily::WINDOW, std::bind(&Application::handleWindow, this, _1));
-    m_Window->subscribe(EventFamily::MOUSE, ASManager::getManager()->getMouseEvent());
-
-    subscribe(EventFamily::FRAME, std::bind(&Application::UI, this, _1));
-    subscribe(EventFamily::FRAME, Logger::getFrameEvent());
-    subscribe(EventFamily::FRAME, ASManager::getManager()->getUIEvent());
-    subscribe(EventFamily::FRAME, SceneManager::getManager()->getUIEvent());
-    subscribe(EventFamily::FRAME, PerformanceLogger::getLogger()->getFrameEvent());
-    subscribe(EventFamily::FRAME, ModificationManager::getManager()->getUIEvent());
-    subscribe(EventFamily::FRAME, AnimationManager::getManager()->getFrameEvent());
-
-    PerformanceLogger::getLogger()->setScreenshotFunction(
-        std::bind(&Application::takeScreenshot, this, _1));
-
-    m_Window->subscribe(EventFamily::KEYBOARD, m_Camera.getKeyboardEvent());
-    m_Window->subscribe(EventFamily::MOUSE, m_Camera.getMouseEvent());
-    subscribe(EventFamily::FRAME, m_Camera.getFrameEvent());
+    addCallbacks();
 
     if (m_Settings.netInfo.enableServerSide) {
         ASManager::getManager()->setAS(ASType::BRICKMAP);
         bool validAS[] = { false, false, false, false, true };
         ASManager::getManager()->loadAS("res/structures/character", validAS);
-        m_Camera.setRotation(0.01, -2);
-        m_Camera.setPosition({ 25, 59, -50 });
     }
 
     if (m_Settings.netInfo.enableClientSide) {
         NetProto::Update update;
         glm::uvec2 size = m_Window->getWindowSize();
-        update.mutable_windowsize()->set_x(size.x);
-        update.mutable_windowsize()->set_y(size.y);
+        update.mutable_window_size()->set_x(size.x);
+        update.mutable_window_size()->set_y(size.y);
 
         Network::sendMessage(NetProto::HEADER_TYPE_UPDATE, update);
     }
@@ -1221,6 +1201,36 @@ void Application::createQueryPool()
 
 void Application::destroyQueryPool() { vkDestroyQueryPool(m_VkDevice, m_VkQueryPool, nullptr); }
 
+void Application::addCallbacks()
+{
+    using namespace std::placeholders;
+
+    m_Window->subscribe(EventFamily::KEYBOARD, std::bind(&Application::handleKeyInput, this, _1));
+    m_Window->subscribe(EventFamily::MOUSE, std::bind(&Application::handleMouse, this, _1));
+    m_Window->subscribe(EventFamily::WINDOW, std::bind(&Application::handleWindow, this, _1));
+    m_Window->subscribe(EventFamily::MOUSE, ASManager::getManager()->getMouseEvent());
+
+    subscribe(EventFamily::FRAME, std::bind(&Application::UI, this, _1));
+    subscribe(EventFamily::FRAME, Logger::getFrameEvent());
+    subscribe(EventFamily::FRAME, ASManager::getManager()->getUIEvent());
+    subscribe(EventFamily::FRAME, SceneManager::getManager()->getUIEvent());
+    subscribe(EventFamily::FRAME, PerformanceLogger::getLogger()->getFrameEvent());
+    subscribe(EventFamily::FRAME, ModificationManager::getManager()->getUIEvent());
+    subscribe(EventFamily::FRAME, AnimationManager::getManager()->getFrameEvent());
+
+    PerformanceLogger::getLogger()->setScreenshotFunction(
+        std::bind(&Application::takeScreenshot, this, _1));
+
+    m_Window->subscribe(EventFamily::KEYBOARD, m_Camera.getKeyboardEvent());
+    m_Window->subscribe(EventFamily::MOUSE, m_Camera.getMouseEvent());
+    subscribe(EventFamily::FRAME, m_Camera.getFrameEvent());
+
+    if (m_Settings.netInfo.enableClientSide) {
+        m_Camera.subscribe(
+            EventFamily::CAMERA, std::bind(&Application::handleCameraEvent, this, _1));
+    }
+}
+
 void Application::requestUIRender()
 {
     ImGui_ImplVulkan_NewFrame();
@@ -1880,8 +1890,8 @@ void Application::resize()
         LOG_INFO("Window resize");
         NetProto::Update update;
         glm::uvec2 size = m_Window->getWindowSize();
-        update.mutable_windowsize()->set_x(size.x);
-        update.mutable_windowsize()->set_y(size.y);
+        update.mutable_window_size()->set_x(size.x);
+        update.mutable_window_size()->set_y(size.y);
 
         Network::sendMessage(NetProto::HEADER_TYPE_UPDATE, update);
     }
@@ -1920,6 +1930,35 @@ void Application::handleWindow(const Event& event)
     }
 }
 
+void Application::handleCameraEvent(const Event& event)
+{
+    const CameraEvent& cEvent = static_cast<const CameraEvent&>(event);
+
+    switch (cEvent.type()) {
+    case CameraEventType::POSITION: {
+        const CameraPositionEvent& pEvent = static_cast<const CameraPositionEvent&>(event);
+
+        NetProto::Update update;
+        update.mutable_camera_position()->set_x(pEvent.position.x);
+        update.mutable_camera_position()->set_y(pEvent.position.y);
+        update.mutable_camera_position()->set_z(pEvent.position.z);
+
+        Network::sendMessage(NetProto::HEADER_TYPE_UPDATE, update);
+        break;
+    }
+    case CameraEventType::ROTATION: {
+        const CameraRotationEvent& pEvent = static_cast<const CameraRotationEvent&>(event);
+
+        NetProto::Update update;
+        update.mutable_camera_rotation()->set_x(pEvent.rotation.x);
+        update.mutable_camera_rotation()->set_y(pEvent.rotation.y);
+
+        Network::sendMessage(NetProto::HEADER_TYPE_UPDATE, update);
+        break;
+    }
+    }
+}
+
 void Application::takeScreenshot(std::string filename) { m_TakeScreenshot = filename; }
 
 bool Application::handleFrameReceive(const std::vector<uint8_t>& data, uint32_t messageID)
@@ -1945,13 +1984,13 @@ bool Application::handleFrameReceive(const std::vector<uint8_t>& data, uint32_t 
     std::vector<uint8_t> rawData(frame.data().begin(), frame.data().end());
     std::vector<uint8_t> uncompressed = Compression::uncompress(rawData);
 
-    VkImageSubresource subResource { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0 };
-    VkSubresourceLayout subResourceLayout;
-    vkGetImageSubresourceLayout(
-        m_VkDevice, m_ScreenshotImage.getImage(), &subResource, &subResourceLayout);
-
     std::lock_guard _lock(m_NetworkImageMutex);
     {
+        VkImageSubresource subResource { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0 };
+        VkSubresourceLayout subResourceLayout;
+        vkGetImageSubresourceLayout(
+            m_VkDevice, m_NetworkImage.getImage(), &subResource, &subResourceLayout);
+
         uint8_t* imageData;
         vmaMapMemory(m_VmaAllocator, m_NetworkImage.getAllocation(), (void**)&imageData);
 
@@ -1991,14 +2030,34 @@ bool Application::handleUpdateReceive(const std::vector<uint8_t>& data, uint32_t
 
     LOG_INFO("UPDATE");
 
-    if (update.has_windowsize()) {
+    if (update.has_window_size()) {
         std::lock_guard _lock(m_ThreadFunctionsMutex);
         m_ThreadFunctions.push([=, this]() {
             glm::uvec2 size;
-            size.x = update.windowsize().x();
-            size.y = update.windowsize().y();
-            LOG_INFO("WINDOW: {} {}", size.x, size.y);
+            size.x = update.window_size().x();
+            size.y = update.window_size().y();
             m_Window->setWindowSize(size);
+        });
+    }
+
+    if (update.has_camera_position()) {
+        std::lock_guard _lock(m_ThreadFunctionsMutex);
+        m_ThreadFunctions.push([=, this]() {
+            glm::vec3 position;
+            position.x = update.camera_position().x();
+            position.y = update.camera_position().y();
+            position.z = update.camera_position().z();
+            m_Camera.setPosition(position);
+        });
+    }
+
+    if (update.has_camera_rotation()) {
+        std::lock_guard _lock(m_ThreadFunctionsMutex);
+        m_ThreadFunctions.push([=, this]() {
+            glm::vec2 rotation;
+            rotation.x = update.camera_rotation().x();
+            rotation.y = update.camera_rotation().y();
+            m_Camera.setRotation(rotation.x, rotation.y);
         });
     }
 

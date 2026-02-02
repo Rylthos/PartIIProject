@@ -7,6 +7,20 @@ message UVec2 {
   uint32 y = 2;
 }
 
+message Vec3 {
+  float x = 1;
+  float y = 2;
+  float z = 3;
+}
+
+message Vec2 {
+  float x = 1;
+  float y = 2;
+}
+
 message Update {
-  UVec2 windowSize = 1;
+  UVec2 window_size = 1;
+
+  Vec3 camera_position = 2;
+  Vec2 camera_rotation = 3;
 }

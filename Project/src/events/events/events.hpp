@@ -2,12 +2,13 @@
 
 #include <glm/glm.hpp>
 
-enum class EventFamily { KEYBOARD, MOUSE, WINDOW, FRAME };
+enum class EventFamily { KEYBOARD, MOUSE, WINDOW, FRAME, CAMERA };
 
 enum class KeyboardEventType { PRESS, RELEASE };
 enum class MouseEventType { MOVE, ENTER_EXIT, CLICK, LIFT };
 enum class WindowEventType { RESIZE };
 enum class FrameEventType { RENDER, UPDATE, UI };
+enum class CameraEventType { POSITION, ROTATION };
 
 class Event {
   public:
@@ -146,4 +147,32 @@ class UIEvent : public FrameEvent {
     ~UIEvent() = default;
 
     virtual FrameEventType type() const { return FrameEventType::UI; }
+};
+
+class CameraEvent : public Event {
+  public:
+    virtual EventFamily family() const { return EventFamily::CAMERA; }
+    virtual CameraEventType type() const = 0;
+};
+
+class CameraPositionEvent : public CameraEvent {
+  public:
+    CameraPositionEvent() = default;
+    ~CameraPositionEvent() = default;
+
+    virtual CameraEventType type() const { return CameraEventType::POSITION; }
+
+  public:
+    glm::vec3 position;
+};
+
+class CameraRotationEvent : public CameraEvent {
+  public:
+    CameraRotationEvent() = default;
+    ~CameraRotationEvent() = default;
+
+    virtual CameraEventType type() const { return CameraEventType::ROTATION; }
+
+  public:
+    glm::vec2 rotation;
 };

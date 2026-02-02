@@ -48,6 +48,8 @@ void Camera::mouseEvent(const Event& event)
 
         m_Pitch = std::clamp(m_Pitch, -89.9f, 89.9f);
 
+        rotationUpdated();
+
         updateVectors();
     }
 }
@@ -97,7 +99,27 @@ void Camera::frameEvent(const Event& event)
             speedup *= 8.f;
 
         m_Position += resultantForce * m_MovementSpeed * updateEvent.delta * speedup;
+
+        if (glm::length(resultantForce) != 0) {
+            positionUpdated();
+        }
     }
+}
+
+void Camera::positionUpdated()
+{
+    CameraPositionEvent pos;
+    pos.position = m_Position;
+
+    post(pos);
+}
+
+void Camera::rotationUpdated()
+{
+    CameraRotationEvent rot;
+    rot.rotation = { m_Yaw, m_Pitch };
+
+    post(rot);
 }
 
 void Camera::updateVectors()
