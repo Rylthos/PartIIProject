@@ -4,6 +4,7 @@
 #include "network_proto/datagram_header.pb.h"
 #include "network_proto/stream_header.pb.h"
 #include "node.hpp"
+#include <chrono>
 #include <msquic.h>
 #include <unordered_map>
 
@@ -14,6 +15,8 @@
 struct DatagramMessage {
     uint32_t fragmentCount;
     uint32_t receivedCount;
+
+    std::chrono::steady_clock::time_point timeout;
 
     std::vector<std::vector<uint8_t>> fragments;
 };
@@ -109,6 +112,23 @@ void handleDatagramData(uint32_t messageID)
     handleReceive(header, data, messageID, header.ByteSizeLong() + 1);
 
     s_DatagramData.erase(messageID);
+}
+
+void cleanupDatagrams()
+{
+    auto time = s_Node.clock.now();
+
+    std::set<uint32_t> erase;
+    for (auto it = s_DatagramData.begin(); it != s_DatagramData.end(); it++) {
+        if (it->second.timeout < time) {
+            erase.insert(it->first);
+        }
+    }
+
+    for (uint32_t i : erase) {
+        LOG_INFO("Erase: {}", i);
+        s_DatagramData.erase(i);
+    }
 }
 
 void setExitCallback(std::function<void()> func) { s_ExitFunc = func; }
@@ -283,6 +303,9 @@ QUIC_STATUS connectionCallback(HQUIC connection, void* context, QUIC_CONNECTION_
             s_DatagramData[messageID].receivedCount = 1;
             s_DatagramData[messageID].fragments.resize(header.fragment_count());
 
+            using namespace std::chrono_literals;
+            s_DatagramData[messageID].timeout = s_Node.clock.now() + 16ms;
+
             s_DatagramData[messageID].fragments[fragmentIndex].resize(buf->Length - headerSize - 1);
             memcpy(s_DatagramData[messageID].fragments[fragmentIndex].data(),
                 buf->Buffer + headerSize + 1, buf->Length - headerSize - 1);
@@ -293,11 +316,13 @@ QUIC_STATUS connectionCallback(HQUIC connection, void* context, QUIC_CONNECTION_
                 buf->Buffer + headerSize + 1, buf->Length - headerSize - 1);
         }
 
-        if (s_DatagramData[messageID].fragmentCount == s_DatagramData[messageID].receivedCount) {
+        cleanupDatagrams();
+
+        if (s_DatagramData.contains(messageID)
+            && s_DatagramData[messageID].fragmentCount == s_DatagramData[messageID].receivedCount) {
             handleDatagramData(messageID);
         }
 
-        /* cleanup old messages */
         break;
     }
     case QUIC_CONNECTION_EVENT_DATAGRAM_STATE_CHANGED:
