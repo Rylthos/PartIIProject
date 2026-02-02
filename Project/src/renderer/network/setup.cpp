@@ -207,7 +207,7 @@ void cleanup()
     }
 
     if (s_Node.connection != nullptr) {
-        s_QuicAPI->ConnectionClose(s_Node.connection);
+        s_QuicAPI->ConnectionShutdown(s_Node.connection, QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0);
     }
 
     cleanupQuic();

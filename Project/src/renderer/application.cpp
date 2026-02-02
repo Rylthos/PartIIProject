@@ -14,6 +14,7 @@
 #include "compression.hpp"
 #include "events/events.hpp"
 
+#include "network/callbacks.hpp"
 #include "network_proto/frame.pb.h"
 #include "network_proto/header.pb.h"
 #include "network_proto/update.pb.h"
@@ -226,11 +227,12 @@ void Application::start()
 
 void Application::cleanup()
 {
-    vkDeviceWaitIdle(m_VkDevice);
-
+    Network::removeCallbacks();
     if (m_Settings.netInfo.networked) {
         m_NetworkWriteLoop.request_stop();
     }
+
+    vkDeviceWaitIdle(m_VkDevice);
 
     ASManager::getManager()->cleanup();
 
@@ -265,6 +267,10 @@ void Application::cleanup()
         destroySwapchain();
     }
 
+    if (m_Settings.netInfo.networked) {
+        Network::cleanup();
+    }
+
     vmaDestroyAllocator(m_VmaAllocator);
     vkDestroyDevice(m_VkDevice, nullptr);
 
@@ -274,10 +280,6 @@ void Application::cleanup()
 
     vkb::destroy_debug_utils_messenger(m_VkInstance, m_VkDebugMessenger);
     vkDestroyInstance(m_VkInstance, nullptr);
-
-    if (m_Settings.netInfo.networked) {
-        Network::cleanup();
-    }
 
     m_Window->cleanup();
 
@@ -1204,6 +1206,10 @@ void Application::destroyQueryPool() { vkDestroyQueryPool(m_VkDevice, m_VkQueryP
 void Application::addCallbacks()
 {
     using namespace std::placeholders;
+
+    if (m_Settings.netInfo.networked) {
+        Network::setExitCallback([this]() { m_Window->requestClose(); });
+    }
 
     m_Window->subscribe(EventFamily::KEYBOARD, std::bind(&Application::handleKeyInput, this, _1));
     m_Window->subscribe(EventFamily::MOUSE, std::bind(&Application::handleMouse, this, _1));

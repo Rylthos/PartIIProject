@@ -23,4 +23,6 @@ void sendMessage(NetProto::Type headerType, const std::vector<uint8_t>& data);
 void addCallback(
     NetProto::Type headerType, std::function<bool(const std::vector<uint8_t>&, uint32_t)> callback);
 
+void removeCallbacks();
+
 };

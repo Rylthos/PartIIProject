@@ -147,6 +147,9 @@ void writeLoop(std::stop_token stoken)
 
             LOG_DEBUG("[NETWORK] sending: {} | {}", (uint8_t)type, std::get<2>(msg).size());
 
+            if (!s_Node.connection)
+                return;
+
             if (sendStream) {
                 quicStreamMessage(s_Node.connection, std::get<1>(msg), std::get<2>(msg));
             } else {
@@ -190,9 +193,16 @@ void sendMessage(NetProto::Type headerType, const std::vector<uint8_t>& data)
 void addCallback(
     NetProto::Type type, std::function<bool(const std::vector<uint8_t>&, uint32_t)> callback)
 {
-    std::unique_lock _lock(s_CallbackLock);
+    std::lock_guard _lock(s_CallbackLock);
 
     s_Callbacks[type].push_back(callback);
+}
+
+void removeCallbacks()
+{
+    std::lock_guard _lock(s_CallbackLock);
+
+    s_Callbacks.clear();
 }
 
 }

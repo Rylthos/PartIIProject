@@ -29,6 +29,8 @@ static std::unordered_map<uint32_t, DatagramMessage> s_DatagramData;
 static std::unordered_map<uint32_t, StreamMessage> s_StreamData;
 static std::unordered_map<HQUIC, uint32_t> s_StreamToMessage;
 
+static std::optional<std::function<void()>> s_ExitFunc;
+
 namespace Network {
 
 void getHeader(const std::vector<uint8_t>& data, NetProto::Header& header)
@@ -108,6 +110,8 @@ void handleDatagramData(uint32_t messageID)
 
     s_DatagramData.erase(messageID);
 }
+
+void setExitCallback(std::function<void()> func) { s_ExitFunc = func; }
 
 QUIC_STATUS streamCallback(HQUIC stream, void* context, QUIC_STREAM_EVENT* event)
 {
@@ -241,9 +245,14 @@ QUIC_STATUS connectionCallback(HQUIC connection, void* context, QUIC_CONNECTION_
         break;
     case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
         LOG_DEBUG("[conn][{}] All done", fmt::ptr(connection));
-        if (!event->SHUTDOWN_COMPLETE.AppCloseInProgress) {
-            s_QuicAPI->ConnectionClose(connection);
+        s_QuicAPI->ConnectionClose(connection);
+
+        s_Node.connection = nullptr;
+
+        if (s_ExitFunc.has_value()) {
+            s_ExitFunc.value()();
         }
+
         break;
     case QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED:
         LOG_DEBUG("[conn][{}] Resumption ticket received ({} bytes)", fmt::ptr(connection),
