@@ -17,3 +17,7 @@ message ReturnFileEntries {
 message ReturnDirEntries {
   repeated string dir_files = 1;
 }
+
+message LoadScene {
+  string scene = 1;
+}

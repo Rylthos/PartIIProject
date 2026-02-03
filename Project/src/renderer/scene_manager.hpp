@@ -29,6 +29,8 @@ class SceneManager {
     std::function<bool(const std::vector<uint8_t>&, uint32_t)> getHandleReturnFileEntries();
     std::function<bool(const std::vector<uint8_t>&, uint32_t)> getHandleReturnDirEntries();
 
+    std::function<bool(const std::vector<uint8_t>&, uint32_t)> getHandleLoadScene();
+
   private:
     SceneManager();
 
@@ -39,6 +41,10 @@ class SceneManager {
 
     bool handleReturnFileEntries(const std::vector<uint8_t>& data, uint32_t messageID);
     bool handleReturnDirEntries(const std::vector<uint8_t>& data, uint32_t messageID);
+
+    bool handleLoadScene(const std::vector<uint8_t>& data, uint32_t messageID);
+
+    void updateValidStructures();
 
     void getDirectories();
     void getFileEntries();

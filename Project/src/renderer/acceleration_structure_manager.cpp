@@ -154,18 +154,23 @@ void ASManager::setAS(ASType type)
 void ASManager::loadAS(
     std::filesystem::path path, bool validStructures[static_cast<uint8_t>(ASType::MAX_TYPE)])
 {
-    if (m_InitInfo.netInfo.enableClientSide)
-        return;
+    auto lambda = [=, this]() {
+        assert(m_CurrentAS);
 
-    assert(m_CurrentAS);
+        if (!validStructures[static_cast<uint8_t>(m_CurrentType)]) {
+            LOG_ERROR("Model is not supported for this structure");
+            return;
+        }
+        LOG_INFO("Load scene {}", path.string());
 
-    if (!validStructures[static_cast<uint8_t>(m_CurrentType)]) {
-        LOG_ERROR("Model is not supported for this structure");
-        return;
+        m_CurrentAS->fromFile(path);
+    };
+
+    if (m_InitInfo.netInfo.enableClientSide) {
+        m_Functions.push(lambda);
+    } else {
+        lambda();
     }
-    LOG_INFO("Load scene {}", path.string());
-
-    m_CurrentAS->fromFile(path);
 }
 
 void ASManager::updateShaders()

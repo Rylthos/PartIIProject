@@ -112,6 +112,9 @@ void Application::init(InitSettings settings)
 
             Network::addCallback(
                 NetProto::HEADER_TYPE_SET_AS, ASManager::getManager()->getHandleASChange());
+
+            Network::addCallback(
+                NetProto::HEADER_TYPE_LOAD_SCENE, SceneManager::getManager()->getHandleLoadScene());
         }
     }
 

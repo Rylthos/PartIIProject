@@ -56,6 +56,12 @@ std::function<bool(const std::vector<uint8_t>&, uint32_t)> SceneManager::getHand
     return std::bind(&SceneManager::handleReturnDirEntries, this, _1, _2);
 }
 
+std::function<bool(const std::vector<uint8_t>&, uint32_t)> SceneManager::getHandleLoadScene()
+{
+    using namespace std::placeholders;
+    return std::bind(&SceneManager::handleLoadScene, this, _1, _2);
+}
+
 void SceneManager::UI(const Event& event)
 {
     const FrameEvent& frameEvent = static_cast<const FrameEvent&>(event);
@@ -97,24 +103,31 @@ void SceneManager::UI(const Event& event)
             ImGui::SameLine();
 
             if (ImGui::Button("Load structure")) {
-                ASManager::getManager()->loadAS(m_SelectedPath, m_ValidStructures);
+                if (m_NetInfo.enableClientSide) {
+                    LOG_INFO("Request Scene: {}", m_SelectedPath.string());
+                    NetProto::LoadScene scene;
+                    scene.set_scene(m_SelectedPath.string());
+                    Network::sendMessage(NetProto::HEADER_TYPE_LOAD_SCENE, scene);
+                } else {
+                    ASManager::getManager()->loadAS(m_SelectedPath, m_ValidStructures);
+                }
             }
 
             {
-                auto addText = [&](const char* extension, const char* text, ASType type) {
+                updateValidStructures();
+                auto addText = [&](const char* text, ASType type) {
                     ImVec4 colour;
-                    bool valid = m_FileEntries.contains(extension);
-                    m_ValidStructures[static_cast<uint8_t>(type)] = valid;
+                    bool valid = m_ValidStructures[static_cast<uint8_t>(type)];
                     colour = valid ? ImVec4 { 0.0f, 1.0f, 0.0f, 1.0f }
                                    : ImVec4 { 1.0f, 0.0f, 0.0f, 1.0f };
                     ImGui::TextColored(colour, "%s", text);
                 };
 
-                addText(".voxgrid", "Grid", ASType::GRID);
-                addText(".voxtexture", "Texture", ASType::TEXTURE);
-                addText(".voxoctree", "Octree", ASType::OCTREE);
-                addText(".voxcontree", "Contree", ASType::CONTREE);
-                addText(".voxbrick", "Brickmap", ASType::BRICKMAP);
+                addText("Grid", ASType::GRID);
+                addText("Texture", ASType::TEXTURE);
+                addText("Octree", ASType::OCTREE);
+                addText("Contree", ASType::CONTREE);
+                addText("Brickmap", ASType::BRICKMAP);
             }
         }
         ImGui::End();
@@ -179,6 +192,36 @@ bool SceneManager::handleReturnDirEntries(const std::vector<uint8_t>& data, uint
     std::sort(m_Directories.begin(), m_Directories.end());
 
     return true;
+}
+
+bool SceneManager::handleLoadScene(const std::vector<uint8_t>& data, uint32_t messageID)
+{
+    NetProto::LoadScene scene;
+    scene.ParseFromArray(data.data(), data.size());
+
+    LOG_INFO("REQUEST SCENE: {}", scene.scene());
+
+    updateValidStructures();
+
+    ASManager::getManager()->loadAS(scene.scene(), m_ValidStructures);
+
+    return true;
+}
+
+void SceneManager::updateValidStructures()
+{
+    std::vector<std::pair<const char*, ASType>> points = {
+        { ".voxgrid",    ASType::GRID     },
+        { ".voxtexture", ASType::TEXTURE  },
+        { ".voxoctree",  ASType::OCTREE   },
+        { ".voxcontree", ASType::CONTREE  },
+        { ".voxbrick",   ASType::BRICKMAP },
+    };
+
+    for (const auto& pair : points) {
+        bool valid = m_FileEntries.contains(pair.first);
+        m_ValidStructures[static_cast<uint8_t>(pair.second)] = valid;
+    }
 }
 
 void SceneManager::getDirectories()
