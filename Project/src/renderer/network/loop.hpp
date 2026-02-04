@@ -16,8 +16,8 @@ void handleReceive(NetProto::Header& header, const std::vector<uint8_t>& data, u
 
 void writeLoop(std::stop_token stoken);
 
+void sendMessage(NetProto::Type headerType);
 void sendMessage(NetProto::Type headerType, const google::protobuf::Message& message);
-
 void sendMessage(NetProto::Type headerType, const std::vector<uint8_t>& data);
 
 void addCallback(

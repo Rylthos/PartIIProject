@@ -76,7 +76,18 @@ void Application::init(InitSettings settings)
 
     SceneManager::getManager()->init(m_Settings.netInfo);
 
+    if (clientSide()) {
+        m_Window = std::make_unique<GLFWWindow>();
+    } else {
+        m_Window = std::make_unique<HeadlessWindow>();
+    }
+
+    m_Window->init();
+
     if (m_Settings.netInfo.networked) {
+        glm::uvec2 size = m_Window->getWindowSize();
+        m_CompressionInfo = Compression::setup(size.x, size.y, m_Settings.netInfo.enableServerSide);
+
         if (m_Settings.netInfo.enableClientSide) {
             Network::initClient(settings.targetIP.c_str(), settings.targetPort);
 
@@ -106,6 +117,9 @@ void Application::init(InitSettings settings)
             Network::addCallback(NetProto::HEADER_TYPE_UPDATE,
                 std::bind(&Application::handleUpdateReceive, this, _1, _2));
 
+            Network::addCallback(NetProto::HEADER_TYPE_START_SENDING_FRAMES,
+                std::bind(&Application::handleStartFramesReceive, this, _1, _2));
+
             Network::addCallback(NetProto::HEADER_TYPE_REQUEST_DIR_ENTRIES,
                 SceneManager::getManager()->getHandleRequestDirEntries());
 
@@ -119,14 +133,6 @@ void Application::init(InitSettings settings)
                 NetProto::HEADER_TYPE_LOAD_SCENE, SceneManager::getManager()->getHandleLoadScene());
         }
     }
-
-    if (clientSide()) {
-        m_Window = std::make_unique<GLFWWindow>();
-    } else {
-        m_Window = std::make_unique<HeadlessWindow>();
-    }
-
-    m_Window->init();
 
     initVulkan();
 
@@ -196,6 +202,8 @@ void Application::init(InitSettings settings)
         update.mutable_window_size()->set_y(size.y);
 
         Network::sendMessage(NetProto::HEADER_TYPE_UPDATE, update);
+
+        Network::sendMessage(NetProto::HEADER_TYPE_START_SENDING_FRAMES);
     }
 
     LOG_DEBUG("Initialised application");
@@ -285,6 +293,8 @@ void Application::cleanup()
 
     vkb::destroy_debug_utils_messenger(m_VkInstance, m_VkDebugMessenger);
     vkDestroyInstance(m_VkInstance, nullptr);
+
+    Compression::cleanup(m_CompressionInfo);
 
     m_Window->cleanup();
 
@@ -479,15 +489,21 @@ void Application::createDrawImages()
         m_PerFrameData[i].drawImage.setDebugNameView("Draw image view");
 
         if (m_Settings.netInfo.networked) {
+            VkExtent3D networkExtent = extent;
+            networkExtent.width = (networkExtent.width + 1) & ~1;
+            networkExtent.height = (networkExtent.height + 1) & ~1;
+
             m_PerFrameData[i].networkImage.init(m_VkDevice, m_VmaAllocator,
-                m_GraphicsQueue->getFamily(), extent, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TYPE_2D,
+                m_GraphicsQueue->getFamily(), networkExtent, VK_FORMAT_R8G8B8A8_UNORM,
+                VK_IMAGE_TYPE_2D,
                 VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
             m_PerFrameData[i].networkImage.setDebugName("Network Image");
 
             m_PerFrameData[i].networkBuffer.init(m_VkDevice, m_VmaAllocator,
-                sizeof(uint32_t) * extent.width * extent.height,
+                sizeof(uint32_t) * networkExtent.width * networkExtent.height,
                 VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                 VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT, VMA_MEMORY_USAGE_AUTO);
+            m_PerFrameData[i].networkBuffer.setDebugName("Network buffer");
         }
     }
 
@@ -1429,7 +1445,12 @@ void Application::render()
             currentFrame.drawImage.transition(
                 commandBuffer, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
             currentFrame.networkImage.transition(
-                commandBuffer, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+                commandBuffer, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+            currentFrame.networkImage.copyFromBuffer(commandBuffer, currentFrame.networkBuffer);
+
+            currentFrame.networkImage.transition(commandBuffer,
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
             currentFrame.networkImage.copyToImage(commandBuffer, currentFrame.drawImage.getImage(),
                 currentFrame.networkImage.getExtent(), currentFrame.drawImage.getExtent());
@@ -1638,6 +1659,9 @@ void Application::render_NetworkImage(VkCommandBuffer& commandBuffer, PerFrameDa
     currentFrame.networkImage.transition(
         commandBuffer, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
+    currentFrame.drawImage.transition(
+        commandBuffer, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+
     currentFrame.drawImage.copyToImage(commandBuffer, currentFrame.networkImage.getImage(),
         currentFrame.drawImage.getExtent(), currentFrame.networkImage.getExtent());
 
@@ -1645,6 +1669,9 @@ void Application::render_NetworkImage(VkCommandBuffer& commandBuffer, PerFrameDa
         commandBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
     currentFrame.networkImage.copyToBuffer(commandBuffer, currentFrame.networkBuffer);
+
+    currentFrame.drawImage.transition(
+        commandBuffer, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
 }
 
 void Application::render_Screenshot(VkCommandBuffer& commandBuffer, PerFrameData& currentFrame)
@@ -1878,6 +1905,10 @@ void Application::resize()
     LOG_DEBUG("Resizing window");
     vkDeviceWaitIdle(m_VkDevice);
 
+    if (m_Settings.netInfo.networked) {
+        Compression::cleanup(m_CompressionInfo);
+    }
+
     if (serverSide()) {
         for (auto& frame : m_PerFrameData) {
             vkFreeDescriptorSets(m_VkDevice, m_VkDescriptorPool, 1, &frame.setupDescriptorSet);
@@ -1911,17 +1942,32 @@ void Application::resize()
 
         Network::sendMessage(NetProto::HEADER_TYPE_UPDATE, update);
     }
+
+    if (m_Settings.netInfo.networked) {
+        glm::uvec2 size = m_Window->getWindowSize();
+        m_CompressionInfo = Compression::setup(size.x, size.y, m_Settings.netInfo.enableServerSide);
+    }
 }
 
 void Application::transmitNetworkImage(PerFrameData& frame)
 {
-    LOG_INFO("TRANSMIT");
+    if (!m_CanTransmitFrames)
+        return;
 
     void* data = frame.networkBuffer.mapMemory();
 
     uint8_t* colourData = (uint8_t*)data;
 
-    LOG_INFO("TOP_LEFT {} {} {}", colourData[0], colourData[1], colourData[2]);
+    VkExtent3D size = frame.networkImage.getExtent();
+
+    std::vector<uint8_t> compressed
+        = Compression::compressVideoFrame(m_CompressionInfo, colourData, size.width, size.height);
+
+    NetProto::Frame networkFrame;
+    networkFrame.set_width(size.width);
+    networkFrame.set_height(size.height);
+    networkFrame.set_data(compressed.data(), compressed.size());
+    Network::sendMessage(NetProto::HEADER_TYPE_FRAME, networkFrame);
 
     frame.networkBuffer.unmapMemory();
 }
@@ -2004,49 +2050,26 @@ bool Application::handleFrameReceive(const std::vector<uint8_t>& data, uint32_t 
     NetProto::Frame frame;
     frame.ParseFromArray(data.data(), data.size());
 
-    glm::uvec2 windowSize = m_Window->getWindowSize();
-    if (frame.width() != windowSize.x || frame.height() != windowSize.y) {
+    glm::uvec2 size = m_Window->getWindowSize();
+    size.x = (size.x + 1) & ~1;
+    size.y = (size.y + 1) & ~1;
+
+    std::vector<uint8_t> rawData(frame.data().begin(), frame.data().end());
+    std::vector<uint8_t> uncompressed
+        = Compression::uncompressVideoFrame(m_CompressionInfo, rawData, size.x, size.y);
+
+    if (frame.width() != size.x || frame.height() != size.y) {
         return false;
     }
 
-    glm::uvec2 size { frame.width(), frame.height() };
+    for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
+        uint8_t* mapData = (uint8_t*)m_PerFrameData[i].networkBuffer.mapMemory();
 
-    // std::vector<uint8_t> rawData(frame.data().begin(), frame.data().end());
-    // std::vector<uint8_t> uncompressed = Compression::uncompress(rawData);
+        memcpy(mapData, uncompressed.data(), uncompressed.size());
 
-    // std::lock_guard _lock(m_NetworkImageMutex);
-    // {
-    //     VkImageSubresource subResource { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0 };
-    //     VkSubresourceLayout subResourceLayout;
-    //     vkGetImageSubresourceLayout(
-    //         m_VkDevice, m_NetworkImage.getImage(), &subResource, &subResourceLayout);
-    //
-    //     uint8_t* imageData;
-    //     vmaMapMemory(m_VmaAllocator, m_NetworkImage.getAllocation(), (void**)&imageData);
-    //
-    //     imageData += subResourceLayout.offset;
-    //
-    //     const uint32_t offset = 8;
-    //
-    //     for (uint32_t y = 0; y < size.y; y++) {
-    //         uint32_t* row = (uint32_t*)imageData;
-    //         for (uint32_t x = 0; x < size.x; x++) {
-    //             uint32_t index = (x + y * size.x) * 4 + offset;
-    //             ((uint8_t*)row)[0] = uncompressed[index + 0];
-    //             ((uint8_t*)row)[1] = uncompressed[index + 1];
-    //             ((uint8_t*)row)[2] = uncompressed[index + 2];
-    //             ((uint8_t*)row)[3] = uncompressed[index + 3];
-    //             row++;
-    //         }
-    //         imageData += subResourceLayout.rowPitch;
-    //     }
-    //
-    //     vmaUnmapMemory(m_VmaAllocator, m_NetworkImage.getAllocation());
-    // }
-
-    // for (size_t i = 0; i < m_PerFrameData.size(); i++) {
-    //     m_PerFrameData[i].dirty = true;
-    // }
+        m_PerFrameData[i].networkBuffer.unmapMemory();
+        m_PerFrameData[i].dirty = true;
+    }
 
     {
         previousID = messageID;
@@ -2056,6 +2079,13 @@ bool Application::handleFrameReceive(const std::vector<uint8_t>& data, uint32_t 
         m_PreviousGPUTime = diff.count();
         previousTime = time;
     }
+
+    return true;
+}
+
+bool Application::handleStartFramesReceive(const std::vector<uint8_t>& data, uint32_t messageID)
+{
+    m_CanTransmitFrames = true;
 
     return true;
 }

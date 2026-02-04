@@ -1,5 +1,6 @@
 #pragma once
 
+#include "compression.hpp"
 #include "logger/logger.hpp"
 
 #include "buffer.hpp"
@@ -73,6 +74,8 @@ class Application : public EventDispatcher {
 
     std::jthread m_NetworkWriteLoop;
 
+    Compression::CompressionInfo m_CompressionInfo;
+
     std::unique_ptr<Window> m_Window;
 
     VkInstance m_VkInstance;
@@ -132,6 +135,8 @@ class Application : public EventDispatcher {
 
     std::queue<std::function<void()>> m_ThreadFunctions;
     std::mutex m_ThreadFunctionsMutex;
+
+    bool m_CanTransmitFrames = false;
 
   private:
     void initVulkan();
@@ -223,6 +228,7 @@ class Application : public EventDispatcher {
     void takeScreenshot(std::string filename);
 
     bool handleFrameReceive(const std::vector<uint8_t>& data, uint32_t messageID);
+    bool handleStartFramesReceive(const std::vector<uint8_t>& data, uint32_t messageID);
     bool handleUpdateReceive(const std::vector<uint8_t>& data, uint32_t messageID);
 
     bool serverSide()

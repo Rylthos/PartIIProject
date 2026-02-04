@@ -206,6 +206,30 @@ void Image::copyToBuffer(VkCommandBuffer cmd, Buffer& buffer)
         cmd, getImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, buffer.getBuffer(), 1, &region);
 }
 
+void Image::copyFromBuffer(VkCommandBuffer cmd, Buffer& buffer)
+{
+    VkBufferImageCopy region = {
+        .bufferOffset = 0,
+        .bufferRowLength = 0,
+        .bufferImageHeight = 0,
+        .imageSubresource = {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .mipLevel = 0,
+            .baseArrayLayer = 0,
+            .layerCount = 1,
+        },
+        .imageOffset = VkOffset3D {
+            .x = 0,
+            .y = 0,
+            .z = 0,
+        },
+        .imageExtent = getExtent(),
+    };
+
+    vkCmdCopyBufferToImage(
+        cmd, buffer.getBuffer(), getImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+}
+
 void Image::setDebugName(const std::string& name)
 {
     Debug::setDebugName(m_Device, VK_OBJECT_TYPE_IMAGE, (uint64_t)m_Image, name.c_str());

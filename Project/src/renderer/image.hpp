@@ -33,6 +33,7 @@ class Image {
     void copyToImage(VkCommandBuffer cmd, VkImage dst, VkExtent3D srcSize, VkExtent3D dstSize);
 
     void copyToBuffer(VkCommandBuffer cmd, Buffer& buffer);
+    void copyFromBuffer(VkCommandBuffer cmd, Buffer& buffer);
 
     void setDebugName(const std::string& name);
     void setDebugNameView(const std::string& name);

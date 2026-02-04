@@ -164,6 +164,12 @@ void writeLoop(std::stop_token stoken)
     }
 }
 
+void sendMessage(NetProto::Type headerType)
+{
+    std::vector<uint8_t> data {};
+    sendMessage(headerType, data);
+}
+
 void sendMessage(NetProto::Type headerType, const google::protobuf::Message& message)
 {
     std::vector<uint8_t> data(message.ByteSizeLong());
