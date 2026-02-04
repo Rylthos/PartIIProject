@@ -5,6 +5,8 @@
 
 #include <string>
 
+class Buffer;
+
 class Image {
   public:
     Image();
@@ -29,6 +31,8 @@ class Image {
 
     void transition(VkCommandBuffer cmd, VkImageLayout current, VkImageLayout target);
     void copyToImage(VkCommandBuffer cmd, VkImage dst, VkExtent3D srcSize, VkExtent3D dstSize);
+
+    void copyToBuffer(VkCommandBuffer cmd, Buffer& buffer);
 
     void setDebugName(const std::string& name);
     void setDebugNameView(const std::string& name);

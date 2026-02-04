@@ -4,6 +4,8 @@
 
 #include "logger/logger.hpp"
 
+#include "buffer.hpp"
+
 #include <vulkan/vulkan_core.h>
 
 Image::~Image() { }
@@ -178,6 +180,30 @@ void Image::copyToImage(VkCommandBuffer cmd, VkImage dst, VkExtent3D srcSize, Vk
     blitInfo.filter = VK_FILTER_LINEAR;
 
     vkCmdBlitImage2(cmd, &blitInfo);
+}
+
+void Image::copyToBuffer(VkCommandBuffer cmd, Buffer& buffer)
+{
+    VkBufferImageCopy region = {
+        .bufferOffset = 0,
+        .bufferRowLength = 0,
+        .bufferImageHeight = 0,
+        .imageSubresource = {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .mipLevel = 0,
+            .baseArrayLayer = 0,
+            .layerCount = 1,
+        },
+        .imageOffset = VkOffset3D {
+            .x = 0,
+            .y = 0,
+            .z = 0,
+        },
+        .imageExtent = getExtent(),
+    };
+
+    vkCmdCopyImageToBuffer(
+        cmd, getImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, buffer.getBuffer(), 1, &region);
 }
 
 void Image::setDebugName(const std::string& name)

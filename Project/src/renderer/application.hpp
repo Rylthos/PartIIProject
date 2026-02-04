@@ -2,6 +2,7 @@
 
 #include "logger/logger.hpp"
 
+#include "buffer.hpp"
 #include "camera.hpp"
 #include "image.hpp"
 #include "queue.hpp"
@@ -39,6 +40,9 @@ struct PerFrameData {
 
     Image drawImage;
     Image rayDirectionImage;
+
+    Image networkImage;
+    Buffer networkBuffer;
 
     VkDescriptorSet setupDescriptorSet;
     VkDescriptorSet gBufferDescriptorSet;
@@ -93,9 +97,6 @@ class Application : public EventDispatcher {
 
     Image m_ScreenshotImage;
 
-    Image m_NetworkImage;
-    std::mutex m_NetworkImageMutex;
-
     VkCommandPool m_GeneralPool;
     std::array<PerFrameData, FRAMES_IN_FLIGHT> m_PerFrameData;
 
@@ -142,7 +143,6 @@ class Application : public EventDispatcher {
     void createGBuffers();
     void createDrawImages();
     void createRayDirectionImages();
-    void createNetworkImage();
     void destroyImages();
 
     void createCommandPools();
@@ -199,6 +199,7 @@ class Application : public EventDispatcher {
     void render_RayGeneration(VkCommandBuffer& commandBuffer, PerFrameData& currentFrame);
     void render_ASRender(VkCommandBuffer& commandBuffer, PerFrameData& currentFrame);
     void render_GBuffer(VkCommandBuffer& commandBuffer, PerFrameData& currentFrame);
+    void render_NetworkImage(VkCommandBuffer& commandBuffer, PerFrameData& currentFrame);
     void render_Screenshot(VkCommandBuffer& commandBuffer, PerFrameData& currentFrame);
     void render_UI(VkCommandBuffer& commandBuffer, PerFrameData& currentFrame);
     void render_Present(
@@ -210,6 +211,8 @@ class Application : public EventDispatcher {
     void update(float delta);
 
     void resize();
+
+    void transmitNetworkImage(PerFrameData& frame);
 
     void handleKeyInput(const Event& event);
     void handleMouse(const Event& event);

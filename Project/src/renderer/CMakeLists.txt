@@ -71,5 +71,5 @@ target_link_libraries(Renderer PRIVATE
   CLI11::CLI11
   protobuf::libprotobuf
   msquic
-  ZLIB::ZLIB
+  PkgConfig::LIBAV
 )
