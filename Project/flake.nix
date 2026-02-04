@@ -27,9 +27,12 @@
           gnumake
           ninja
 
+          pkg-config
+
           protobuf_33
 
           zlib
+          ffmpeg_7-headless
 
           libmsquic
           openssl
