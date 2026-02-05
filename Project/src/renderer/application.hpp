@@ -1,10 +1,10 @@
 #pragma once
 
-#include "compression.hpp"
 #include "logger/logger.hpp"
 
 #include "buffer.hpp"
 #include "camera.hpp"
+#include "encoder.hpp"
 #include "image.hpp"
 #include "queue.hpp"
 #include "window/base_window.hpp"
@@ -74,7 +74,7 @@ class Application : public EventDispatcher {
 
     std::jthread m_NetworkWriteLoop;
 
-    Compression::CompressionInfo m_CompressionInfo;
+    Encoder::EncoderInfo m_EncoderInfo;
 
     std::unique_ptr<Window> m_Window;
 

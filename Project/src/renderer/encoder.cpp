@@ -1,4 +1,4 @@
-#include "compression.hpp"
+#include "encoder.hpp"
 
 #include <cassert>
 #include <filesystem>
@@ -13,14 +13,14 @@ extern "C" {
 
 #include <logger/logger.hpp>
 
-namespace Compression {
+namespace Encoder {
 
-CompressionInfo setup(uint32_t width, uint32_t height, bool encode)
+EncoderInfo setup(uint32_t width, uint32_t height, bool encode)
 {
     width = (width + 1) & ~1;
     height = (height + 1) & ~1;
 
-    CompressionInfo info;
+    EncoderInfo info;
     if (encode) {
         info.codec = avcodec_find_encoder(AV_CODEC_ID_H264);
     } else {
@@ -52,8 +52,8 @@ CompressionInfo setup(uint32_t width, uint32_t height, bool encode)
 
     info.context->bit_rate = 6000000;
 
-    av_opt_set(info.context->priv_data, "preset", "superfast", 0);
-    av_opt_set(info.context->priv_data, "crf", "40", 0);
+    av_opt_set(info.context->priv_data, "preset", "ultrafast", 0);
+    av_opt_set(info.context->priv_data, "crf", "30", 0);
     av_opt_set(info.context->priv_data, "tune", "zerolatency", 0);
 
     if (avcodec_open2(info.context, info.codec, nullptr) < 0) {
@@ -97,7 +97,7 @@ CompressionInfo setup(uint32_t width, uint32_t height, bool encode)
     return info;
 }
 
-std::vector<uint8_t> compressVideoFrame(CompressionInfo& info, uint8_t* data, int width, int height)
+std::vector<uint8_t> compressVideoFrame(EncoderInfo& info, uint8_t* data, int width, int height)
 {
     if (av_frame_make_writable(info.frame) < 0) {
         LOG_ERROR("Frame data not writable");
@@ -126,7 +126,7 @@ std::vector<uint8_t> compressVideoFrame(CompressionInfo& info, uint8_t* data, in
 }
 
 std::vector<uint8_t> uncompressVideoFrame(
-    CompressionInfo& info, const std::vector<uint8_t>& data, int width, int height)
+    EncoderInfo& info, const std::vector<uint8_t>& data, int width, int height)
 {
     av_packet_unref(info.packet);
 
@@ -173,7 +173,7 @@ std::vector<uint8_t> uncompressVideoFrame(
     return returnData;
 }
 
-void cleanup(CompressionInfo info)
+void cleanup(EncoderInfo info)
 {
     av_packet_free(&info.packet);
     av_frame_free(&info.frame);

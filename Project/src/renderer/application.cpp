@@ -14,7 +14,7 @@
 #include "CLI/CLI.hpp"
 #include "animation_manager.hpp"
 #include "buffer.hpp"
-#include "compression.hpp"
+#include "encoder.hpp"
 #include "events/events.hpp"
 
 #include "network/callbacks.hpp"
@@ -86,7 +86,7 @@ void Application::init(InitSettings settings)
 
     if (m_Settings.netInfo.networked) {
         glm::uvec2 size = m_Window->getWindowSize();
-        m_CompressionInfo = Compression::setup(size.x, size.y, m_Settings.netInfo.enableServerSide);
+        m_EncoderInfo = Encoder::setup(size.x, size.y, m_Settings.netInfo.enableServerSide);
 
         if (m_Settings.netInfo.enableClientSide) {
             Network::initClient(settings.targetIP.c_str(), settings.targetPort);
@@ -294,7 +294,7 @@ void Application::cleanup()
     vkb::destroy_debug_utils_messenger(m_VkInstance, m_VkDebugMessenger);
     vkDestroyInstance(m_VkInstance, nullptr);
 
-    Compression::cleanup(m_CompressionInfo);
+    Encoder::cleanup(m_EncoderInfo);
 
     m_Window->cleanup();
 
@@ -1906,7 +1906,7 @@ void Application::resize()
     vkDeviceWaitIdle(m_VkDevice);
 
     if (m_Settings.netInfo.networked) {
-        Compression::cleanup(m_CompressionInfo);
+        Encoder::cleanup(m_EncoderInfo);
     }
 
     if (serverSide()) {
@@ -1945,7 +1945,7 @@ void Application::resize()
 
     if (m_Settings.netInfo.networked) {
         glm::uvec2 size = m_Window->getWindowSize();
-        m_CompressionInfo = Compression::setup(size.x, size.y, m_Settings.netInfo.enableServerSide);
+        m_EncoderInfo = Encoder::setup(size.x, size.y, m_Settings.netInfo.enableServerSide);
     }
 }
 
@@ -1961,7 +1961,7 @@ void Application::transmitNetworkImage(PerFrameData& frame)
     VkExtent3D size = frame.networkImage.getExtent();
 
     std::vector<uint8_t> compressed
-        = Compression::compressVideoFrame(m_CompressionInfo, colourData, size.width, size.height);
+        = Encoder::compressVideoFrame(m_EncoderInfo, colourData, size.width, size.height);
 
     NetProto::Frame networkFrame;
     networkFrame.set_width(size.width);
@@ -2056,7 +2056,7 @@ bool Application::handleFrameReceive(const std::vector<uint8_t>& data, uint32_t 
 
     std::vector<uint8_t> rawData(frame.data().begin(), frame.data().end());
     std::vector<uint8_t> uncompressed
-        = Compression::uncompressVideoFrame(m_CompressionInfo, rawData, size.x, size.y);
+        = Encoder::uncompressVideoFrame(m_EncoderInfo, rawData, size.x, size.y);
 
     if (frame.width() != size.x || frame.height() != size.y) {
         return false;
