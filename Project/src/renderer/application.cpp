@@ -249,9 +249,8 @@ void Application::cleanup()
     Network::removeCallbacks();
     if (m_Settings.netInfo.networked) {
         m_NetworkWriteLoop.request_stop();
+        m_VideoThread.request_stop();
     }
-
-    m_VideoThread.request_stop();
 
     vkDeviceWaitIdle(m_VkDevice);
 
@@ -302,7 +301,9 @@ void Application::cleanup()
     vkb::destroy_debug_utils_messenger(m_VkInstance, m_VkDebugMessenger);
     vkDestroyInstance(m_VkInstance, nullptr);
 
-    Encoder::cleanup(m_EncoderInfo);
+    if (m_Settings.netInfo.networked) {
+        Encoder::cleanup(m_EncoderInfo);
+    }
 
     m_Window->cleanup();
 
