@@ -136,6 +136,11 @@ class Application : public EventDispatcher {
     std::queue<std::function<void()>> m_ThreadFunctions;
     std::mutex m_ThreadFunctionsMutex;
 
+    std::mutex m_NetworkMutex;
+    std::mutex m_VideoMutex;
+    std::optional<std::tuple<uint32_t, uint32_t, std::vector<uint8_t>>> m_VideoData;
+    std::jthread m_VideoThread;
+
     bool m_CanTransmitFrames = false;
 
   private:
@@ -226,6 +231,9 @@ class Application : public EventDispatcher {
     void handleCameraEvent(const Event& event);
 
     void takeScreenshot(std::string filename);
+
+    void videoEncodeThread(std::stop_token stoken);
+    void videoDecodeThread(std::stop_token stoken);
 
     bool handleFrameReceive(const std::vector<uint8_t>& data, uint32_t messageID);
     bool handleStartFramesReceive(const std::vector<uint8_t>& data, uint32_t messageID);

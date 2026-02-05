@@ -111,6 +111,9 @@ void Application::init(InitSettings settings)
 
             Network::addCallback(NetProto::HEADER_TYPE_RETURN_FILE_ENTRIES,
                 SceneManager::getManager()->getHandleReturnFileEntries());
+
+            m_VideoThread
+                = std::jthread([this](std::stop_token stoken) { videoDecodeThread(stoken); });
         }
 
         if (m_Settings.netInfo.enableServerSide) {
@@ -131,6 +134,9 @@ void Application::init(InitSettings settings)
 
             Network::addCallback(
                 NetProto::HEADER_TYPE_LOAD_SCENE, SceneManager::getManager()->getHandleLoadScene());
+
+            m_VideoThread
+                = std::jthread([this](std::stop_token stoken) { videoEncodeThread(stoken); });
         }
     }
 
@@ -244,6 +250,8 @@ void Application::cleanup()
     if (m_Settings.netInfo.networked) {
         m_NetworkWriteLoop.request_stop();
     }
+
+    m_VideoThread.request_stop();
 
     vkDeviceWaitIdle(m_VkDevice);
 
@@ -1917,6 +1925,8 @@ void Application::resize()
         }
     }
 
+    m_NetworkMutex.lock();
+
     destroySyncStructures();
     destroyImages();
 
@@ -1928,6 +1938,8 @@ void Application::resize()
 
     createImages();
     createSyncStructures();
+
+    m_NetworkMutex.unlock();
 
     if (serverSide()) {
         createDescriptors();
@@ -1956,20 +1968,15 @@ void Application::transmitNetworkImage(PerFrameData& frame)
 
     void* data = frame.networkBuffer.mapMemory();
 
-    uint8_t* colourData = (uint8_t*)data;
-
     VkExtent3D size = frame.networkImage.getExtent();
 
-    std::vector<uint8_t> compressed
-        = Encoder::compressVideoFrame(m_EncoderInfo, colourData, size.width, size.height);
-
-    NetProto::Frame networkFrame;
-    networkFrame.set_width(size.width);
-    networkFrame.set_height(size.height);
-    networkFrame.set_data(compressed.data(), compressed.size());
-    Network::sendMessage(NetProto::HEADER_TYPE_FRAME, networkFrame);
+    std::vector<uint8_t> vec(size.width * size.height * sizeof(uint32_t));
+    memcpy(vec.data(), data, vec.size());
 
     frame.networkBuffer.unmapMemory();
+
+    std::lock_guard _lock(m_VideoMutex);
+    m_VideoData = std::make_tuple(size.width, size.height, vec);
 }
 
 void Application::handleKeyInput(const Event& event)
@@ -2036,11 +2043,83 @@ void Application::handleCameraEvent(const Event& event)
 
 void Application::takeScreenshot(std::string filename) { m_TakeScreenshot = filename; }
 
-bool Application::handleFrameReceive(const std::vector<uint8_t>& data, uint32_t messageID)
+void Application::videoEncodeThread(std::stop_token stoken)
+{
+    while (!stoken.stop_requested()) {
+        if (m_VideoData.has_value()) {
+            std::lock_guard _lock(m_VideoMutex);
+
+            uint32_t width, height;
+            std::vector<uint8_t> data;
+            std::tie(width, height, data) = m_VideoData.value();
+
+            std::vector<uint8_t> compressed
+                = Encoder::compressVideoFrame(m_EncoderInfo, data.data(), width, height);
+
+            {
+                NetProto::Frame networkFrame;
+                networkFrame.set_width(width);
+                networkFrame.set_height(height);
+                networkFrame.set_data(compressed.data(), compressed.size());
+                Network::sendMessage(NetProto::HEADER_TYPE_FRAME, networkFrame);
+            }
+
+            m_VideoData.reset();
+        }
+    }
+}
+
+void Application::videoDecodeThread(std::stop_token stoken)
 {
     static std::chrono::steady_clock clock;
     static auto previousTime = clock.now();
 
+    while (!stoken.stop_requested()) {
+        if (m_VideoData.has_value()) {
+            std::lock_guard _lock(m_VideoMutex);
+
+            uint32_t width, height;
+            std::vector<uint8_t> data;
+            std::tie(width, height, data) = m_VideoData.value();
+
+            glm::uvec2 size = m_Window->getWindowSize();
+            size.x = (size.x + 1) & ~1;
+            size.y = (size.y + 1) & ~1;
+
+            std::vector<uint8_t> uncompressed
+                = Encoder::uncompressVideoFrame(m_EncoderInfo, data, size.x, size.y);
+
+            if (width != size.x || height != size.y)
+                continue;
+
+            {
+                std::lock_guard _lock2(m_ThreadFunctionsMutex);
+                m_ThreadFunctions.push([=, this]() {
+                    std::lock_guard _lock3(m_NetworkMutex);
+                    for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
+                        uint8_t* mapData = (uint8_t*)m_PerFrameData[i].networkBuffer.mapMemory();
+
+                        memcpy(mapData, uncompressed.data(), uncompressed.size());
+
+                        m_PerFrameData[i].networkBuffer.unmapMemory();
+                        m_PerFrameData[i].dirty = true;
+                    }
+
+                    auto time = clock.now();
+
+                    std::chrono::duration<float, std::milli> diff = time - previousTime;
+                    m_PreviousGPUTime = diff.count();
+                    previousTime = time;
+                });
+            }
+
+            m_VideoData.reset();
+        }
+    }
+}
+
+bool Application::handleFrameReceive(const std::vector<uint8_t>& data, uint32_t messageID)
+{
     static uint32_t previousID = 0;
 
     if (messageID < previousID) {
@@ -2050,35 +2129,14 @@ bool Application::handleFrameReceive(const std::vector<uint8_t>& data, uint32_t 
     NetProto::Frame frame;
     frame.ParseFromArray(data.data(), data.size());
 
-    glm::uvec2 size = m_Window->getWindowSize();
-    size.x = (size.x + 1) & ~1;
-    size.y = (size.y + 1) & ~1;
-
     std::vector<uint8_t> rawData(frame.data().begin(), frame.data().end());
-    std::vector<uint8_t> uncompressed
-        = Encoder::uncompressVideoFrame(m_EncoderInfo, rawData, size.x, size.y);
-
-    if (frame.width() != size.x || frame.height() != size.y) {
-        return false;
-    }
-
-    for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
-        uint8_t* mapData = (uint8_t*)m_PerFrameData[i].networkBuffer.mapMemory();
-
-        memcpy(mapData, uncompressed.data(), uncompressed.size());
-
-        m_PerFrameData[i].networkBuffer.unmapMemory();
-        m_PerFrameData[i].dirty = true;
-    }
 
     {
-        previousID = messageID;
-        auto time = clock.now();
-
-        std::chrono::duration<float, std::milli> diff = time - previousTime;
-        m_PreviousGPUTime = diff.count();
-        previousTime = time;
+        std::lock_guard _lock(m_VideoMutex);
+        m_VideoData = std::make_tuple(frame.width(), frame.height(), rawData);
     }
+
+    previousID = messageID;
 
     return true;
 }
