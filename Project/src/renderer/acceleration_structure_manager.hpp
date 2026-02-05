@@ -82,6 +82,12 @@ class ASManager {
         return std::bind(&ASManager::handleASChange, this, _1, _2);
     }
 
+    std::function<bool(const std::vector<uint8_t>&, uint32_t)> getHandleUpdate()
+    {
+        using namespace std::placeholders;
+        return std::bind(&ASManager::handleUpdate, this, _1, _2);
+    }
+
     uint64_t getMemoryUsage();
     uint64_t getVoxels();
     uint64_t getNodes();
@@ -102,6 +108,7 @@ class ASManager {
     void mouse(const Event& event);
 
     bool handleASChange(const std::vector<uint8_t>& data, uint32_t messageID);
+    bool handleUpdate(const std::vector<uint8_t>& data, uint32_t messageID);
 
   private:
     ASStructInfo m_InitInfo;

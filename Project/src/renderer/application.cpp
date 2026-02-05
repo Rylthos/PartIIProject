@@ -131,6 +131,8 @@ void Application::init(InitSettings settings)
 
             Network::addCallback(
                 NetProto::HEADER_TYPE_SET_AS, ASManager::getManager()->getHandleASChange());
+            Network::addCallback(
+                NetProto::HEADER_TYPE_UPDATE, ASManager::getManager()->getHandleUpdate());
 
             Network::addCallback(
                 NetProto::HEADER_TYPE_LOAD_SCENE, SceneManager::getManager()->getHandleLoadScene());
@@ -1915,6 +1917,7 @@ void Application::resize()
     vkDeviceWaitIdle(m_VkDevice);
 
     if (m_Settings.netInfo.networked) {
+        m_VideoMutex.lock();
         Encoder::cleanup(m_EncoderInfo);
     }
 
@@ -1959,6 +1962,7 @@ void Application::resize()
     if (m_Settings.netInfo.networked) {
         glm::uvec2 size = m_Window->getWindowSize();
         m_EncoderInfo = Encoder::setup(size.x, size.y, m_Settings.netInfo.enableServerSide);
+        m_VideoMutex.unlock();
     }
 }
 
@@ -2185,5 +2189,5 @@ bool Application::handleUpdateReceive(const std::vector<uint8_t>& data, uint32_t
         });
     }
 
-    return true;
+    return false;
 }

@@ -6,7 +6,9 @@
 #include <memory>
 
 #include "network/loop.hpp"
+#include "network_proto/header.pb.h"
 #include "network_proto/messages.pb.h"
+#include "network_proto/update.pb.h"
 
 #include "accelerationStructures/acceleration_structure.hpp"
 #include "accelerationStructures/brickmap.hpp"
@@ -303,6 +305,11 @@ void ASManager::UI(const Event& event)
                 }
                 if (ImGui::IsItemDeactivatedAfterEdit()) {
                     updateShader = true;
+
+                    LOG_INFO("UPDATE STEPS");
+                    NetProto::Update update;
+                    update.set_step_count(stepLimit);
+                    Network::sendMessage(NetProto::HEADER_TYPE_UPDATE, update);
                 }
             }
 
@@ -556,4 +563,25 @@ bool ASManager::handleASChange(const std::vector<uint8_t>& data, uint32_t messag
     m_Functions.push([this, type]() { setAS(type); });
 
     return true;
+}
+
+bool ASManager::handleUpdate(const std::vector<uint8_t>& data, uint32_t messageID)
+{
+    NetProto::Update update;
+    update.ParseFromArray(data.data(), data.size());
+
+    bool shouldUpdate = false;
+    if (update.has_step_count()) {
+        LOG_INFO("UPDATE STEPS");
+        ShaderManager::getInstance()->setMacro(
+            "STEP_LIMIT", std::format("{}", update.step_count()));
+
+        shouldUpdate = true;
+    }
+
+    if (shouldUpdate) {
+        updateShaders();
+    }
+
+    return false;
 }

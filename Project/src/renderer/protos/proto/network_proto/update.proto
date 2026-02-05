@@ -19,8 +19,10 @@ message Vec2 {
 }
 
 message Update {
-  UVec2 window_size = 1;
+  optional UVec2 window_size = 1;
 
-  Vec3 camera_position = 2;
-  Vec2 camera_rotation = 3;
+  optional Vec3 camera_position = 2;
+  optional Vec2 camera_rotation = 3;
+
+  optional uint32 step_count = 5;
 }
