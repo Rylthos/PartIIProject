@@ -567,6 +567,12 @@ bool ASManager::handleASChange(const std::vector<uint8_t>& data, uint32_t messag
 
 bool ASManager::handleUpdate(const std::vector<uint8_t>& data, uint32_t messageID)
 {
+    static uint32_t previousMessage = 0;
+    if (messageID < previousMessage) {
+        return false;
+    }
+    previousMessage = messageID;
+
     NetProto::Update update;
     update.ParseFromArray(data.data(), data.size());
 

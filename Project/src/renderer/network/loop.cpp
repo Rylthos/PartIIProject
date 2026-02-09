@@ -136,13 +136,9 @@ void writeLoop(std::stop_token stoken)
 
             NetProto::Type type = std::get<0>(msg);
 
-            bool sendStream = true;
-            switch (type) {
-            case NetProto::HEADER_TYPE_FRAME:
-                sendStream = false;
-                break;
-            default:
-                break;
+            bool sendStream = false;
+            if (static_cast<int32_t>(type) >= 1000) {
+                sendStream = true;
             }
 
             LOG_DEBUG("[NETWORK] sending: {} | {}", (uint8_t)type, std::get<2>(msg).size());

@@ -2164,6 +2164,13 @@ bool Application::handleStartFramesReceive(const std::vector<uint8_t>& data, uin
 
 bool Application::handleUpdateReceive(const std::vector<uint8_t>& data, uint32_t messageID)
 {
+    static uint32_t previousMessage = 0;
+
+    if (messageID < previousMessage) {
+        return false;
+    }
+    previousMessage = messageID;
+
     NetProto::Update update;
     update.ParseFromArray(data.data(), data.size());
 
