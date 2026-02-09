@@ -1392,8 +1392,9 @@ void Application::render()
 
     VK_CHECK(vkResetFences(m_VkDevice, 1, &currentFrame.fence), "Reset fence");
 
-    if (m_Settings.netInfo.enableServerSide) {
+    if (m_Settings.netInfo.enableServerSide && m_ShouldTransmitImage) {
         transmitNetworkImage(currentFrame);
+        m_ShouldTransmitImage = false;
     }
 
     uint32_t swapchainImageIndex = 0;
@@ -1886,9 +1887,12 @@ void Application::renderImGui(VkCommandBuffer& commandBuffer, const PerFrameData
 
 void Application::update(float delta)
 {
+    static float timePassed = 0.0f;
+
     m_CurrentFrameIndex = (m_CurrentFrameIndex + 1) % FRAMES_IN_FLIGHT;
 
     m_PreviousFrameTime = delta;
+    timePassed += delta;
 
     ShaderManager::getInstance()->updateShaders();
     FrameCommands::getInstance()->commit();
@@ -1908,6 +1912,11 @@ void Application::update(float delta)
             (m_ThreadFunctions.front())();
             m_ThreadFunctions.pop();
         }
+    }
+
+    if (timePassed > 1.f / 60.f) {
+        timePassed = 0.f;
+        m_ShouldTransmitImage = true;
     }
 }
 

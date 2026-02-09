@@ -136,6 +136,7 @@ class Application : public EventDispatcher {
     std::queue<std::function<void()>> m_ThreadFunctions;
     std::mutex m_ThreadFunctionsMutex;
 
+    bool m_ShouldTransmitImage = false;
     std::mutex m_NetworkMutex;
     std::mutex m_VideoMutex;
     std::optional<std::tuple<uint32_t, uint32_t, std::vector<uint8_t>>> m_VideoData;
