@@ -20,6 +20,8 @@ EncoderInfo setup(uint32_t width, uint32_t height, bool encode)
     width = (width + 1) & ~1;
     height = (height + 1) & ~1;
 
+    av_log_set_level(AV_LOG_QUIET);
+
     EncoderInfo info;
     if (encode) {
         info.codec = avcodec_find_encoder(AV_CODEC_ID_H264);
@@ -38,15 +40,15 @@ EncoderInfo setup(uint32_t width, uint32_t height, bool encode)
         exit(-1);
     }
 
-    info.context->time_base = { 1, 30 };
-    info.context->framerate = { 30, 1 };
+    info.context->time_base = { 1, 60 };
+    info.context->framerate = { 60, 1 };
 
     info.context->pix_fmt = AV_PIX_FMT_YUV420P;
 
     info.context->width = width;
     info.context->height = height;
 
-    info.context->gop_size = 10;
+    info.context->gop_size = 30;
     info.context->max_b_frames = 0;
     info.context->refs = 3;
 
