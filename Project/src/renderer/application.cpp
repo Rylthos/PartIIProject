@@ -234,6 +234,13 @@ void Application::start()
         auto current = timer.now();
         std::chrono::duration<float, std::milli> difference = current - previous;
         float delta = difference.count() / 1000.f;
+
+        if (m_Settings.netInfo.enableServerSide) {
+            if (difference.count() < (1. / 60.f)) {
+                continue;
+            }
+        }
+
         previous = current;
 
         if (clientSide()) {
